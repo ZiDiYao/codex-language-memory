@@ -528,10 +528,10 @@ input[role="switch"]:checked::after {
 .history-entry summary:focus-visible { outline: 2px solid var(--muted); border-radius: 12px; }
 .entry-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto 10px; align-items: center; gap: 10px; }
 .entry-heading h3 { font-size: 16px; font-weight: 550; overflow-wrap: anywhere; }
-.entry-status { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 3px 8px; color: var(--muted); background: transparent; border-color: transparent; border-radius: 6px; font-size: 11px; font-weight: 400; white-space: nowrap; }
-.entry-status::before { content: ""; width: 11px; height: 11px; border: 1px solid currentColor; border-radius: 50%; }
-.entry-status[aria-pressed="true"] { color: var(--text); background: var(--raised); }
-.entry-status[aria-pressed="true"]::before { content: "\2713"; display: grid; place-items: center; font-size: 9px; line-height: 1; }
+.entry-status-group { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.entry-status { min-height: 28px; padding: 3px 9px; color: var(--muted); background: transparent; border: 0; border-radius: 5px; font-size: 11px; font-weight: 450; white-space: nowrap; }
+.entry-status:hover:not(:disabled) { color: var(--text); }
+.entry-status[aria-pressed="true"] { color: var(--text); background: var(--hover); box-shadow: 0 1px 3px #0002; }
 .entry-chevron { width: 7px; height: 7px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: translateY(-2px) rotate(45deg); transition: transform 200ms var(--ease); }
 summary[aria-expanded="true"] .entry-chevron { transform: translateY(2px) rotate(225deg); }
 .entry-preview { margin: 3px 0; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }

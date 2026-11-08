@@ -59,7 +59,8 @@ export class EntryEditor {
   }
 
   reflect(key) {
-    this.feedback.textContent = this.t(key);
+    this.footer.hidden = !this.error;
+    this.feedback.textContent = this.error ? this.t(key) : "";
     this.feedback.classList.toggle("error", !!this.error);
     this.retry.hidden = !this.error || this.error === "editConflict";
     this.reload.hidden = !this.error;
@@ -115,9 +116,10 @@ export class EntryEditor {
     }
   }
 
-  async toggleStatus() {
+  async setStatus(status) {
     if (!(await this.flush())) return false;
-    this.queue({ status: this.record.status === "mastered" ? "new" : "mastered" });
+    if (this.record.status === status) return true;
+    this.queue({ status });
     return this.flush();
   }
 
@@ -129,14 +131,15 @@ export class EntryEditor {
     const meta = this.text("div", `${this.t(record.kind)} · ${this.languageName(record.language)}`, "entry-meta");
     meta.append(this.text("span", this.t("lastSeen", { date: record.last_seen_at })));
     article.append(meta, this.note(record.note));
-    const footer = this.text("div", "", "entry-footer");
-    this.feedback = this.text("span", this.t("autoSave"), "help");
+    this.footer = this.text("div", "", "entry-footer");
+    this.footer.hidden = true;
+    this.feedback = this.text("span", "", "help");
     this.feedback.setAttribute("role", "status");
     this.retry = this.button("retry", () => { this.error = null; this.flush(); });
     this.reload = this.button("reloadSaved", () => this.reloadSaved());
     this.retry.hidden = this.reload.hidden = true;
-    footer.append(this.feedback, this.retry, this.reload);
-    article.append(footer);
+    this.footer.append(this.feedback, this.retry, this.reload);
+    article.append(this.footer);
     return article;
   }
 }

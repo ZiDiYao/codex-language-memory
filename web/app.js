@@ -159,8 +159,8 @@ function applyLocale() {
   document.querySelectorAll("[data-tooltip]").forEach((node) => {
     node.title = t(node.dataset.tooltip);
   });
-  document.querySelectorAll(".entry-status").forEach((node) => {
-    node.setAttribute("aria-label", t("mastered"));
+  document.querySelectorAll(".entry-status-group").forEach((node) => {
+    node.setAttribute("aria-label", t("status"));
   });
   document.querySelectorAll("[data-language]").forEach((node) => {
     node.textContent = languageName(node.dataset.language);
@@ -265,8 +265,16 @@ function card(record, expanded = false) {
   const body = element("div", undefined, "entry-body");
   const heading = element("div", undefined, "entry-heading");
   const title = element("h3");
-  const mastery = element("button", undefined, "entry-status");
-  mastery.type = "button";
+  const mastery = element("div", undefined, "entry-status-group");
+  mastery.setAttribute("role", "group");
+  mastery.setAttribute("aria-label", t("status"));
+  const statusButtons = ["new", "mastered"].map((status) => {
+    const button = translated("button", status, {}, "entry-status");
+    button.type = "button";
+    button.dataset.status = status;
+    return button;
+  });
+  mastery.append(...statusButtons);
   const preview = element("p", undefined, "entry-preview");
   const lastSeen = translated("small", "lastSeen", { date: record.last_seen_at }, "entry-last-seen");
   heading.append(title, mastery, element("span", undefined, "entry-chevron"));
@@ -275,12 +283,9 @@ function card(record, expanded = false) {
     title.textContent = point.note_title || t("untitledNote");
     title.lang = point.language;
     summary.setAttribute("aria-label", title.textContent);
-    mastery.textContent = t(point.status);
-    mastery.dataset.i18n = point.status;
-    mastery.setAttribute("aria-label", t("mastered"));
-    mastery.setAttribute("aria-pressed", String(point.status === "mastered"));
-    mastery.dataset.tooltip = point.status === "mastered" ? "keepLearning" : "markMastered";
-    mastery.title = t(mastery.dataset.tooltip);
+    statusButtons.forEach((button) => {
+      button.setAttribute("aria-pressed", String(button.dataset.status === point.status));
+    });
     preview.textContent = point.note_preview;
     preview.hidden = !point.note_preview;
   }
@@ -298,18 +303,18 @@ function card(record, expanded = false) {
       notice("deleted");
     },
   });
-  mastery.addEventListener("click", async (event) => {
+  statusButtons.forEach((button) => button.addEventListener("click", async (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const restoreFocus = document.activeElement === mastery;
-    mastery.disabled = true;
+    const restoreFocus = document.activeElement === button;
+    statusButtons.forEach((control) => { control.disabled = true; });
     try {
-      if (!(await editor.toggleStatus())) details.open = true;
+      if (!(await editor.setStatus(button.dataset.status))) details.open = true;
     } finally {
-      mastery.disabled = false;
-      if (restoreFocus && document.activeElement === document.body) mastery.focus({ preventScroll: true });
+      statusButtons.forEach((control) => { control.disabled = false; });
+      if (restoreFocus && document.activeElement === document.body) button.focus({ preventScroll: true });
     }
-  });
+  }));
   editors.set(record.id, editor);
   body.append(editor.node);
   details.append(summary, body);
