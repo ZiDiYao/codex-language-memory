@@ -10,6 +10,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError, model_validator
 
+from learning import ALGORITHM, advance, memory_snapshot, recall_rating
+
 Kind = Literal["word", "expression", "grammar", "correction"]
 Status = Literal["new", "mastered"]
 ReviewResult = Literal["correct", "partial", "incorrect", "skipped"]
@@ -58,6 +60,27 @@ class Patch(Content):
     meaning: Text | None = None
     status: Status | None = None
     review_result: ReviewResult | None = None
+
+
+class Review(StrictModel):
+    result: ReviewResult
+    assisted: bool = False
+    effort: Literal["standard", "hard", "easy"] = "standard"
+    prompt: Text | None = None
+    answer: Text | None = None
+
+    @model_validator(mode="after")
+    def effort_requires_success(self):
+        if self.effort != "standard" and (self.result != "correct" or self.assisted):
+            raise ValueError("Recall effort applies only to an unassisted correct answer")
+        return self
+
+
+class LearnerPreferences(StrictModel):
+    explanation_language: Language | None = None
+    explanation_style: Literal["concise", "detailed"] | None = None
+    learning_goal: Text | None = None
+    interests: Annotated[list[Title], Field(max_length=8)] | None = None
 
 
 CaptureMode = Literal["automatic", "explicit"]
@@ -125,6 +148,62 @@ CREATE TABLE IF NOT EXISTS save_requests (
     results TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS encounters (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    record_id INTEGER NOT NULL REFERENCES knowledge(id) ON DELETE CASCADE,
+    request_id TEXT NOT NULL,
+    occurred_at TEXT NOT NULL,
+    context TEXT,
+    source TEXT NOT NULL,
+    UNIQUE (request_id, record_id)
+);
+CREATE INDEX IF NOT EXISTS encounters_by_point ON encounters(record_id, id DESC);
+
+CREATE TABLE IF NOT EXISTS memory_states (
+    record_id INTEGER PRIMARY KEY REFERENCES knowledge(id) ON DELETE CASCADE,
+    card TEXT NOT NULL,
+    due_at TEXT NOT NULL,
+    rated_reviews INTEGER NOT NULL,
+    algorithm TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS memory_due ON memory_states(due_at);
+
+CREATE TABLE IF NOT EXISTS review_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    record_id INTEGER NOT NULL REFERENCES knowledge(id) ON DELETE CASCADE,
+    occurred_at TEXT NOT NULL,
+    result TEXT NOT NULL,
+    assisted INTEGER NOT NULL,
+    effort TEXT NOT NULL,
+    prompt TEXT,
+    answer TEXT,
+    rating INTEGER,
+    predicted_recall REAL,
+    fsrs_log TEXT,
+    algorithm TEXT
+);
+CREATE INDEX IF NOT EXISTS reviews_by_point ON review_events(record_id, id DESC);
+
+CREATE TABLE IF NOT EXISTS review_requests (
+    request_id TEXT PRIMARY KEY,
+    fingerprint TEXT NOT NULL,
+    result TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS learner_preferences (
+    language TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- A pre-upgrade page may still hold a connection with foreign keys disabled.
+CREATE TRIGGER IF NOT EXISTS learning_evidence_deleted AFTER DELETE ON knowledge
+BEGIN
+    DELETE FROM encounters WHERE record_id = OLD.id;
+    DELETE FROM review_events WHERE record_id = OLD.id;
+    DELETE FROM memory_states WHERE record_id = OLD.id;
+END;
+
 CREATE TABLE IF NOT EXISTS change_versions (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     content INTEGER NOT NULL DEFAULT 0,
@@ -186,6 +265,7 @@ class Store:
     @contextmanager
     def connection(self, *, write=False):
         db = sqlite3.connect(self.path, timeout=10)
+        db.execute("PRAGMA foreign_keys = ON")
         db.row_factory = sqlite3.Row
         db.create_function("normalize", 1, normalized, deterministic=True)
         try:
@@ -294,6 +374,10 @@ class Store:
                         tuple(data.values()),
                     )
                     result = {"status": "added", "id": cursor.lastrowid, "encounter_count": 1}
+                db.execute(
+                    "INSERT INTO encounters (record_id, request_id, occurred_at, context, source) VALUES (?, ?, ?, ?, ?)",
+                    (result["id"], request_id, timestamp, point.context, source),
+                )
                 results.append({"index": index, **result})
             db.execute(
                 "INSERT INTO save_requests VALUES (?, ?, ?)",
@@ -361,16 +445,32 @@ class Store:
                 f"SELECT * FROM knowledge WHERE {where} ORDER BY last_seen_at DESC, id DESC", params,
             )]
 
-    def review(self, *, language=None, kind=None, limit=5, include_variants=False):
+    def review(self, *, language=None, kind=None, limit=5, include_variants=False, include_upcoming=False):
+        timestamp = now()
+        clauses, params = self._filters(language=language, kind=kind, status="new", include_variants=include_variants)
+        where = " AND ".join(clauses)
         with self.connection() as db:
             rows = db.execute(
-                """SELECT * FROM knowledge WHERE status != 'mastered'
-                   AND (? IS NULL OR language = ? OR (? AND language LIKE ?))
-                   AND (? IS NULL OR kind = ?)
-                   ORDER BY last_reviewed_at ASC, last_seen_at ASC, id ASC LIMIT ?""",
-                (language, language, include_variants, (language or "") + "-%", kind, kind, limit),
+                f"""SELECT knowledge.*, card, due_at, rated_reviews FROM knowledge
+                    LEFT JOIN memory_states ON record_id = knowledge.id
+                    WHERE {where} AND (? OR due_at IS NULL OR due_at <= ?)
+                    ORDER BY CASE WHEN due_at <= ? THEN 0 WHEN due_at IS NULL THEN 1 ELSE 2 END,
+                             due_at ASC, created_at ASC, id ASC LIMIT ?""",
+                (*params, include_upcoming, timestamp, timestamp, limit),
             )
-            return {"records": [record(row) for row in rows]}
+            records = []
+            for row in rows:
+                item = record(row)
+                card = item.pop("card")
+                due = item.pop("due_at")
+                item["memory"] = memory_snapshot(card, timestamp, item.pop("rated_reviews") or 0)
+                item["review_reason"] = "unassessed" if due is None else "due" if due <= timestamp else "upcoming"
+                records.append(item)
+            next_due = db.execute(
+                f"""SELECT MIN(due_at) FROM knowledge JOIN memory_states ON record_id = knowledge.id
+                    WHERE {where} AND due_at > ?""", (*params, timestamp),
+            ).fetchone()[0]
+            return {"records": records, "next_due_at": next_due, "algorithm": ALGORITHM}
 
     def languages(self) -> dict:
         with self.connection() as db:
@@ -391,8 +491,7 @@ class Store:
             if required in changes and changes[required] is None:
                 return {"status": "failed", "error": f"{required}_cannot_be_null"}
         if "review_result" in changes:
-            changes["last_review_result"] = changes.pop("review_result")
-            changes["last_reviewed_at"] = now()
+            return {"status": "failed", "error": "use_record_review_with_request_id"}
         data = content_fields(changes)
         assignments = ", ".join(f"{column} = ?" for column in data)
         with self.connection(write=True) as db:
@@ -407,6 +506,146 @@ class Store:
                 return {"status": "not_found"}
             row = db.execute("SELECT * FROM knowledge WHERE id = ?", (record_id,)).fetchone()
             return {"status": "updated", "record": record(row)}
+
+    def record_review(self, record_id: int, request_id: str, review: Review) -> dict:
+        fingerprint = hashlib.sha256(encode([record_id, review.model_dump()]).encode()).hexdigest()
+        with self.connection(write=True) as db:
+            previous = db.execute("SELECT * FROM review_requests WHERE request_id = ?", (request_id,)).fetchone()
+            if previous:
+                if previous["fingerprint"] != fingerprint:
+                    return {"status": "failed", "error": "request_id_conflict"}
+                result = json.loads(previous["result"])
+                if not db.execute("SELECT 1 FROM knowledge WHERE id = ?", (record_id,)).fetchone():
+                    result["deleted"] = True
+                return {**result, "replayed": True}
+            if not db.execute("SELECT 1 FROM knowledge WHERE id = ?", (record_id,)).fetchone():
+                return {"status": "not_found"}
+            timestamp = now()
+            state = db.execute("SELECT * FROM memory_states WHERE record_id = ?", (record_id,)).fetchone()
+            serialized = state["card"] if state else None
+            rated_reviews = state["rated_reviews"] if state else 0
+            rating = recall_rating(review.result, review.assisted, review.effort)
+            log = prediction = None
+            if rating is not None:
+                try:
+                    card, log, prediction = advance(record_id, serialized, rating, timestamp)
+                except ValueError as error:
+                    return {"status": "failed", "error": str(error)}
+                serialized = card.to_json()
+                rated_reviews += 1
+                db.execute(
+                    """INSERT INTO memory_states VALUES (?, ?, ?, ?, ?)
+                       ON CONFLICT(record_id) DO UPDATE SET card = excluded.card, due_at = excluded.due_at,
+                       rated_reviews = excluded.rated_reviews, algorithm = excluded.algorithm""",
+                    (record_id, serialized, card.due.isoformat(timespec="microseconds"), rated_reviews, encode(ALGORITHM)),
+                )
+            event = db.execute(
+                """INSERT INTO review_events (record_id, occurred_at, result, assisted, effort,
+                   prompt, answer, rating, predicted_recall, fsrs_log, algorithm)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (record_id, timestamp, review.result, review.assisted, review.effort, review.prompt,
+                 review.answer, int(rating) if rating else None, prediction,
+                 log.to_json() if log else None, encode(ALGORITHM) if log else None),
+            )
+            db.execute("UPDATE knowledge SET last_reviewed_at = ?, last_review_result = ? WHERE id = ?",
+                       (timestamp, review.result, record_id))
+            result = {"status": "reviewed", "record_id": record_id, "event_id": event.lastrowid,
+                      "scheduled": rating is not None, "rating": int(rating) if rating else None,
+                      "memory": memory_snapshot(serialized, timestamp, rated_reviews)}
+            db.execute("INSERT INTO review_requests VALUES (?, ?, ?)", (request_id, fingerprint, encode(result)))
+            return {**result, "replayed": False}
+
+    def history(self, record_id: int, *, limit=20, before_encounter_id=None, before_review_id=None):
+        with self.connection() as db:
+            db.execute("BEGIN")
+            point = db.execute("SELECT * FROM knowledge WHERE id = ?", (record_id,)).fetchone()
+            if not point:
+                return {"status": "not_found"}
+            encounters = [dict(row) for row in db.execute(
+                """SELECT id, occurred_at, context, source FROM encounters WHERE record_id = ?
+                   AND (? IS NULL OR id < ?) ORDER BY id DESC LIMIT ?""",
+                (record_id, before_encounter_id, before_encounter_id, limit + 1),
+            )]
+            reviews = [dict(row) for row in db.execute(
+                """SELECT id, occurred_at, result, assisted, effort, prompt, answer, rating,
+                   predicted_recall FROM review_events WHERE record_id = ?
+                   AND (? IS NULL OR id < ?) ORDER BY id DESC LIMIT ?""",
+                (record_id, before_review_id, before_review_id, limit + 1),
+            )]
+            captured = db.execute("SELECT COUNT(*) FROM encounters WHERE record_id = ?", (record_id,)).fetchone()[0]
+            state = db.execute("SELECT * FROM memory_states WHERE record_id = ?", (record_id,)).fetchone()
+            return {
+                "status": "found", "record": record(point),
+                "encounters": encounters[:limit], "reviews": reviews[:limit],
+                "next_encounter_before_id": encounters[limit - 1]["id"] if len(encounters) > limit else None,
+                "next_review_before_id": reviews[limit - 1]["id"] if len(reviews) > limit else None,
+                "encounters_without_history": max(0, point["encounter_count"] - captured),
+                "memory": memory_snapshot(state["card"] if state else None, now(), state["rated_reviews"] if state else 0),
+                "algorithm": ALGORITHM,
+            }
+
+    def learning_preferences(self, language=None, patch: LearnerPreferences | None = None):
+        scope = language or "*"
+        with self.connection(write=patch is not None) as db:
+            row = db.execute("SELECT data, updated_at FROM learner_preferences WHERE language = ?", (scope,)).fetchone()
+            current = json.loads(row["data"]) if row else {}
+            timestamp = row["updated_at"] if row else None
+            if patch is not None:
+                current.update(patch.model_dump(exclude_unset=True))
+                current = {key: value for key, value in current.items() if value is not None}
+                timestamp = now()
+                db.execute("INSERT INTO learner_preferences VALUES (?, ?, ?) ON CONFLICT(language) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at",
+                           (scope, encode(current), timestamp))
+            return {"scope": scope, "preferences": current, "source": "user_stated", "updated_at": timestamp}
+
+    def learning_profile(self, *, language=None, include_variants=False):
+        clauses, params = self._filters(language=language, include_variants=include_variants)
+        where = " AND ".join(clauses) or "1"
+        with self.connection() as db:
+            # Use one snapshot for all evidence counts. Summaries never invent a proficiency level.
+            db.execute("BEGIN")
+            groups = [dict(row) for row in db.execute(
+                f"""SELECT language, kind, COUNT(*) AS points, SUM(encounter_count) AS encounters,
+                    SUM(status = 'mastered') AS user_marked_mastered FROM knowledge
+                    WHERE {where} GROUP BY language, kind ORDER BY language, kind""", params,
+            )]
+            outcomes = [dict(row) for row in db.execute(
+                f"""SELECT language, kind, result, assisted, COUNT(*) AS attempts FROM review_events
+                    JOIN knowledge ON knowledge.id = record_id WHERE {where}
+                    GROUP BY language, kind, result, assisted ORDER BY language, kind, result, assisted""", params,
+            )]
+            recurring = [dict(row) for row in db.execute(
+                f"""SELECT knowledge.id, title, language, kind, encounter_count, status,
+                    (SELECT COUNT(*) FROM review_events e WHERE e.record_id = knowledge.id
+                     AND e.rating = 1) AS unsuccessful_recalls FROM knowledge
+                    WHERE {where} AND status = 'new' AND (encounter_count > 1 OR EXISTS
+                        (SELECT 1 FROM review_events e WHERE e.record_id = knowledge.id AND e.rating = 1))
+                    ORDER BY unsuccessful_recalls DESC, encounter_count DESC, last_seen_at DESC LIMIT 10""", params,
+            )]
+            evaluation = dict(db.execute(
+                f"""SELECT COUNT(*) AS predictions, AVG((predicted_recall - (result = 'correct')) *
+                    (predicted_recall - (result = 'correct'))) AS brier_score
+                    FROM review_events JOIN knowledge ON knowledge.id = record_id
+                    WHERE {where} AND rating IS NOT NULL AND predicted_recall IS NOT NULL""", params,
+            ).fetchone())
+            preferences = [dict(row) for row in db.execute(
+                "SELECT language, data, updated_at FROM learner_preferences WHERE ? IS NULL OR language = ? OR language = '*' ORDER BY language",
+                (language, language),
+            )]
+            for item in preferences:
+                item["preferences"] = json.loads(item.pop("data"))
+                item["source"] = "user_stated"
+            rated = db.execute(
+                f"""SELECT COUNT(*) FROM review_events JOIN knowledge ON knowledge.id = record_id
+                    WHERE {where} AND rating IS NOT NULL""", params,
+            ).fetchone()[0]
+            return {
+                "scope": "Observed learning interactions only; not an overall proficiency assessment",
+                "language": language, "groups": groups, "review_outcomes": outcomes,
+                "recurring_points": recurring, "preferences": preferences,
+                "rated_reviews": rated, "evidence_status": "observed_practice" if rated else "not_assessed",
+                "prediction_evaluation": evaluation, "algorithm": ALGORITHM,
+            }
 
     def delete(self, record_id: int) -> dict:
         with self.connection(write=True) as db:

@@ -11,7 +11,7 @@ from pathlib import Path
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from store import Patch, Store
+from store import Patch, Review, Store
 
 
 APP = Path(__file__).resolve().parents[1]
@@ -108,18 +108,18 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(self.store.query(language="fr")["records"][0]["id"], ids[2])
         self.assertEqual(self.store.query(limit=1, offset=1)["records"][0]["id"], ids[1])
 
-        updated = self.store.update(ids[0], Patch(
-            status="new", review_result="correct", meaning="办法", context=None,
-        ))["record"]
+        self.store.record_review(ids[0], "review-query", Review(result="correct"))
+        updated = self.store.update(ids[0], Patch(status="new", meaning="办法", context=None))["record"]
         self.assertIsNone(updated["context"])
         self.assertEqual(updated["meaning"], "办法")
         self.assertEqual(updated["last_review_result"], "correct")
         self.assertTrue(updated["last_reviewed_at"])
         self.assertEqual(self.store.query(keyword="办法", status="new")["records"], [updated])
         self.assertEqual([r["id"] for r in self.store.review(language="en")["records"]],
-                         [ids[1], ids[0]])
+                         [ids[1]])
         self.store.update(ids[1], Patch(status="mastered"))
-        self.assertEqual(self.store.review(language="en")["records"], [updated])
+        self.assertEqual(self.store.review(language="en")["records"], [])
+        self.assertEqual(self.store.review(language="en", include_upcoming=True)["records"][0]["id"], ids[0])
         self.assertEqual(self.store.update(ids[0], Patch(title="strategy"))["status"], "updated")
         self.assertEqual(self.store.query(keyword="strategy")["records"][0]["id"], ids[0])
 
@@ -159,6 +159,7 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                     "get_recording", "set_recording", "save_points", "find_points",
                     "review_queue", "update_point", "delete_point",
                     "get_settings", "update_settings", "open_memory_page", "list_languages", "export_points",
+                    "record_review", "get_point_history", "get_learning_profile", "update_learning_preferences",
                 })
                 self.assertTrue((await self.call(session, "get_recording"))["enabled"])
                 self.assertTrue((await self.call(session, "set_recording", {"enabled": True}))["enabled"])
@@ -190,8 +191,24 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(found["records"][0]["id"], record_id)
                 queue = await self.call(session, "review_queue", {"kind": "word"})
                 self.assertEqual(queue["records"][0]["id"], record_id)
+                result = await self.call(session, "record_review", {
+                    "record_id": record_id, "request_id": "mcp-review-once", "review": {"result": "correct"},
+                })
+                self.assertTrue(result["scheduled"])
+                retry = await self.call(session, "record_review", {
+                    "record_id": record_id, "request_id": "mcp-review-once", "review": {"result": "correct"},
+                })
+                self.assertTrue(retry["replayed"])
+                history = await self.call(session, "get_point_history", {"record_id": record_id})
+                self.assertEqual(len(history["reviews"]), 1)
+                await self.call(session, "update_learning_preferences", {
+                    "language": "en", "patch": {"explanation_language": "zh"},
+                })
+                profile = await self.call(session, "get_learning_profile", {"language": "en"})
+                self.assertEqual(profile["rated_reviews"], 1)
+                self.assertEqual(profile["preferences"][0]["preferences"]["explanation_language"], "zh")
                 result = await self.call(session, "update_point", {
-                    "record_id": record_id, "patch": {"review_result": "correct", "status": "mastered"},
+                    "record_id": record_id, "patch": {"status": "mastered"},
                 })
                 self.assertEqual(result["record"]["last_review_result"], "correct")
                 self.assertEqual((await self.call(session, "review_queue"))["records"], [])

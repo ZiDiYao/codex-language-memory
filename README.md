@@ -37,6 +37,7 @@ Equivalent requests work in any language; these examples are in English:
 5. `I know this now.` Or: `Delete that record`, `Pause recording`, `Is recording enabled?`
 6. `Open the language learning page`, `Switch the interface to Spanish`, or `How many records do I have in each language?`
 7. `Export my English expressions to Word`, `Export all my records as PDF`, or `Prepare a Notion import`.
+8. `Explain my Japanese grammar in Chinese, keep it brief, and use travel examples.` Then in another conversation: `Based on my learning history, what should I practice?`
 
 Automatic capture depends on Codex selecting the skill and calling tools. It can miss a point. Use `Remember this` or `Save the language points from this conversation` as explicit fallbacks. The integration does not listen to every message, scan chat history, or inject all records into every conversation. Records enter the current model context when Codex retrieves them.
 
@@ -89,7 +90,9 @@ Only necessary learning context is stored. A translation does not imply every wo
 
 ## Storage and tools
 
-Each knowledge point has an ID, type, target language, title, stable sense key, meaning, explanation, examples, optional context/correction, creation and last-encounter timestamps, encounter count, mastery, and last review timestamp/result. Mastery is `new` (To Learn) or `mastered` (Mastered). Legacy `learning` records migrate to `new`. Review results update the review timestamp without automatically changing mastery. The latest supplied context is retained when encounters merge.
+Each knowledge point has an ID, type, target language, title, stable sense key, meaning, explanation, examples, optional context/correction, creation and last-encounter timestamps, encounter count, mastery, and last review timestamp/result. Mastery is `new` (To Learn) or `mastered` (Mastered). Legacy `learning` records migrate to `new`. Review results never automatically change mastery. Merged encounters keep the latest context on the record and preserve each new context separately in history.
+
+FSRS-6 (`fsrs==6.3.2`) updates each point's memory state after actual unassisted recall, using default parameters and 90% desired retention. The review queue prioritizes overdue points, then unassessed points. Skipped or assisted attempts are preserved as evidence without changing the schedule; asking a question does not count as a failed quiz. Codex reads observed histories and explicit, language-specific teaching preferences to personalize explanations. No personal parameter fitting or overall proficiency scoring is claimed. See [the learning model and primary references](docs/learning-model.md) for rating semantics, uncertainty, evaluation and migration details.
 
 | Tool | Purpose |
 | --- | --- |
@@ -99,14 +102,20 @@ Each knowledge point has an ID, type, target language, title, stable sense key, 
 | `list_languages` | List language groups and record counts |
 | `save_points` | Batch save with per-item added, merged, skipped, or failed outcomes |
 | `find_points` | Search by keyword, type, language, mastery, or missing generated content; follow `next_cursor` for more |
-| `review_queue` | Exclude mastered points; unreviewed first, then oldest review |
-| `update_point` | Edit content/mastery or record a review result |
+| `review_queue` | Exclude mastered points; overdue FSRS reviews, then unassessed; optional early practice |
+| `record_review` | Record an actual quiz attempt idempotently and update FSRS when eligible |
+| `get_point_history` | Read encounter contexts, quiz evidence and an explicitly uncalibrated memory estimate |
+| `get_learning_profile` | Read language-scoped practice counts, recurring points and stated preferences |
+| `update_learning_preferences` | Store or clear explicit explanation language/style, goal and example interests |
+| `update_point` | Edit content or user-controlled mastery |
 | `delete_point` | Delete by ID |
 | `export_points` | Export all matching records locally as PDF, XLSX, DOCX, Notion ZIP, or JSON |
 
 Deduplication uses type, language, normalized title, and `sense_key`. Codex searches for a likely repeat and reuses its identity; paraphrased identities can still create semantic duplicates. Different meanings use separate sense keys.
 
 A new encounter gets a new `request_id`. Retries reuse the same ID and exact parameters, so they cannot increment the count again. Saves and receipts commit in one SQLite transaction. Deleting a record leaves a content-free request hash and receipt so retrying the old save cannot recreate it. `source=automatic/explicit` describes a save's origin; it is not a recording-mode preference.
+
+Each quiz attempt also requires a fresh `request_id` through `record_review`. Repeat the same arguments and ID on retry. Legacy `update_point` patches containing `review_result` fail without making changes; migrate them to `record_review`. Existing latest-review summaries are preserved but do not fabricate past FSRS history. Deletion removes the point's encounters, review events and scheduler state together. Preference fields can be forgotten by setting them to null through `update_learning_preferences`.
 
 Paused recording blocks new saves, including explicit ones. Queries, review, edits, and deletion remain available. Type restrictions also apply to explicit saves. Upgrade compatibility ignores retired `capture_mode`, `target_language`, and `target_languages` preferences while preserving existing data, the recording switch, type selection, and UI language.
 
@@ -118,13 +127,15 @@ Paused recording blocks new saves, including explicit ones. Queries, review, edi
 node --test tests/test_locales.mjs
 ```
 
-The 28 Python tests use isolated databases and cover persistence, query filters, language separation, sense deduplication, partial batches, rollback, concurrent idempotent retries, deletion without resurrection, legacy preference migration, settings validation, local HTTP protections, cursor pagination under concurrent inserts, legacy mastery migration, generated-content requirements, cross-process change detection, complete filtered exports, multilingual Office/Notion content, literal spreadsheet formulas, PDF text/font errors, and an MCP session restart with review/update/delete/export. The 2 Node tests check translation completeness and matching placeholders for all six UI locales.
+The 41 Python tests use isolated databases and cover persistence, query filters, language separation, sense deduplication, partial batches, rollback, concurrent idempotent retries, deletion without resurrection, legacy preference migration, settings validation, local HTTP protections, cursor pagination under concurrent inserts, legacy mastery migration, generated-content requirements, cross-process change detection, complete filtered exports, multilingual Office/Notion content, literal spreadsheet formulas, PDF text/font errors, and an MCP session restart with review/update/delete/export. Learning-model checks cover exact scheduling agreement with upstream FSRS across successful and failed recalls, assisted/skipped attempts, review retries and rollback, chronological prediction scoring, history pagination, language-scoped preferences, deletion cascades, legacy history gaps and clock reversal. These verify software behavior, not educational effectiveness. The 2 Node tests check translation completeness and matching placeholders for all six UI locales.
 
 A real Codex CLI conversation was tested against the local user's database: four learning questions produced one automatic `save_points` call with four successful additions, one each for English, Chinese, Japanese, and Korean. No explicit save request was included. These are local acceptance-test records; they are not shipped in the repository.
 
 A separate Codex CLI session, without explicitly naming the skill, retrieved all four records and asked a Japanese question without showing its answer. The Codex browser was used to verify immediate settings writes, persistence after reload, sequential rapid changes, and the French and Spanish interfaces. Earlier CLI/App Server tests also verified a quiz, waiting for an answer, and writing the review result into an isolated database. A further isolated real Codex CLI session automatically captured a French expression with its definition, explanation, and example, then exported it to Word. Browser checks verified both mastery transitions, custom language menus, 65 unique records loaded by scrolling, and automatic synchronization after an MCP content update. PDF and Word samples containing English, Chinese, Japanese, and Korean were rendered and visually inspected. Excel and Notion exports were parsed to verify content and structure; actual Notion import has not been tested.
 
 After upgrading, restart or reconnect the MCP server and open a new Codex conversation to load changed tool schemas and skill instructions. Desktop skill discovery and write approvals should still be checked in your own installed client with the examples above; capture on every turn is not guaranteed.
+
+The FSRS integration was also exercised in real isolated Codex App Server conversations: explicit preferences persisted across chats, personalized questions withheld their answers, unassisted success advanced memory without changing mastery, assisted answers did not train the scheduler, and repeated meaning questions added encounters rather than failed reviews. A progress question retrieved the evidence and declined to infer an overall English level from one practiced sense. A fresh ordinary word lookup automatically loaded the saved teaching preferences. These are observed cases, not a guarantee of model behavior on every turn.
 
 Source identifiers, comments, documentation, and skill instructions are written in English. Localized UI strings and multilingual learning fixtures retain their original languages.
 

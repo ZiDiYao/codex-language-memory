@@ -3,3 +3,4 @@ pydantic>=2.11,<3
 reportlab>=4.4,<5
 python-docx>=1.2,<2
 openpyxl>=3.1,<4
+fsrs==6.3.2

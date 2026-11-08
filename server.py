@@ -8,7 +8,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from store import (CaptureMode, Kind, Language, Limit, Patch, RecordId, RequestId,
+from store import (CaptureMode, Kind, Language, LearnerPreferences, Limit, Patch, RecordId, RequestId, Review,
                    SettingsPatch, Status, Store, Title)
 from dashboard import Dashboard
 from exports import ExportError, ExportRequest, save_export
@@ -110,17 +110,63 @@ def create_server(store: Store) -> FastMCP:
     @server.tool(annotations=read_only)
     def review_queue(
         language: Language | None = None, kind: Kind | None = None, limit: Limit = 5,
-        include_variants: bool = False,
+        include_variants: bool = False, include_upcoming: bool = False,
     ) -> dict[str, Any]:
-        """Get unmastered points, never-reviewed first, then least recently reviewed.
+        """Get unmastered points: overdue FSRS reviews first, then unassessed points.
+        Future reviews are excluded unless include_upcoming=true for requested early practice.
+        Memory estimates use population parameters and are not calibrated proficiency scores.
         Supply language to review one language. include_variants includes regional forms.
         """
-        return store.review(language=language, kind=kind, limit=limit, include_variants=include_variants)
+        return store.review(language=language, kind=kind, limit=limit, include_variants=include_variants,
+                            include_upcoming=include_upcoming)
+
+    @server.tool(annotations=local_write)
+    def record_review(record_id: RecordId, request_id: RequestId, review: Review) -> dict[str, Any]:
+        """Record an actual answered quiz once; reuse request_id and exact arguments on retry.
+        result is correct/partial/incorrect/skipped. Set assisted=true if hints or the answer
+        were shown before the learner responded; assisted/skipped attempts do not train FSRS.
+        Correct maps to Good; partial/incorrect to Again. effort=hard/easy applies only to
+        an unassisted correct answer when the user explicitly reports recall effort.
+        Include only the exercise prompt and relevant learner answer. Never infer a quiz
+        result from asking a meaning, reading an explanation, or marking Mastered.
+        This never changes user-controlled mastery or encounter counts.
+        """
+        return store.record_review(record_id, request_id, review)
+
+    @server.tool(annotations=read_only)
+    def get_point_history(
+        record_id: RecordId, limit: Limit = 20,
+        before_encounter_id: RecordId | None = None, before_review_id: RecordId | None = None,
+    ) -> dict[str, Any]:
+        """Read one point's encounter contexts, actual quiz attempts and memory estimate.
+        Follow next_encounter_before_id/next_review_before_id to read older evidence.
+        Older pre-upgrade encounters may lack history; never invent their contents.
+        """
+        return store.history(record_id, limit=limit, before_encounter_id=before_encounter_id,
+                             before_review_id=before_review_id)
+
+    @server.tool(annotations=read_only)
+    def get_learning_profile(language: Language | None = None, include_variants: bool = False) -> dict[str, Any]:
+        """Read observed practice counts, recurring points and explicit learning preferences.
+        Use before personalized teaching/review or when asked about learning progress.
+        Counts cover saved learning interactions, not all activity or overall proficiency.
+        Keep languages separate. No personal FSRS parameter fitting has been performed.
+        """
+        return store.learning_profile(language=language, include_variants=include_variants)
+
+    @server.tool(annotations=local_write)
+    def update_learning_preferences(patch: LearnerPreferences, language: Language | None = None) -> dict[str, Any]:
+        """Remember explicitly stated explanation_language, explanation_style (concise/detailed),
+        learning_goal or interests. Omit language for global preferences; otherwise scope to
+        that learning language. Null clears a field. Never infer these from identity or UI locale.
+        """
+        return store.learning_preferences(language, patch)
 
     @server.tool(annotations=ToolAnnotations(openWorldHint=False))
     def update_point(record_id: RecordId, patch: Patch) -> dict[str, Any]:
         """Edit supplied fields only. Use null to clear optional content.
-        A review_result sets the review timestamp. Status changes only when supplied.
+        Status changes only when supplied. Record quiz results with record_review and its
+        idempotent request_id; legacy review_result patches fail without changing data.
         """
         return store.update(record_id, patch)
 
