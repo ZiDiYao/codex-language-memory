@@ -96,7 +96,7 @@ async def exercise(archive):
             page = await call(session, "open_memory_page")
             with urlopen(page["url"]) as response:
                 assert "Language memory" in response.read().decode()
-            for asset in ("documents.js", "page-model.js"):
+            for asset in ("entry-editor.js", "history-model.js"):
                 with urlopen(page["url"] + asset) as response:
                     assert response.status == 200 and response.read()
             point = (await call(session, "find_points"))["records"][0]

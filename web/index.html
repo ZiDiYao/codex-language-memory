@@ -64,12 +64,7 @@
         </div>
       </header>
       <section id="records-panel">
-        <div id="page-heading" class="page-heading" hidden>
-          <button id="back-library" class="subtle" data-i18n="backLibrary"></button>
-          <button id="page-ask" class="subtle" data-i18n="askCodex"></button>
-        </div>
-        <h2 id="page-title" class="collection-title" tabindex="-1" hidden></h2>
-        <div id="browse-controls">
+        <nav id="languages" class="language-tabs" aria-label="Learning language"></nav>
         <form id="search-form" class="search-line" role="search">
           <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
           <label class="sr-only" for="search" data-i18n="search"></label>
@@ -80,18 +75,6 @@
             data-placeholder="searchPlaceholder"
           />
         </form>
-        <div class="filters">
-          <div id="language-field" hidden>
-            <span class="field-label" data-i18n="notebook"></span>
-            <div id="language"></div>
-          </div>
-          <div>
-            <span class="field-label" data-i18n="status"></span>
-            <div id="status"></div>
-          </div>
-        </div>
-        </div>
-        <nav id="collections" class="collections" aria-label="Knowledge pages"></nav>
         <div id="records" aria-live="polite"></div>
         <div id="load-sentinel">
           <span id="load-state" data-i18n="loading"></span
@@ -194,22 +177,6 @@
       </div>
       <p class="help" data-i18n="notionHelp"></p>
       <div class="export-feedback help" role="status"></div>
-    </dialog>
-    <dialog id="codex-dialog" aria-labelledby="codex-title">
-      <div class="dialog-heading">
-        <h2 id="codex-title" data-i18n="askCodex"></h2>
-        <button class="icon-button dialog-close"><span aria-hidden="true">×</span><span class="sr-only" data-i18n="close"></span></button>
-      </div>
-      <p class="help" data-i18n="codexHelp"></p>
-      <label class="question-label"><span class="field-label" data-i18n="yourQuestion"></span>
-        <textarea id="codex-question" rows="3" maxlength="500" data-placeholder="questionPlaceholder"></textarea>
-      </label>
-      <div class="actions">
-        <a id="codex-open" class="button-link" data-i18n="continueCodex"></a>
-        <button id="codex-copy" class="subtle" data-i18n="copyPrompt"></button>
-      </div>
-      <p id="codex-feedback" class="help" role="status"></p>
-      <label id="prompt-fallback" hidden><span class="field-label" data-i18n="copyPrompt"></span><textarea id="codex-prompt" rows="5" readonly></textarea></label>
     </dialog>
     <div id="notice" role="status" hidden></div>
   </body>

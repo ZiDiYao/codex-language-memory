@@ -6,7 +6,7 @@ Recording is automatic for all languages and enabled by default on new installat
 
 ## Install the local Beta
 
-Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.3), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
+Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.4), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
 
 To upgrade, download the next Beta and run its **Install.command**. The installer validates the package, tests its runtime, backs up the database and switches versions while preserving learning records and settings. Repeating the same installation is safe. It also migrates the earlier source-checkout installation automatically.
 
@@ -53,17 +53,16 @@ MCP operations follow the client's approval policy. A rejected write is reported
 
 Ask Codex to open the learning page. `open_memory_page` returns a local URL that Codex can open in its browser side panel when that capability is available. Otherwise, open the returned URL in a browser.
 
-- Open a knowledge point as an editable document, or open **Words**, **Expressions**, **Grammar**, or **Corrections** to work with multiple points on one category page. These are local views of the same records, not separate copies or cloud pages.
-- Edit titles, meanings, explanations, examples, translations and original contexts directly. Edits auto-save after a short pause or when leaving a field. Concurrent changes produce a conflict message and preserve the draft until the user copies or discards it. Editing does not add encounters or reviews.
+- Select a language to see its recent learning history. English, Chinese and other languages stay separate. There are no type categories or separate document pages.
+- Expand a record in place to edit its title, meaning, explanation, examples, translations and original context. Edits auto-save after a short pause or when leaving a field. Concurrent changes preserve the draft and show a conflict message. Editing does not add encounters or reviews.
 - Mark a point **Mastered** with **I know this**, return it to **To Learn**, or delete it. The user decides whether they know it; no score or quiz is required.
 - Open **Settings** in the top-right corner to change recording, captured types, or interface language. English is the initial interface language. Settings save immediately.
 - Scroll to load more records automatically. The visible page checks for database changes every three seconds and when focused. Active edits are preserved. There are no page numbers or Refresh button.
-- Use **Export** to download the current point, or all records matching a category page's filters, including records not loaded on screen.
-- **Ask Codex** prepares a scoped prompt with the record ID or page filters. **Continue in Codex** uses the documented [new-chat deep link](https://learn.chatgpt.com/docs/reference/commands) to open a new chat with that prompt; the user sends it. **Copy prompt** is available when a browser does not support the link. This is a handoff, not an embedded chat or background model call.
+- Use **Export** to download the selected language's history matching the current search, including records not loaded on screen. Continue explanations and review directly in your Codex conversation.
 
-Pages, menus, dialogs, and feedback use short, interruptible transitions. Native keyboard activation and Escape dismissal remain available. System reduced-motion preferences disable movement. Search updates as you type, keeping the previous results visible until the next response arrives; background synchronization does not replay entrance animations.
+Expandable records, menus and dialogs use short transitions. System reduced-motion preferences disable movement. Search updates as you type; background synchronization preserves expanded records and active edits.
 
-Learning-language menus contain only languages with saved records. The first saved point creates its language group; deleting the last point removes it. When only one language exists, the page hides the language switcher. Every language is eligible for capture, including languages outside the six interface translations. Regional variants share a group while records keep their exact tags. First-language and interface settings remain independent of these groups and do not translate saved content.
+Language tabs contain only languages with saved records. The first saved point creates its language group; deleting the last point removes it. Every language is eligible for capture, including languages outside the six interface translations. Regional variants share a group while records keep their exact tags. First-language and interface settings remain independent of these groups and do not translate saved content.
 
 The server binds only to loopback and uses a random URL token. The page shares the MCP database. A page started by MCP stops with that MCP process; ask Codex to open it again if its URL expires. To run a standalone page against the same database:
 

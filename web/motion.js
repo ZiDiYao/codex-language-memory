@@ -71,7 +71,7 @@ export async function closeDialog(dialog) {
   }
 }
 
-export function disclosure(details, summary, body, onChange) {
+export function disclosure(details, summary, body, onChange, beforeClose) {
   const reflect = (open) => {
     summary.setAttribute("aria-expanded", String(open));
     body.inert = !open;
@@ -84,6 +84,7 @@ export function disclosure(details, summary, body, onChange) {
   summary.addEventListener("click", async (event) => {
     event.preventDefault();
     const open = !(details.dataset.animating ? details.dataset.expanded === "true" : details.open);
+    if (!open && beforeClose && !(await beforeClose())) return;
     const from = details.getBoundingClientRect().height;
     details.dataset.animating = "true";
     details.dataset.expanded = String(open);

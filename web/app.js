@@ -1,9 +1,9 @@
 import { messages } from "./i18n.js";
 import { Picker } from "./picker.js";
-import { enter, reveal, conceal, openDialog, closeDialog } from "./motion.js";
+import { enter, reveal, conceal, openDialog, closeDialog, disclosure } from "./motion.js";
 
-import { DocumentEditor } from "./documents.js";
-import { kinds, languageSelection, pageFromHash, codexPrompt, codexLink } from "./page-model.js";
+import { EntryEditor } from "./entry-editor.js";
+import { languageSelection } from "./history-model.js";
 
 const $ = (selector) => document.querySelector(selector);
 const pageSize = 20;
@@ -25,11 +25,8 @@ let settingsWriteError;
 let noticeTimer;
 const displayed = new Map();
 const editors = new Map();
-let view = pageFromHash(location.hash);
-let currentHash = location.hash;
-let navigating = false;
-let askContext;
-
+let selectedLanguage = "";
+let switchingLanguage = false;
 
 function t(key, params = {}) {
   return messages[locale][key].replace(/\{(\w+)\}/g, (_, name) => {
@@ -59,17 +56,6 @@ function languageName(code) {
     return code;
   }
 }
-function typeOptions(keys) {
-  return keys.map((key) => ({ value: key, label: t(key) }));
-}
-const languagePicker = new Picker($("#language"), {
-  label: "Learning language",
-  onChange: () => { renderCollections(); loadRecords(true); },
-});
-const statusPicker = new Picker($("#status"), {
-  label: "Learning status",
-  onChange: () => loadRecords(true),
-});
 const localePicker = new Picker($("#ui-language"), {
   label: "Interface language",
   value: locale,
@@ -102,63 +88,40 @@ function renderLanguagePreferences() {
 }
 
 function renderCatalog() {
-  const selection = languageSelection(catalog.counts, languagePicker.value);
-  languagePicker.setOptions([
-    { value: "", label: t("allLanguages"), count: Object.values(catalog.counts).reduce((a, b) => a + b, 0) },
-    ...selection.languages.map((value) => ({ value, label: languageName(value), count: catalog.counts[value] })),
-  ]);
-  languagePicker.setValue(selection.value);
-  $("#language-field").hidden = !selection.showPicker;
-  renderCollections();
-}
-function renderCollections() {
-  const nav = $("#collections");
-  nav.hidden = view.type !== "library";
-  nav.setAttribute("aria-label", t("pages"));
-  const counts = languagePicker.value ? catalog.by_language?.[languagePicker.value] || {} : catalog.kinds || {};
-  nav.replaceChildren(...kinds.filter((kind) => counts[kind] > 0).map((kind) => {
-    const button = element("button", undefined, "collection-link");
-    button.append(element("span", "▤", "page-icon"), element("strong", t(kind + "Page")), element("small", counts[kind]));
-    button.addEventListener("click", () => navigate("#collection-" + kind));
+  const selection = languageSelection(catalog.counts, selectedLanguage);
+  selectedLanguage = selection.value;
+  const nav = $("#languages");
+  const restoreFocus = nav.contains(document.activeElement);
+  nav.setAttribute("aria-label", t("notebook"));
+  nav.replaceChildren(...selection.languages.map((code) => {
+    const button = element("button", undefined, "language-tab");
+    button.type = "button";
+    button.setAttribute("aria-pressed", String(code === selectedLanguage));
+    button.append(element("span", languageName(code)), element("small", catalog.counts[code]));
+    button.addEventListener("click", async () => {
+      if (code === selectedLanguage || switchingLanguage) return;
+      switchingLanguage = true;
+      try {
+        if (!(await flushEditors())) return;
+        selectedLanguage = code;
+        renderCatalog();
+        await loadRecords(true);
+      } finally { switchingLanguage = false; }
+    });
     return button;
   }));
-}
-function renderView() {
-  const point = view.type === "point";
-  $("#page-heading").hidden = view.type === "library";
-  $("#page-ask").hidden = view.type !== "collection";
-  $("#page-title").hidden = view.type !== "collection";
-  $("#page-title").textContent = view.type === "collection" ? t(view.kind + "Page") : "";
-  $("#browse-controls").hidden = point;
-  $("#records").classList.toggle("document-page", view.type !== "library");
-  renderCollections();
+  nav.hidden = selection.languages.length === 0;
+  if (restoreFocus) nav.querySelector('[aria-pressed="true"]')?.focus({ preventScroll: true });
 }
 async function flushEditors() {
   for (const editor of editors.values()) {
     if (!(await editor.flush())) {
+      editor.card.open = true;
       editor.node.scrollIntoView({ block: "nearest", behavior: "smooth" });
       return false;
     }
   }
   return true;
-}
-async function navigate(hash, fromHistory = false) {
-  if (navigating) return;
-  navigating = true;
-  try {
-    if (!(await flushEditors())) {
-      if (fromHistory) history.replaceState(null, "", currentHash || location.pathname);
-      return;
-    }
-    ++queryVersion;
-    if (!fromHistory) history.pushState(null, "", hash || location.pathname);
-    currentHash = hash;
-    view = pageFromHash(hash);
-    renderView();
-    await loadRecords(true);
-    window.scrollTo({ top: 0 });
-    (view.type === "collection" ? $("#page-title") : view.type === "point" ? $(".document-title") : $("#search"))?.focus({ preventScroll: true });
-  } finally { navigating = false; }
 }
 function applyLocale() {
   document.documentElement.lang = locale;
@@ -175,17 +138,10 @@ function applyLocale() {
   document.querySelectorAll("[data-language]").forEach((node) => {
     node.textContent = languageName(node.dataset.language);
   });
-  languagePicker.setLabel(t("notebook"));
-  statusPicker.setLabel(t("status"));
   localePicker.setLabel(t("uiLanguage"));
-  statusPicker.setOptions([
-    { value: "", label: t("allStatuses") },
-    ...typeOptions(["new", "mastered"]),
-  ]);
   localePicker.setValue(locale);
   renderCatalog();
   renderLanguagePreferences();
-  renderView();
   refreshEditorLocales();
 }
 function refreshEditorLocales() {
@@ -255,9 +211,7 @@ function filters() {
   const result = { include_variants: true };
   for (const [key, value] of Object.entries({
     keyword: $("#search").value.trim(),
-    language: languagePicker.value,
-    kind: view.type === "collection" ? view.kind : "",
-    status: statusPicker.value,
+    language: selectedLanguage,
   })) {
     if (value) result[key] = value;
   }
@@ -274,37 +228,41 @@ function renderSettings() {
   $("#settings-fields").disabled = false;
   renderLanguagePreferences();
 }
-function card(record) {
-  const row = element("button", undefined, "knowledge-row");
-  row.dataset.id = record.id;
-  const content = element("span", undefined, "row-content");
-  const title = element("strong", record.title);
-  title.lang = record.language;
-  content.append(title, element("span", record.meaning, "row-meaning"));
-  const meta = element("span", undefined, "row-meta");
-  meta.append(translated("span", record.kind), element("span", languageName(record.language)), translated("span", record.status, {}, "status-tag"));
-  row.append(element("span", "▤", "page-icon"), content, meta, element("span", "↗", "row-arrow"));
-  row.addEventListener("click", () => navigate("#point-" + record.id));
-  return row;
-}
-function documentBlock(record) {
-  const editor = new DocumentEditor(record, {
-    t, api, languageName, uiLocale: locale,
-    onChange: (updated) => { displayed.set(updated.id, updated); },
+function card(record, expanded = false) {
+  const details = element("details", undefined, "history-entry");
+  details.dataset.id = record.id;
+  details.open = expanded;
+  const summary = element("summary");
+  const body = element("div", undefined, "entry-body");
+  function renderSummary(point) {
+    const heading = element("div", undefined, "entry-heading");
+    const title = element("h3", point.title);
+    title.lang = point.language;
+    heading.append(title, translated("span", point.status, {}, "status-tag"), element("span", undefined, "entry-chevron"));
+    summary.replaceChildren(heading, element("p", point.meaning, "entry-preview"),
+      translated("small", "lastSeen", { date: point.last_seen_at }));
+  }
+  renderSummary(record);
+  const editor = new EntryEditor(record, {
+    t, api, languageName, uiLocale: locale, card: details,
+    onChange: (updated) => { displayed.set(updated.id, updated); renderSummary(updated); },
     onDeleted: async (deleted) => {
       editors.delete(deleted.id);
       displayed.delete(deleted.id);
-      editor.node.remove();
+      details.remove();
       catalog = await api("languages/list");
       renderCatalog();
-      if (view.type === "point") await navigate("");
-      else await loadRecords(true, true);
+      await loadRecords(true, true);
       notice("deleted");
     },
-    onAsk: (point) => openCodex({ type: "point", id: point.id }),
   });
   editors.set(record.id, editor);
-  return editor.node;
+  body.append(editor.node);
+  details.append(summary, body);
+  disclosure(details, summary, body, (open) => {
+    if (open) editor.node.querySelectorAll("textarea").forEach((input) => editor.resize(input));
+  }, () => editor.flush());
+  return details;
 }
 function updateLoadState(key, params = {}) {
   $("#load-sentinel").hidden = key === "allLoaded";
@@ -326,9 +284,10 @@ function maybeLoadMore() {
 async function loadRecords(reset = false, preserve = false) {
   if (!ready || (!reset && (loading || !hasMore || loadFailed))) return false;
   if (reset && !preserve && !(await flushEditors())) return false;
-  if (preserve && (document.activeElement?.closest(".document-block") || [...editors.values()].some((editor) => editor.dirty))) return false;
+  if (preserve && (document.activeElement?.closest(".entry-editor") || [...editors.values()].some((editor) => editor.dirty))) return false;
   const version = reset ? ++queryVersion : queryVersion;
   const anchor = preserve ? [...$("#records").children].find((node) => node.getBoundingClientRect().top >= 0) : null;
+  const expanded = new Set(preserve ? [...document.querySelectorAll(".history-entry[open]")].map((node) => node.dataset.id) : []);
   const anchorId = anchor?.dataset.id;
   const anchorTop = anchor?.getBoundingClientRect().top;
   const amount = preserve ? Math.max(pageSize, displayed.size) : pageSize;
@@ -339,26 +298,20 @@ async function loadRecords(reset = false, preserve = false) {
   $("#records").setAttribute("aria-busy", "true");
   $("#records").classList.toggle("is-filtering", reset && !preserve);
   try {
-    let data;
-    if (view.type === "point") {
-      const result = await api("points/read", { record_id: view.id });
-      data = { records: [result.record], has_more: false, next_cursor: null };
-    } else {
-      data = { records: [], has_more: true, next_cursor: cursor };
-      do {
-        const args = { ...filters(), limit: Math.min(50, amount - data.records.length) };
-        if (data.next_cursor) args.cursor = data.next_cursor;
-        const batch = await api("points/query", args);
-        data = { ...batch, records: [...data.records, ...batch.records] };
-      } while (data.has_more && data.records.length < amount && version === queryVersion);
-    }
-    if (version !== queryVersion || [...editors.values()].some((editor) => editor.dirty) || (preserve && document.activeElement?.closest(".document-block"))) return false;
+    let data = { records: [], has_more: true, next_cursor: cursor };
+    do {
+      const args = { ...filters(), limit: Math.min(50, amount - data.records.length) };
+      if (data.next_cursor) args.cursor = data.next_cursor;
+      const batch = await api("points/query", args);
+      data = { ...batch, records: [...data.records, ...batch.records] };
+    } while (data.has_more && data.records.length < amount && version === queryVersion);
+    if (version !== queryVersion || [...editors.values()].some((editor) => editor.dirty) || (preserve && document.activeElement?.closest(".entry-editor"))) return false;
     if (reset) { displayed.clear(); editors.clear(); $("#records").replaceChildren(); }
     const added = [];
     for (const record of data.records) {
       if (displayed.has(record.id)) continue;
       displayed.set(record.id, record);
-      const node = view.type === "library" ? card(record) : documentBlock(record);
+      const node = card(record, expanded.has(String(record.id)));
       $("#records").append(node);
       added.push(node);
     }
@@ -468,8 +421,7 @@ async function download(format) {
   });
   feedback(".export-feedback", "exporting");
   try {
-    const scope = view.type === "point" ? { record_ids: [view.id] } : filters();
-    const response = await request("export", { format, ...scope });
+    const response = await request("export", { format, ...filters() });
     if (!response.ok) {
       const data = await response.json();
       throw new Error(data.error);
@@ -564,36 +516,13 @@ $("#search").addEventListener("input", () => {
 });
 $("#retry-load").addEventListener("click", () => {
   loadFailed = false;
-  loadRecords(view.type === "point");
+  loadRecords(true);
 });
 new IntersectionObserver(maybeLoadMore, { rootMargin: "250px" }).observe(
   $("#load-sentinel"),
 );
-$("#back-library").addEventListener("click", () => navigate(""));
-$("#page-ask").addEventListener("click", async () => { if (await flushEditors()) openCodex(view); });
-window.addEventListener("hashchange", () => navigate(location.hash, true));
 window.addEventListener("beforeunload", (event) => {
   if ([...editors.values()].some((editor) => editor.dirty)) { event.preventDefault(); event.returnValue = ""; }
-});
-function openCodex(context) {
-  askContext = { page: { ...context }, filters: filters() };
-  $("#codex-question").value = "";
-  $("#codex-feedback").textContent = "";
-  $("#prompt-fallback").hidden = true;
-  updateCodexLink();
-  openDialog($("#codex-dialog"));
-  $("#codex-question").focus();
-}
-function updateCodexLink() {
-  if (!askContext) return;
-  const prompt = codexPrompt(askContext.page, askContext.filters, $("#codex-question").value);
-  $("#codex-open").href = codexLink(prompt);
-  $("#codex-prompt").value = prompt;
-}
-$("#codex-question").addEventListener("input", updateCodexLink);
-$("#codex-copy").addEventListener("click", async () => {
-  try { await navigator.clipboard.writeText($("#codex-prompt").value); feedback("#codex-feedback", "copied"); }
-  catch { $("#prompt-fallback").hidden = false; $("#codex-prompt").select(); }
 });
 document.addEventListener("visibilitychange", synchronize);
 window.addEventListener("focus", synchronize);

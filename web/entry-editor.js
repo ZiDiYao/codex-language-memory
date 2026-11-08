@@ -1,5 +1,5 @@
-/** Editable learning documents backed by the same records as the MCP tools. */
-export class DocumentEditor {
+/** Inline editing with automatic saves and protection for concurrent changes. */
+export class EntryEditor {
   constructor(record, helpers) {
     this.record = record;
     Object.assign(this, helpers);
@@ -32,10 +32,10 @@ export class DocumentEditor {
 
   field(label, value, change, { title = false, language = null, max = 2000 } = {}) {
     const wrapper = document.createElement("label");
-    wrapper.className = "document-field";
-    wrapper.append(this.text("span", this.t(label), title ? "sr-only" : "document-label"));
+    wrapper.className = "entry-field";
+    wrapper.append(this.text("span", this.t(label), "entry-label"));
     const input = document.createElement("textarea");
-    input.className = title ? "document-input document-title" : "document-input";
+    input.className = "entry-input";
     input.rows = 1;
     input.maxLength = max;
     input.value = value || "";
@@ -115,10 +115,10 @@ export class DocumentEditor {
   render() {
     const record = this.record;
     const article = document.createElement("article");
-    article.className = "document-block";
+    article.className = "entry-editor";
     article.dataset.id = record.id;
-    const meta = this.text("div", `${this.t(record.kind)} · ${this.languageName(record.language)}`, "document-meta");
-    const actions = this.text("div", "", "document-actions");
+    const meta = this.text("div", `${this.t(record.kind)} · ${this.languageName(record.language)}`, "entry-meta");
+    const actions = this.text("div", "", "entry-actions");
     const mastery = this.button(record.status === "mastered" ? "keepLearning" : "markMastered", async () => {
       mastery.disabled = true;
       try {
@@ -127,9 +127,7 @@ export class DocumentEditor {
         if (await this.flush()) mastery.textContent = this.t(this.record.status === "mastered" ? "keepLearning" : "markMastered");
       } finally { mastery.disabled = false; }
     });
-    actions.append(mastery, this.button("askCodex", async () => {
-      if (await this.flush()) this.onAsk(this.record);
-    }));
+    actions.append(mastery);
     meta.append(actions);
     article.append(meta, this.field("title", record.title, (title) => this.queue({ title }), { title: true, language: record.language, max: 350 }));
     for (const [key, label] of [["meaning", "meaning"], ["explanation", "explanation"], ["context", "context"], ["corrected_sentence", "corrected"]]) {
@@ -138,13 +136,13 @@ export class DocumentEditor {
         { language: key === "corrected_sentence" ? record.language : null }));
     }
     const examples = document.createElement("div");
-    examples.className = "document-examples";
+    examples.className = "entry-examples";
     this.examples = record.examples.map((item) => ({ ...item }));
     const changed = () => this.queue({ examples: this.examples.filter((item) => item.text || item.translation).map((item) => ({ text: item.text, translation: item.translation || null })) });
     const renderExamples = () => {
-      examples.replaceChildren(this.text("h3", this.t("examples"), "document-label"));
+      examples.replaceChildren(this.text("h3", this.t("examples"), "entry-label"));
       this.examples.forEach((example, index) => {
-        const block = this.text("div", "", "document-example");
+        const block = this.text("div", "", "entry-example");
         block.append(
           this.field("exampleText", example.text, (value) => { example.text = value; changed(); }, { language: record.language }),
           this.field("exampleTranslation", example.translation, (value) => { example.translation = value; changed(); }),
@@ -159,7 +157,7 @@ export class DocumentEditor {
     };
     renderExamples();
     article.append(examples);
-    const footer = this.text("div", "", "document-footer");
+    const footer = this.text("div", "", "entry-footer");
     this.feedback = this.text("span", this.t("autoSave"), "help");
     this.feedback.setAttribute("role", "status");
     this.retry = this.button("retry", () => { this.error = null; this.flush(); });
