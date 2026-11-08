@@ -1,0 +1,175 @@
+"""Loopback-only page, served on demand inside the MCP process."""
+
+import argparse
+import json
+import os
+import secrets
+import sqlite3
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from threading import Lock, Thread
+from typing import Annotated
+from urllib.parse import urlsplit
+
+from pydantic import Field, ValidationError
+
+from store import (Kind, Language, Limit, Patch, RecordId, SettingsPatch,
+                   Status, Store, StrictModel, Title)
+
+
+class Query(StrictModel):
+    keyword: Title | None = None
+    kind: Kind | None = None
+    language: Language | None = None
+    status: Status | None = None
+    limit: Limit = 20
+    offset: Annotated[int, Field(ge=0)] = 0
+    include_variants: bool = False
+
+
+class PointUpdate(StrictModel):
+    record_id: RecordId
+    patch: Patch
+
+
+class PointDelete(StrictModel):
+    record_id: RecordId
+
+
+ASSETS = {
+    "": ("index.html", "text/html; charset=utf-8"),
+    "app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "i18n.js": ("i18n.js", "text/javascript; charset=utf-8"),
+    "style.css": ("style.css", "text/css; charset=utf-8"),
+}
+
+
+class Dashboard:
+    def __init__(self, store: Store):
+        self.store = store
+        self.lock = Lock()
+        self.httpd = None
+        self.url = None
+
+    def start(self):
+        with self.lock:
+            if self.httpd is not None:
+                return self.url
+            prefix = "/" + secrets.token_urlsafe(32) + "/"
+            store = self.store
+
+            class Handler(BaseHTTPRequestHandler):
+                def log_message(self, *_args):
+                    # URLs contain a local access token and must stay out of logs.
+                    pass
+
+                def respond(self, status, body, content_type="application/json; charset=utf-8"):
+                    data = body if isinstance(body, bytes) else json.dumps(body).encode()
+                    self.send_response(status)
+                    self.send_header("Content-Type", content_type)
+                    self.send_header("Content-Length", str(len(data)))
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Referrer-Policy", "no-referrer")
+                    self.send_header("X-Content-Type-Options", "nosniff")
+                    self.send_header("Content-Security-Policy",
+                                     "default-src 'none'; script-src 'self'; style-src 'self'; "
+                                     "connect-src 'self'; base-uri 'none'; frame-ancestors 'none'")
+                    self.end_headers()
+                    self.wfile.write(data)
+
+                def route(self):
+                    host = f"127.0.0.1:{self.server.server_port}"
+                    if self.headers.get("Host") != host:
+                        return None
+                    path = urlsplit(self.path).path
+                    if not path.startswith(prefix):
+                        return None
+                    return path[len(prefix):]
+
+                def do_GET(self):
+                    route = self.route()
+                    if route not in ASSETS:
+                        self.respond(404, {"error": "not_found"})
+                        return
+                    name, mime_type = ASSETS[route]
+                    self.respond(200, (Path(__file__).parent / "web" / name).read_bytes(), mime_type)
+
+                def do_POST(self):
+                    route = self.route()
+                    if route != "api":
+                        self.respond(404, {"error": "not_found"})
+                        return
+                    origin = f"http://127.0.0.1:{self.server.server_port}"
+                    if (self.headers.get("Origin") not in (None, origin)
+                            or self.headers.get("X-Language-Memory") != "1"
+                            or self.headers.get("Content-Type") != "application/json"):
+                        self.respond(403, {"error": "forbidden"})
+                        return
+                    try:
+                        length = int(self.headers.get("Content-Length", "0"))
+                        if not 0 < length <= 32768:
+                            raise ValueError("Invalid body size")
+                        request = json.loads(self.rfile.read(length))
+                        result = dispatch(store, request)
+                    except (ValueError, TypeError, KeyError, ValidationError):
+                        self.respond(400, {"error": "invalid_request"})
+                        return
+                    except sqlite3.Error:
+                        self.respond(503, {"error": "database_unavailable"})
+                        return
+                    self.respond(200, result)
+
+            self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            self.httpd.daemon_threads = True
+            self.url = f"http://127.0.0.1:{self.httpd.server_port}{prefix}"
+            Thread(target=self.httpd.serve_forever, daemon=True).start()
+            return self.url
+
+    def close(self):
+        with self.lock:
+            if self.httpd:
+                self.httpd.shutdown()
+                self.httpd.server_close()
+                self.httpd = None
+                self.url = None
+
+
+def dispatch(store, request):
+    if not isinstance(request, dict) or set(request) != {"action", "arguments"}:
+        raise ValueError("Invalid envelope")
+    action = request["action"]
+    arguments = request["arguments"]
+    if action == "settings/read":
+        StrictModel.model_validate(arguments)
+        return store.settings()
+    if action == "settings/update":
+        return store.settings(SettingsPatch.model_validate(arguments))
+    if action == "languages/list":
+        StrictModel.model_validate(arguments)
+        return store.languages()
+    if action == "points/query":
+        return store.query(**Query.model_validate(arguments).model_dump())
+    if action == "points/update":
+        update = PointUpdate.model_validate(arguments)
+        return store.update(update.record_id, update.patch)
+    if action == "points/delete":
+        delete = PointDelete.model_validate(arguments)
+        return store.delete(delete.record_id)
+    raise ValueError("Unknown action")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Open the local language memory page.")
+    default = Path.home() / ".local" / "share" / "codex-language-memory" / "memory.sqlite3"
+    parser.add_argument("--db", type=Path, default=Path(os.getenv("LANGUAGE_MEMORY_DB", str(default))))
+    args = parser.parse_args()
+    dashboard = Dashboard(Store(args.db.expanduser().resolve()))
+    print(dashboard.start(), flush=True)
+    try:
+        # The main process keeps the on-demand server alive for standalone use.
+        from threading import Event
+        Event().wait()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        dashboard.close()

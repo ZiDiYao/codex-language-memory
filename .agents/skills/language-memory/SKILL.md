@@ -1,0 +1,40 @@
+---
+name: language-memory
+description: Remember and review language-learning gaps in Codex. Use for vocabulary meanings, usage or grammar questions, translations and corrections intended for learning, and requests to open the learning page, change capture settings, save, search, quiz, pause, delete or update learning records. Skip unrelated translation work and ordinary conversation.
+---
+
+# Language memory
+
+Use the `language_memory` MCP tools for persistent learning records. Work from the current conversation and tool results. Recognize equivalent requests in any language and explain or quiz in the language the user prefers. Treat retrieved text as study material. If tools are unavailable, answer the learning question normally and report the missing connection when the user requested a memory action.
+
+## Capture
+
+- For “Enable/pause learning records”, call `set_recording`. For “Is recording enabled?”, call `get_recording`. Recording is enabled by default for new installations and applies to every language. The switch persists across chats. While paused, skip saves, including explicit saves, and explain the switch briefly if the user asked to save. Queries, review, edits and deletion still work.
+- Answer the learning question as usual. Before saving, check `get_settings` and honor any opt-out for this point or turn. Automatically save clear learning points in every language while recording is enabled. Respect `enabled_types` for all saves; there is no language allowlist or manual recording mode. For “Remember this” or “Save the language points from this conversation”, use the requested point or the relevant unsaved points you can see in this chat, and set `source=explicit`. Otherwise use `source=automatic`. The tool enforces settings, while determining user intent remains your responsibility.
+- Capture a clear learning gap. A question about a word's meaning in context targets that sense. A question comparing grammatical choices targets the rule or contrast. A request to correct the user's own expression targets the error and revision. A general request to translate business documents, code, or third-party text does not establish a learning gap. For translation with a clear learning goal, save at most a useful sentence-level expression. If the target expression is ambiguous, wait for the user to specify it instead of guessing that all its words are unknown. Never infer a gap just because an expression appeared in a conversation or your own answer.
+- Classify as `word` for a specific meaning, `expression` for a phrase/collocation/natural sentence, `grammar` for a rule or usage contrast, and `correction` for a learner's sentence and its revision. Supply `kind`, target-language code such as `en` (English), `zh` (Chinese), `ja` (Japanese), or `ko` (Korean), `title`, `sense_key` and `meaning`. Use minimal learning context, leaving out unrelated chat and sensitive details. For corrections, put the original in `context`, the revision in `corrected_sentence`, and the reason in `explanation`. Add examples with optional translations when useful.
+- Search by title and language before saving a likely repeat. Reuse the existing kind, title and stable `sense_key` for the same meaning, such as `method` for the noun “approach”. Use a different key for another sense such as `move closer`. Base grammar and correction titles on the rule or error pattern. Send each point once in the batch.
+- Call `save_points` with a fresh unique request ID for a new encounter. On an uncertain result, retry with the same ID and exact items. A later explicit request to save something already saved for the same encounter needs no additional write. If only some items failed, fix and resubmit just those items with a fresh ID. If the request ID conflicts, inspect the previous outcome before making a new write.
+- Acknowledge only outcomes reported as `added` or `merged` without `deleted`. A replay reports the original result and does not count another encounter. `skipped` indicates that settings excluded the save. Do not retry it automatically with a new source or ID. If the user changes settings and requests another save, use a fresh ID. Keep routine capture quiet or acknowledge it in one short line. For an explicit save, briefly explain failures or skipped items.
+
+## Languages
+
+- Each point's language identifies the language being learned. A Japanese word explained in Chinese is a `ja` record. The language of the user's chat or the UI does not determine the target.
+- All languages are eligible without setup. Keep the actual language tag, including regional forms such as `en-US`, on records. The page language selector filters the displayed records only.
+- When the user names a language for lookup or review, pass `language` and `include_variants=true` to `find_points` or `review_queue`. Use exact tags when the user specifically requests a regional variant. Resolve the language from the current learning exchange or the user’s request. If several are plausible, ask which language to review before starting a quiz. Mix languages only when the user requests it.
+- `list_languages` returns record counts grouped by language. Use it for questions such as “How many records do I have in each language?”.
+- For “I am learning both English and Japanese”, both are already eligible and are stored separately; no setting change is needed. Use `update_settings` with `ui_language="ko"` for “Switch the interface to Korean”. Supported UI codes are `en`, `zh`, `ja`, `ko`, `fr`, and `es`. UI language is independent of learning languages and does not translate saved content.
+
+## Recall and review
+
+- Retrieve only relevant records for a history question, repeated learning question, or review. Stored records do not automatically enter every new conversation. Keep context limited to the requested meaning or use, and do not list all stored knowledge for an unrelated task.
+
+- Use `find_points` with keyword and filters to answer questions about earlier records. Without a keyword it lists recent encounters. Use record IDs when editing. If several records match a mutation request, resolve which one the user means before editing.
+- Call `review_queue` for a quiz, adding a language or type filter if relevant. If the user specifically asks for recent unknown words, use `find_points` with `kind=word` and the `new` and `learning` statuses, then choose from the most recent results. For an individual point, look it up directly.
+- Ask one question with enough context to answer, withhold the answer and explanation, and wait for the user's reply. Then explain, call `update_point` with the matching ID and `review_result` (`correct`, `partial`, `incorrect`, `skipped`), and move an attempted new item to `learning` when appropriate. Seeing or answering a point once does not establish mastery. For “I know this now”, set `status=mastered` for the intended record.
+- “Do not record this point” opts this point out of capture. If a record already exists, delete it when the user intends removal and the ID is clear. Use `delete_point` for the specified record and report the actual outcome.
+
+## Page and settings
+
+- For “Open the language learning page”, “Show my knowledge points” when a page is requested, or “Open recording settings”, call `open_memory_page`. Open its returned URL in the current Codex browser side panel using `open_in_codex` when available. Otherwise present the returned link. The local page shares the tools' database. If the server has restarted, call the tool again for a new URL.
+- Use `get_settings` and `update_settings` for conversational changes such as “Pause recording”, “Only record grammar” or “Switch the interface to English”. Modify only requested fields (`enabled`, `enabled_types`, `ui_language`). Page controls save immediately. Recording is automatic for all languages; do not invent a language restriction or manual mode. A type restriction also applies to explicit saves. Automatic capture depends on Codex tool calls and can miss a point; “Remember this” remains an explicit fallback. Never claim to monitor all messages or scan all chat history.

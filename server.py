@@ -1,0 +1,120 @@
+"""Local stdio MCP entry point for Codex Language Memory."""
+
+import os
+from pathlib import Path
+from typing import Annotated, Any
+
+from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
+from pydantic import Field
+
+from store import (CaptureMode, Kind, Language, Limit, Patch, RecordId, RequestId,
+                   SettingsPatch, Status, Store, Title)
+from dashboard import Dashboard
+
+
+def create_server(store: Store) -> FastMCP:
+    server = FastMCP("language_memory")
+    read_only = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
+    local_write = ToolAnnotations(destructiveHint=False, openWorldHint=False)
+    dashboard = Dashboard(store)
+
+    @server.tool(annotations=read_only)
+    def open_memory_page() -> dict[str, Any]:
+        """Open the language learning records and settings page.
+        Show the returned local URL in the Codex browser side panel when available.
+        The page shares this server's database and lasts until this process exits.
+        """
+        return {"url": dashboard.start(), "title": "Language memory"}
+
+    @server.tool(annotations=read_only)
+    def get_settings() -> dict[str, Any]:
+        """Read recording, ui_language and enabled record types. Capture is automatic for all languages."""
+        return store.settings()
+
+    @server.tool(annotations=local_write)
+    def update_settings(patch: SettingsPatch) -> dict[str, Any]:
+        """Update supplied settings immediately. ui_language is en/zh/ja/ko/fr/es.
+        Capture automatically covers every language while recording is enabled.
+        """
+        return store.settings(patch)
+
+    @server.tool(annotations=read_only)
+    def list_languages() -> dict[str, Any]:
+        """List available languages and saved record counts grouped by base language."""
+        return store.languages()
+
+    @server.tool(annotations=read_only)
+    def get_recording() -> dict[str, Any]:
+        """Read the persistent recording switch. Enabled by default."""
+        return store.recording()
+
+    @server.tool(annotations=local_write)
+    def set_recording(enabled: bool) -> dict[str, Any]:
+        """Enable or pause new saves. Existing entries remain available."""
+        return store.recording(enabled)
+
+    @server.tool(annotations=local_write)
+    def save_points(
+        request_id: RequestId,
+        items: Annotated[list[dict[str, Any]], Field(min_length=1, max_length=20)],
+        source: CaptureMode = "automatic",
+    ) -> dict[str, Any]:
+        """Save one batch from a learning encounter. Reuse request_id and exact items on retry.
+
+        Each item needs kind (word/expression/grammar/correction), language (e.g. en),
+        title, sense_key (stable short meaning/use label) and meaning. Optional fields
+        are context, corrected_sentence, explanation and examples (text, optional translation).
+        Set source=explicit only when the user requested this save.
+        Returns one added/merged/skipped/failed outcome per item when processed.
+        Skipped means the current capture settings exclude the item.
+        """
+        return store.save(request_id, items, source)
+
+    @server.tool(annotations=read_only)
+    def find_points(
+        keyword: Title | None = None,
+        kind: Kind | None = None,
+        language: Language | None = None,
+        status: Status | None = None,
+        limit: Limit = 10,
+        offset: Annotated[int, Field(ge=0)] = 0,
+        include_variants: bool = False,
+    ) -> dict[str, Any]:
+        """Find points by keyword and filters, most recently seen first.
+        Set language to isolate a learning language and include_variants=true to include regional forms.
+        """
+        return store.query(
+            keyword=keyword, kind=kind, language=language, status=status,
+            limit=limit, offset=offset, include_variants=include_variants,
+        )
+
+    @server.tool(annotations=read_only)
+    def review_queue(
+        language: Language | None = None, kind: Kind | None = None, limit: Limit = 5,
+        include_variants: bool = False,
+    ) -> dict[str, Any]:
+        """Get unmastered points, never-reviewed first, then least recently reviewed.
+        Supply language to review one language. include_variants includes regional forms.
+        """
+        return store.review(language=language, kind=kind, limit=limit, include_variants=include_variants)
+
+    @server.tool(annotations=ToolAnnotations(openWorldHint=False))
+    def update_point(record_id: RecordId, patch: Patch) -> dict[str, Any]:
+        """Edit supplied fields only. Use null to clear optional content.
+        A review_result sets the review timestamp. Status changes only when supplied.
+        """
+        return store.update(record_id, patch)
+
+    @server.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
+    def delete_point(record_id: RecordId) -> dict[str, Any]:
+        """Delete a specific knowledge point by ID."""
+        return store.delete(record_id)
+
+    return server
+
+
+if __name__ == "__main__":
+    default = Path.home() / ".local" / "share" / "codex-language-memory" / "memory.sqlite3"
+    path = Path(os.environ.get("LANGUAGE_MEMORY_DB", str(default))).expanduser().resolve()
+    create_server(Store(path)).run(transport="stdio")

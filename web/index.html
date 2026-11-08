@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Language memory</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="app.js" type="module"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="topline">
+          <div class="app-heading">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              width="24"
+              height="24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+            >
+              <path
+                d="M4 4h6c2 0 2 1 2 2v15c0-2-1-3-3-3H4zM20 4h-6c-2 0-2 1-2 2v15c0-2 1-3 3-3h5z"
+              />
+            </svg>
+            <h1 data-i18n="appTitle">Language memory</h1>
+          </div>
+          <label class="locale-control"
+            ><span data-i18n="uiLanguage">Interface language</span
+            ><select id="ui-language"></select
+          ></label>
+        </div>
+        <p class="intro" data-i18n="subtitle"></p>
+        <div class="navigation-row">
+          <nav aria-label="Navigation">
+            <button id="records-tab" aria-current="page" data-i18n="records">
+              Knowledge</button
+            ><button id="settings-tab" data-i18n="settings">Settings</button>
+          </nav>
+          <span
+            id="recording-badge"
+            class="badge"
+            data-i18n="connecting"
+          ></span>
+        </div>
+      </header>
+      <section id="records-panel">
+        <div class="notebook-row">
+          <label
+            ><span data-i18n="notebook">Learning language</span
+            ><select id="language"></select></label
+          ><button id="refresh" class="subtle" data-i18n="refresh"></button>
+        </div>
+        <form id="search-form">
+          <div class="search-line">
+            <label class="sr-only" for="search" data-i18n="search"></label
+            ><input
+              id="search"
+              type="search"
+              maxlength="350"
+              data-placeholder="searchPlaceholder"
+            /><button type="submit" data-i18n="search"></button>
+          </div>
+          <div class="filters">
+            <label
+              ><span data-i18n="kind"></span
+              ><select id="kind">
+                <option value="" data-i18n="allTypes"></option>
+                <option value="word" data-i18n="word"></option>
+                <option value="expression" data-i18n="expression"></option>
+                <option value="grammar" data-i18n="grammar"></option>
+                <option
+                  value="correction"
+                  data-i18n="correction"
+                ></option></select
+            ></label>
+            <label
+              ><span data-i18n="status"></span
+              ><select id="status">
+                <option value="" data-i18n="allStatuses"></option>
+                <option value="new" data-i18n="new"></option>
+                <option value="learning" data-i18n="learning"></option>
+                <option value="mastered" data-i18n="mastered"></option></select
+            ></label>
+          </div>
+        </form>
+        <div id="records" aria-live="polite">
+          <p class="empty" data-i18n="loading"></p>
+        </div>
+        <div class="pagination">
+          <button id="previous" disabled data-i18n="previous"></button
+          ><span id="page-number"></span
+          ><button id="next" disabled data-i18n="next"></button>
+        </div>
+        <aside>
+          <strong data-i18n="reviewTitle"></strong>
+          <p data-i18n="reviewHelp"></p>
+        </aside>
+      </section>
+      <section id="settings-panel" hidden>
+        <div class="section-heading">
+          <h2 data-i18n="settingsTitle"></h2>
+          <p data-i18n="settingsHelp"></p>
+        </div>
+        <form id="settings-form">
+          <fieldset id="settings-fields" disabled>
+            <label class="toggle-row"
+              ><span
+                ><strong data-i18n="recording"></strong
+                ><small data-i18n="recordingHelp"></small></span
+              ><input id="enabled" type="checkbox" role="switch"
+            /></label>
+            <div class="setting">
+              <h3 data-i18n="recordTypes"></h3>
+              <div class="type-grid">
+                <label class="choice"
+                  ><input
+                    type="checkbox"
+                    name="enabled-type"
+                    value="word"
+                    checked /><span
+                    ><strong data-i18n="word"></strong
+                    ><small data-i18n="wordHelp"></small></span
+                ></label>
+                <label class="choice"
+                  ><input
+                    type="checkbox"
+                    name="enabled-type"
+                    value="expression"
+                    checked /><span
+                    ><strong data-i18n="expression"></strong
+                    ><small data-i18n="expressionHelp"></small></span
+                ></label>
+                <label class="choice"
+                  ><input
+                    type="checkbox"
+                    name="enabled-type"
+                    value="grammar"
+                    checked /><span
+                    ><strong data-i18n="grammar"></strong
+                    ><small data-i18n="grammarHelp"></small></span
+                ></label>
+                <label class="choice"
+                  ><input
+                    type="checkbox"
+                    name="enabled-type"
+                    value="correction"
+                    checked /><span
+                    ><strong data-i18n="correction"></strong
+                    ><small data-i18n="correctionHelp"></small></span
+                ></label>
+              </div>
+            </div>
+          </fieldset>
+        </form>
+        <aside>
+          <strong data-i18n="limitsTitle"></strong>
+          <p data-i18n="limitsHelp"></p>
+        </aside>
+      </section>
+      <div id="notice" role="status" hidden></div>
+      <footer data-i18n="footer"></footer>
+    </main>
+  </body>
+</html>

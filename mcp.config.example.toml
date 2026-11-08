@@ -1,0 +1,9 @@
+# Copy the table into your Codex user config or a trusted project's .codex/config.toml.
+# Replace the absolute paths if you move the project.
+[mcp_servers.language_memory]
+command = "/absolute/path/to/codex-language-memory/.venv/bin/python"
+args = ["/absolute/path/to/codex-language-memory/server.py"]
+
+# Optional override. Use a single absolute path outside your repositories.
+# [mcp_servers.language_memory.env]
+# LANGUAGE_MEMORY_DB = "/absolute/path/to/memory.sqlite3"

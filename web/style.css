@@ -1,0 +1,488 @@
+:root {
+  color-scheme: light;
+  --background: #ffffff;
+  --surface: #f7f7f7;
+  --hover: #efefef;
+  --text: #202020;
+  --muted: #737373;
+  --line: #e5e5e5;
+  --button: #202020;
+  --button-text: #ffffff;
+  --error: #b63535;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans", "Malgun Gothic", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --background: #181818;
+    --surface: #212121;
+    --hover: #2c2c2c;
+    --text: #ededed;
+    --muted: #a0a0a0;
+    --line: #363636;
+    --button: #eeeeee;
+    --button-text: #191919;
+    --error: #ff9696;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+main {
+  max-width: 820px;
+  margin: auto;
+  padding: 24px;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+h1 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+}
+h2 {
+  font-size: 17px;
+  font-weight: 600;
+}
+h3 {
+  font-size: 13px;
+  font-weight: 600;
+}
+.topline,
+.app-heading,
+.navigation-row {
+  display: flex;
+  align-items: center;
+}
+.topline {
+  justify-content: space-between;
+  gap: 12px;
+}
+.app-heading {
+  gap: 10px;
+}
+.app-heading svg {
+  flex-shrink: 0;
+}
+.locale-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.locale-control select {
+  width: auto;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.intro {
+  color: var(--muted);
+  margin: 12px 0 22px;
+  font-size: 12px;
+}
+.navigation-row {
+  border-bottom: 1px solid var(--line);
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+nav {
+  display: flex;
+  gap: 22px;
+}
+nav button {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 9px 0;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+}
+nav button[aria-current] {
+  color: var(--text);
+  border-bottom-color: var(--text);
+  font-weight: 600;
+}
+.badge {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.badge::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button {
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+button:hover:not(:disabled) {
+  background: var(--hover);
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+button.primary {
+  background: var(--button);
+  color: var(--button-text);
+  border-color: var(--button);
+}
+button.primary:hover:not(:disabled) {
+  opacity: 0.85;
+  background: var(--button);
+}
+button.subtle {
+  background: transparent;
+}
+button.danger {
+  color: var(--error);
+}
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 9px 10px;
+  min-width: 0;
+}
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--text);
+  width: 16px;
+  height: 16px;
+  margin: 3px 0 0;
+  flex-shrink: 0;
+}
+textarea {
+  resize: vertical;
+  min-height: 76px;
+}
+:focus-visible {
+  outline: 2px solid var(--muted);
+  outline-offset: 3px;
+}
+.notebook-row {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 16px;
+  justify-content: space-between;
+}
+.notebook-row label {
+  max-width: 320px;
+  flex: 1;
+  color: var(--muted);
+  font-size: 11px;
+}
+.notebook-row select {
+  margin-top: 6px;
+  font-weight: 500;
+}
+.search-line {
+  display: flex;
+  gap: 8px;
+}
+.search-line input {
+  flex: 1;
+  width: 0;
+}
+.filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 12px 0 22px;
+}
+.filters label,
+.edit-grid label {
+  font-size: 11px;
+  color: var(--muted);
+}
+.filters select {
+  margin-top: 5px;
+}
+.card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.card summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 16px;
+}
+.card summary::-webkit-details-marker {
+  display: none;
+}
+.card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.kind {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.meaning {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.meta {
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+}
+.disclosure {
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.disclosure::after {
+  content: "+";
+  font-size: 14px;
+}
+.card[open] .disclosure::after {
+  content: "−";
+}
+.detail {
+  padding: 0 16px 16px;
+  border-top: 1px solid var(--line);
+}
+.detail h4 {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+  margin: 16px 0 5px;
+}
+.detail p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.example {
+  padding: 10px 12px;
+  border-left: 2px solid var(--line);
+  margin-top: 12px;
+}
+.example small {
+  margin-top: 4px;
+}
+.edit-grid {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0;
+}
+.edit-grid input,
+.edit-grid textarea,
+.edit-grid select {
+  display: block;
+  margin-top: 5px;
+  color: var(--text);
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.actions + .actions {
+  margin-top: 12px;
+}
+.empty {
+  padding: 40px 18px;
+  text-align: center;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.empty strong {
+  display: block;
+  color: var(--text);
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 20px 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.pagination button {
+  font-size: 11px;
+}
+aside {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  margin-top: 26px;
+  font-size: 12px;
+  color: var(--muted);
+}
+aside strong {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+}
+aside p {
+  margin-top: 6px;
+}
+fieldset {
+  padding: 0;
+  border: 0;
+  margin: 0;
+}
+.section-heading {
+  margin-bottom: 20px;
+}
+.section-heading p,
+.help {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+.toggle-row strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
+  margin-top: 3px;
+}
+.setting {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  margin: 12px 0;
+}
+.choice strong {
+  font-weight: 500;
+  font-size: 12px;
+}
+.type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 18px;
+}
+#settings-form button {
+  margin-top: 20px;
+}
+#notice {
+  position: sticky;
+  bottom: 12px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 3px 16px #0002;
+  margin-top: 16px;
+  font-size: 12px;
+}
+#notice.error {
+  color: var(--error);
+}
+footer {
+  color: var(--muted);
+  font-size: 10px;
+  text-align: center;
+  margin-top: 30px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+[hidden] {
+  display: none !important;
+}
+@media (max-width: 520px) {
+  main {
+    padding: 20px 16px;
+  }
+  h1 {
+    font-size: 17px;
+  }
+  .locale-control {
+    flex-direction: column;
+    align-items: end;
+    gap: 2px;
+  }
+  .locale-control select {
+    max-width: 108px;
+  }
+  .topline {
+    align-items: start;
+  }
+  .type-grid {
+    grid-template-columns: 1fr;
+  }
+}
