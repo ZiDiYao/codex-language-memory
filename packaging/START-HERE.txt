@@ -1,0 +1,54 @@
+LANGUAGE MEMORY — LOCAL BETA
+
+For Apple Silicon Macs (M1 or later). Codex desktop or CLI is required.
+Python, pip, Git, a separate AI API key and manual path configuration are not required.
+
+INSTALL OR UPDATE
+1. Extract the complete ZIP; keep its contents together.
+2. Double-click Install.command. It also upgrades an existing installation.
+3. Wait for the success message, then restart Codex and start a new conversation.
+4. Ask: "What does approach mean in 'The new approach worked'?"
+   Then: "Open the language learning page."
+
+This Beta is not Developer ID signed or notarized. macOS may block the downloaded
+command or runtime. Use Apple's normal Privacy & Security / Open Anyway flow only
+after checking the release source and checksum. Do not disable Gatekeeper globally.
+If organizational policy blocks unsigned software, use the source installation or
+wait for a signed release. Smooth first-open behavior on a clean downloaded Mac has
+not yet been certified.
+
+UPDATES
+Download a newer ZIP from the same GitHub Releases page and run Install.command
+again. The installer checks the package and new runtime first, backs up the database,
+and switches the active release. It preserves your records, settings and custom
+absolute database location. Delete the downloaded folder after installation if desired.
+Updates are explicit; this Beta does not download or execute code in the background.
+
+STATUS AND RECOVERY
+- Check Installation.command reports the installed version and connection status.
+- Roll Back.command returns to the previous packaged release, keeping current data.
+  Rollback does not restore an old database or discard newly learned points.
+- Uninstall.command disconnects this MCP server and Skill. It retains learning data,
+  backups and release files, so reinstalling reconnects them. Restart Codex afterward.
+
+These command files can be run from any extracted release folder. No folder path
+needs to be typed. Close and reopen this folder after downloading a new release.
+
+DATA AND PRIVACY
+Learning records stay in ~/.local/share/codex-language-memory/memory.sqlite3 by
+default. Installed code is under ~/Library/Application Support/Codex Language Memory.
+Backups are stored next to the database, in backups/. Existing custom database
+locations are retained. Do not delete that directory if you want to keep your records.
+Relevant records retrieved by tools enter your Codex conversation and are subject to
+its normal data handling. The plugin adds no telemetry or hosted learning backend.
+
+Only this plugin's MCP entry and Skill link are changed. Other Codex configuration
+and credentials are preserved. An unrelated server or skill with the same name
+causes installation to stop rather than overwrite it.
+
+This installer registers MCP and Skill directly. The package also contains portable
+plugin manifests for authoring. Do not separately install the same package through
+a plugin marketplace while using the installer, as that would duplicate registration.
+
+Releases: https://github.com/ZiDiYao/codex-language-memory/releases
+Support: https://github.com/ZiDiYao/codex-language-memory/issues

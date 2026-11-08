@@ -1,0 +1,19 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "language-memory",
+  "version": "0.2.0-beta.1",
+  "description": "Local language-learning memory and adaptive review for Codex.",
+  "author": {"name": "ZiDiYao"},
+  "repository": "https://github.com/ZiDiYao/codex-language-memory",
+  "extensions": {
+    "com.openai": {
+      "requires_local_executor": true,
+      "interface": {
+        "displayName": "Language memory",
+        "shortDescription": "Remember learning gaps and practice with Codex.",
+        "developerName": "ZiDiYao",
+        "defaultPrompt": ["Quiz me on one of my words.", "Open my language learning page."]
+      }
+    }
+  }
+}

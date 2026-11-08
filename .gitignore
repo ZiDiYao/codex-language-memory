@@ -11,3 +11,6 @@ __pycache__/
 node_modules/
 *.log
 exports/
+build/
+dist/
+*.spec

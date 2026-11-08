@@ -4,27 +4,33 @@ A local language-learning memory for Codex. Keep learning in your existing conve
 
 Recording is automatic for all languages and enabled by default on new installations. The optional local page lets you browse records and change preferences. It uses neutral colors, follows the system theme, and supports English, Chinese, Japanese, Korean, French, and Spanish.
 
-## Install
+## Install the local Beta
 
-Requires a local Codex desktop app or CLI and Python 3.10+. Tested with Python 3.12. Clone the repository, then run from its directory:
+Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.1), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
+
+To upgrade, download the next Beta and run its **Install.command**. The installer validates the package, tests its runtime, backs up the database and switches versions while preserving learning records and settings. Repeating the same installation is safe. It also migrates the earlier source-checkout installation automatically.
+
+- **Check Installation.command**: inspect the installed version and connection.
+- **Roll Back.command**: activate the previous packaged version while keeping current data.
+- **Uninstall.command**: disconnect MCP and Skill; retain records, backups and release files for recovery.
+
+The repository is currently private, so GitHub downloads require repository access. This Beta is not Apple Developer ID signed or notarized; macOS may require its normal Privacy & Security / Open Anyway confirmation. The installer never disables Gatekeeper. Tested on macOS 26.5.1 arm64; other binary targets and clean-machine downloaded-app validation remain outstanding.
+
+Code is installed under `~/Library/Application Support/Codex Language Memory`. Data stays at `~/.local/share/codex-language-memory/memory.sqlite3` unless this integration already has a custom absolute database path. An existing `CODEX_HOME` is respected. Other Codex settings, servers and skills are preserved. See [installation, upgrade and recovery details](docs/beta-release.md).
+
+This installer connects the local MCP server and Skill directly. It does not publish to or install from the official plugin directory. Portable plugin manifests are included for authoring; avoid registering a second copy through a marketplace.
+
+For source development, Python 3.10+ is supported (tested with 3.12):
 
 ```sh
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 codex mcp add language_memory -- "$PWD/.venv/bin/python" "$PWD/server.py"
-codex mcp get language_memory
-```
-
-The project skill is in `.agents/skills/language-memory`. To make it available across projects, link it into your user skill directory:
-
-```sh
 mkdir -p "$HOME/.agents/skills"
 ln -s "$PWD/.agents/skills/language-memory" "$HOME/.agents/skills/language-memory"
 ```
 
-If a skill or MCP server already exists under this name, inspect its location before replacing it. Open a new Codex conversation after installation. The CLI's `/mcp` command lists connected tools. Alternatively, adapt the absolute paths in [mcp.config.example.toml](mcp.config.example.toml) and merge it into your Codex configuration.
-
-The database defaults to `~/.local/share/codex-language-memory/memory.sqlite3`, outside the repository. Set `LANGUAGE_MEMORY_DB` to an absolute path to override it. Use the same path for every session. Database files, local environments, secrets files, and logs are ignored by Git.
+The source instructions are an alternative to the Beta installer. Inspect an existing registration before replacing it. Database files, environments, credentials and release artifacts are ignored by Git. [Build and test the packaged Beta](docs/beta-release.md#building-and-checking-a-release) before distributing a new version.
 
 ## Try it in Codex
 
@@ -127,7 +133,7 @@ Paused recording blocks new saves, including explicit ones. Queries, review, edi
 node --test tests/test_locales.mjs
 ```
 
-The 41 Python tests use isolated databases and cover persistence, query filters, language separation, sense deduplication, partial batches, rollback, concurrent idempotent retries, deletion without resurrection, legacy preference migration, settings validation, local HTTP protections, cursor pagination under concurrent inserts, legacy mastery migration, generated-content requirements, cross-process change detection, complete filtered exports, multilingual Office/Notion content, literal spreadsheet formulas, PDF text/font errors, and an MCP session restart with review/update/delete/export. Learning-model checks cover exact scheduling agreement with upstream FSRS across successful and failed recalls, assisted/skipped attempts, review retries and rollback, chronological prediction scoring, history pagination, language-scoped preferences, deletion cascades, legacy history gaps and clock reversal. These verify software behavior, not educational effectiveness. The 2 Node tests check translation completeness and matching placeholders for all six UI locales.
+The 55 Python tests use isolated databases and cover persistence, query filters, language separation, sense deduplication, partial batches, rollback, concurrent idempotent retries, deletion without resurrection, legacy preference migration, settings validation, local HTTP protections, cursor pagination under concurrent inserts, legacy mastery migration, generated-content requirements, cross-process change detection, complete filtered exports, multilingual Office/Notion content, literal spreadsheet formulas, PDF text/font errors, and an MCP session restart with review/update/delete/export. Learning-model checks cover exact scheduling agreement with upstream FSRS across successful and failed recalls, assisted/skipped attempts, review retries and rollback, chronological prediction scoring, history pagination, language-scoped preferences, deletion cascades, legacy history gaps and clock reversal. These verify software behavior, not educational effectiveness. The 2 Node tests check translation completeness and matching placeholders for all six UI locales.
 
 A real Codex CLI conversation was tested against the local user's database: four learning questions produced one automatic `save_points` call with four successful additions, one each for English, Chinese, Japanese, and Korean. No explicit save request was included. These are local acceptance-test records; they are not shipped in the repository.
 
