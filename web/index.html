@@ -28,13 +28,18 @@
             <h1 data-i18n="appTitle">Language memory</h1>
           </div>
           <div class="header-actions">
-            <button id="export-open" class="subtle" data-i18n="export">
-              Export
+            <button id="export-open" type="button" class="icon-button" aria-haspopup="dialog" data-tooltip="export">
+              <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3v12m-4-4 4 4 4-4M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5" />
+              </svg>
+              <span class="sr-only" data-i18n="export">Export</span>
             </button>
             <button
               id="settings-open"
+              type="button"
               class="icon-button"
               aria-haspopup="dialog"
+              data-tooltip="settings"
             >
               <svg
                 aria-hidden="true"

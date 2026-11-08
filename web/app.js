@@ -156,6 +156,12 @@ function applyLocale() {
   document.querySelectorAll("[data-placeholder]").forEach((node) => {
     node.placeholder = t(node.dataset.placeholder);
   });
+  document.querySelectorAll("[data-tooltip]").forEach((node) => {
+    node.title = t(node.dataset.tooltip);
+  });
+  document.querySelectorAll(".entry-status").forEach((node) => {
+    node.setAttribute("aria-label", t("mastered"));
+  });
   document.querySelectorAll("[data-language]").forEach((node) => {
     node.textContent = languageName(node.dataset.language);
   });
@@ -270,9 +276,11 @@ function card(record, expanded = false) {
     title.lang = point.language;
     summary.setAttribute("aria-label", title.textContent);
     mastery.textContent = t(point.status);
+    mastery.dataset.i18n = point.status;
     mastery.setAttribute("aria-label", t("mastered"));
     mastery.setAttribute("aria-pressed", String(point.status === "mastered"));
-    mastery.title = t(point.status === "mastered" ? "keepLearning" : "markMastered");
+    mastery.dataset.tooltip = point.status === "mastered" ? "keepLearning" : "markMastered";
+    mastery.title = t(mastery.dataset.tooltip);
     preview.textContent = point.note_preview;
     preview.hidden = !point.note_preview;
   }

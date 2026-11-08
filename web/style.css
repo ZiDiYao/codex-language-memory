@@ -131,6 +131,16 @@ a:focus-visible {
 .header-actions {
   gap: 4px;
 }
+.header-actions > .icon-button {
+  flex: 0 0 36px;
+  height: 36px;
+  padding: 7px;
+}
+.header-actions > .icon-button svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
 .intro-row {
   gap: 16px;
   justify-content: space-between;
