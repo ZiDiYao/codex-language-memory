@@ -115,23 +115,19 @@ export class EntryEditor {
     }
   }
 
+  async toggleStatus() {
+    if (!(await this.flush())) return false;
+    this.queue({ status: this.record.status === "mastered" ? "new" : "mastered" });
+    return this.flush();
+  }
+
   render() {
     const record = this.record;
     const article = document.createElement("article");
     article.className = "entry-editor";
     article.dataset.id = record.id;
     const meta = this.text("div", `${this.t(record.kind)} · ${this.languageName(record.language)}`, "entry-meta");
-    const actions = this.text("div", "", "entry-actions");
-    const mastery = this.button(record.status === "mastered" ? "keepLearning" : "markMastered", async () => {
-      mastery.disabled = true;
-      try {
-        if (!(await this.flush())) return;
-        this.queue({ status: this.record.status === "mastered" ? "new" : "mastered" });
-        if (await this.flush()) mastery.textContent = this.t(this.record.status === "mastered" ? "keepLearning" : "markMastered");
-      } finally { mastery.disabled = false; }
-    });
-    actions.append(mastery);
-    meta.append(actions);
+    meta.append(this.text("span", this.t("lastSeen", { date: record.last_seen_at })));
     article.append(meta, this.note(record.note));
     const footer = this.text("div", "", "entry-footer");
     this.feedback = this.text("span", this.t("autoSave"), "help");
@@ -140,16 +136,7 @@ export class EntryEditor {
     this.reload = this.button("reloadSaved", () => this.reloadSaved());
     this.retry.hidden = this.reload.hidden = true;
     footer.append(this.feedback, this.retry, this.reload);
-    const confirmation = this.text("div", "", "actions delete-confirmation");
-    confirmation.hidden = true;
-    confirmation.append(this.text("span", this.t("deleteQuestion")),
-      this.button("confirmDelete", async () => {
-        if (!(await this.flush())) return;
-        try { await this.api("points/delete", { record_id: record.id }); await this.onDeleted(record); }
-        catch (error) { this.error = error.message; this.reflect(this.error); }
-      }, "danger"), this.button("cancel", () => { confirmation.hidden = true; }));
-    footer.append(this.button("delete", () => { confirmation.hidden = false; }, "subtle delete-action"));
-    article.append(footer, confirmation);
+    article.append(footer);
     return article;
   }
 }

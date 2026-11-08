@@ -257,13 +257,24 @@ function card(record, expanded = false) {
   details.open = expanded;
   const summary = element("summary");
   const body = element("div", undefined, "entry-body");
+  const heading = element("div", undefined, "entry-heading");
+  const title = element("h3");
+  const mastery = element("button", undefined, "entry-status");
+  mastery.type = "button";
+  const preview = element("p", undefined, "entry-preview");
+  const lastSeen = translated("small", "lastSeen", { date: record.last_seen_at }, "entry-last-seen");
+  heading.append(title, mastery, element("span", undefined, "entry-chevron"));
+  summary.append(heading, preview, lastSeen);
   function renderSummary(point) {
-    const heading = element("div", undefined, "entry-heading");
-    const title = element("h3", point.note_title || t("untitledNote"));
+    title.textContent = point.note_title || t("untitledNote");
     title.lang = point.language;
-    heading.append(title, translated("span", point.status, {}, "status-tag"), element("span", undefined, "entry-chevron"));
-    summary.replaceChildren(heading, element("p", point.note_preview, "entry-preview"),
-      translated("small", "lastSeen", { date: point.last_seen_at }));
+    summary.setAttribute("aria-label", title.textContent);
+    mastery.textContent = t(point.status);
+    mastery.setAttribute("aria-label", t("mastered"));
+    mastery.setAttribute("aria-pressed", String(point.status === "mastered"));
+    mastery.title = t(point.status === "mastered" ? "keepLearning" : "markMastered");
+    preview.textContent = point.note_preview;
+    preview.hidden = !point.note_preview;
   }
   renderSummary(record);
   const editor = new EntryEditor(record, {
@@ -278,6 +289,18 @@ function card(record, expanded = false) {
       await loadRecords(true, true);
       notice("deleted");
     },
+  });
+  mastery.addEventListener("click", async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const restoreFocus = document.activeElement === mastery;
+    mastery.disabled = true;
+    try {
+      if (!(await editor.toggleStatus())) details.open = true;
+    } finally {
+      mastery.disabled = false;
+      if (restoreFocus && document.activeElement === document.body) mastery.focus({ preventScroll: true });
+    }
   });
   editors.set(record.id, editor);
   body.append(editor.node);
