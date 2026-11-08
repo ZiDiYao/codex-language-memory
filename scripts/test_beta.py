@@ -81,10 +81,11 @@ async def exercise(archive):
             assert len((await session.list_tools()).tools) == 16
             points = [{"kind": "word", "language": "en", "title": "approach", "sense_key": "method",
                        "meaning": "A way of doing something.", "explanation": "A countable noun describing a method.",
-                       "context": "We need a fresh approach.", "examples": [{"text": "Try a different approach."}]},
+                       "context": "We need a fresh approach.", "examples": [{"text": "Try a different approach."}, {"text": "This approach saves time."}]},
                       {"kind": "expression", "language": "ja", "title": "ありがとうございます", "sense_key": "polite thanks",
                        "meaning": "Thank you, politely.", "explanation": "Use this to express polite gratitude.",
-                       "examples": [{"text": "ありがとうございます。", "translation": "Thank you."}]}]
+                       "examples": [{"text": "ありがとうございます。", "translation": "Thank you."},
+                                    {"text": "お手伝いいただき、ありがとうございます。", "translation": "Thank you for your help."}]}]
             saved = await call(session, "save_points", {"request_id": "beta-save-once", "items": points})
             record_id = saved["results"][0]["id"]
             assert (await call(session, "save_points", {"request_id": "beta-save-once", "items": points}))["replayed"]

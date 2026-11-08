@@ -71,7 +71,8 @@ def create_server(store: Store) -> FastMCP:
 
         Each item needs kind (word/expression/grammar/correction), language (e.g. en),
         title, sense_key (stable short meaning/use label) and meaning. Codex must also provide
-        a useful explanation and at least one example (text, optional translation).
+        a useful explanation with natural usage/collocations and two to five distinct examples
+        (text, translation in the preferred explanation language when useful).
         Optional fields are context and corrected_sentence. Generate content before saving; never ask the user to fill a form.
         Set source=explicit only when the user requested this save.
         Returns one added/merged/skipped/failed outcome per item when processed.
@@ -93,7 +94,7 @@ def create_server(store: Store) -> FastMCP:
     ) -> dict[str, Any]:
         """Find points by keyword and filters, most recently seen first.
         Set language to isolate a learning language and include_variants=true to include regional forms.
-        Use needs_enrichment=true for older records missing explanations/examples.
+        Use needs_enrichment=true for noncustom records missing an explanation or two distinct examples.
         Pass next_cursor to continue reading; omit offset when using a cursor.
         """
         return store.query(

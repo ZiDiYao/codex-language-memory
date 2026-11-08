@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError, field_validator, model_validator
 
 from learning import ALGORITHM, advance, memory_snapshot, recall_rating
 
@@ -54,7 +54,14 @@ class KnowledgePoint(Content):
     sense_key: SenseKey
     meaning: Text
     explanation: Text
-    examples: Annotated[list[Example], Field(min_length=1, max_length=5)]
+    examples: Annotated[list[Example], Field(min_length=2, max_length=5)]
+
+    @field_validator("examples")
+    @classmethod
+    def distinct_examples(cls, examples):
+        if len({normalized(example.text) for example in examples}) != len(examples):
+            raise ValueError("Provide distinct example sentences, not repeated originals")
+        return examples
 
 
 class Patch(Content):
@@ -245,11 +252,17 @@ def encode(value) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
+def example_count(value: str | None) -> int:
+    return len({normalized(item["text"]) for item in json.loads(value or "[]")})
+
+
 def record(row: sqlite3.Row) -> dict:
     result = dict(row)
     result.pop("title_key")
     result["examples"] = json.loads(result["examples"]) if result["examples"] else []
-    result["content_ready"] = result["note"] is not None or bool(result["explanation"] and result["examples"])
+    result["content_ready"] = result["note"] is not None or bool(
+        result["explanation"] and result["explanation"].strip() and example_count(row["examples"]) >= 2
+    )
     result["revision"] = hashlib.sha256(encode({key: result.get(key) for key in (
         "title", "sense_key", "meaning", "context", "corrected_sentence", "explanation", "examples", "status", "note",
     )}).encode()).hexdigest()
@@ -293,6 +306,7 @@ class Store:
         db.execute("PRAGMA foreign_keys = ON")
         db.row_factory = sqlite3.Row
         db.create_function("normalize", 1, normalized, deterministic=True)
+        db.create_function("example_count", 1, example_count, deterministic=True)
         try:
             with db:
                 if write:
@@ -389,19 +403,28 @@ class Store:
                     continue
                 seen.add(key)
                 existing = db.execute(
-                    """SELECT id, encounter_count FROM knowledge
+                    """SELECT id, encounter_count, note, examples FROM knowledge
                        WHERE kind = ? AND language = ? AND title_key = ? AND sense_key = ?""",
                     key,
                 ).fetchone()
                 if existing:
                     # Keep curated content. Refresh the latest supplied learning context.
+                    examples = existing["examples"]
+                    if existing["note"] is None and example_count(examples) < 2:
+                        combined = json.loads(examples or "[]")
+                        originals = {normalized(item["text"]) for item in combined}
+                        for example in point.examples:
+                            if normalized(example.text) not in originals and len(combined) < 5:
+                                combined.append(example.model_dump(exclude_none=True))
+                                originals.add(normalized(example.text))
+                        examples = encode(combined)
                     db.execute(
                         """UPDATE knowledge SET encounter_count = encounter_count + 1,
                            last_seen_at = ?, context = COALESCE(?, context),
                            explanation = COALESCE(NULLIF(explanation, ''), ?),
-                           examples = CASE WHEN examples IS NULL OR examples = '[]' THEN ? ELSE examples END,
+                           examples = ?,
                            corrected_sentence = COALESCE(corrected_sentence, ?) WHERE id = ?""",
-                        (timestamp, point.context, point.explanation, data["examples"], point.corrected_sentence, existing["id"]),
+                        (timestamp, point.context, point.explanation, examples, point.corrected_sentence, existing["id"]),
                     )
                     result = {"status": "merged", "id": existing["id"],
                               "encounter_count": existing["encounter_count"] + 1}
@@ -445,7 +468,7 @@ class Store:
             filters.append("(" + " OR ".join(clauses) + ")")
             params.extend([normalized(keyword)] * len(columns))
         if needs_enrichment:
-            filters.append("(note IS NULL AND (explanation IS NULL OR trim(explanation) = '' OR examples IS NULL OR examples = '[]'))")
+            filters.append("(note IS NULL AND (explanation IS NULL OR trim(explanation) = '' OR example_count(examples) < 2))")
         return filters, params
 
     def query(self, *, keyword=None, kind=None, language=None, status=None, limit=10, offset=0,

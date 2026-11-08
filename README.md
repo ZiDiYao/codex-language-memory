@@ -6,7 +6,7 @@ Recording is automatic for all languages and enabled by default on new installat
 
 ## Install the local Beta
 
-Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.9), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
+Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.10), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
 
 To upgrade, download the next Beta and run its **Install.command**. The installer validates the package, tests its runtime, backs up the database and switches versions while preserving learning records and settings. Repeating the same installation is safe. It also migrates the earlier source-checkout installation automatically.
 
@@ -84,7 +84,7 @@ PDF export embeds a local TrueType font that covers the exported characters. mac
 
 ## Capture decisions
 
-Codex interprets the conversation and generates the contextual definition, explanation, and examples before saving. New records require an explanation and at least one example. The backend validates and stores that content; it does not make a second AI call. For older incomplete records, Codex can retrieve `needs_enrichment=true` records and fill missing content through `update_point` without adding an encounter. The page itself does not run a background AI worker.
+Codex interprets the conversation and generates the contextual definition, explanation, and examples before saving. New captures require an explanation and two to five distinct example sentences. Codex adds common collocations or natural usage, a relevant pitfall when useful, and example translations in the preferred explanation language. Duplicate example originals are rejected. The backend validates and stores that content; it does not make a second AI call. For older incomplete records, Codex can retrieve `needs_enrichment=true` records and fill a missing explanation or append examples through `update_point` without adding an encounter or changing mastery. Existing examples and user-edited notes are preserved; the quality checks do not restrict freely edited notes. The page itself does not run a background AI worker.
 
 | Request | What to capture |
 | --- | --- |

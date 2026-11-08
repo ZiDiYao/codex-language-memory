@@ -32,7 +32,7 @@ def healthcheck(database):
         saved = sample.save("runtime-healthcheck", [{
             "kind": "word", "language": "en", "title": "approach", "sense_key": "method",
             "meaning": "A way of doing something.", "explanation": "A countable noun describing a method.",
-            "examples": [{"text": "Try a new approach."}],
+            "examples": [{"text": "Try a new approach."}, {"text": "This approach saves time."}],
         }])
         sample.record_review(saved["results"][0]["id"], "runtime-review-check", Review(result="correct"))
         for format_name in ("pdf", "docx", "xlsx", "notion", "json"):

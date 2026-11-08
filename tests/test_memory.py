@@ -23,7 +23,8 @@ APPROACH = {
     "meaning": "A method or way of doing something.",
     "explanation": "Here approach is a countable noun describing a method, not movement toward something.",
     "context": "The new approach worked.",
-    "examples": [{"text": "Try a different approach.", "translation": "试试另一种方法。"}],
+    "examples": [{"text": "Try a different approach.", "translation": "试试另一种方法。"},
+                 {"text": "Her approach to teaching is practical.", "translation": "她的教学方法很实用。"}],
 }
 
 

@@ -69,7 +69,7 @@ class ExportTests(unittest.TestCase):
             self.assertIn("&lt;b&gt;text&lt;/b&gt; &amp;", archive.read("pages/point-1.md").decode())
 
     def test_pdf_is_readable_and_missing_fonts_fail_explicitly(self):
-        self.store.save("pdf-english", [dict(APPROACH, examples=[{"text": "Try another approach."}])])
+        self.store.save("pdf-english", [dict(APPROACH, examples=[{"text": "Try another approach."}, {"text": "This approach saves time."}])])
         result = build_export(self.store, ExportRequest(format="pdf"))
         reader = PdfReader(io.BytesIO(result.data))
         self.assertTrue(reader.pages)
