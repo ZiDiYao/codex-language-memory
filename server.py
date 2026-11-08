@@ -171,6 +171,9 @@ def create_server(store: Store) -> FastMCP:
     @server.tool(annotations=ToolAnnotations(openWorldHint=False))
     def update_point(record_id: RecordId, patch: Patch, expected_revision: Revision | None = None) -> dict[str, Any]:
         """Edit supplied fields only. Use null to clear optional content.
+        The returned note is the current editable study content. Set patch.note to replace
+        it verbatim, including an empty string; null restores the generated source content.
+        If note_is_custom is true, edit note rather than the historical structured fields.
         Status changes only when supplied. Record quiz results with record_review and its
         idempotent request_id; legacy review_result patches fail without changing data.
         Pass the record's revision to avoid overwriting a concurrent page edit. On edit_conflict,

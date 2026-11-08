@@ -18,6 +18,7 @@ ReviewResult = Literal["correct", "partial", "incorrect", "skipped"]
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=350)]
 SenseKey = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=150)]
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
+Note = Annotated[str, StringConstraints(max_length=30000)]
 Language = Annotated[str, StringConstraints(
     strip_whitespace=True, to_lower=True, pattern=r"^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$",
     max_length=35,
@@ -57,6 +58,7 @@ class KnowledgePoint(Content):
 
 
 class Patch(Content):
+    note: Note | None = None
     title: Title | None = None
     sense_key: SenseKey | None = None
     meaning: Text | None = None
@@ -145,6 +147,7 @@ CREATE TABLE IF NOT EXISTS knowledge (
     status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'mastered')),
     last_reviewed_at TEXT,
     last_review_result TEXT,
+    note TEXT,
     UNIQUE (kind, language, title_key, sense_key)
 );
 
@@ -246,10 +249,18 @@ def record(row: sqlite3.Row) -> dict:
     result = dict(row)
     result.pop("title_key")
     result["examples"] = json.loads(result["examples"]) if result["examples"] else []
-    result["content_ready"] = bool(result["explanation"] and result["examples"])
+    result["content_ready"] = result["note"] is not None or bool(result["explanation"] and result["examples"])
     result["revision"] = hashlib.sha256(encode({key: result.get(key) for key in (
-        "title", "sense_key", "meaning", "context", "corrected_sentence", "explanation", "examples", "status",
+        "title", "sense_key", "meaning", "context", "corrected_sentence", "explanation", "examples", "status", "note",
     )}).encode()).hexdigest()
+    result["note_is_custom"] = result["note"] is not None
+    if result["note"] is None:
+        parts = [result[key] for key in ("title", "meaning", "explanation", "context", "corrected_sentence")]
+        parts.extend("\n".join(filter(None, (item["text"], item.get("translation")))) for item in result["examples"])
+        result["note"] = "\n\n".join(part for part in parts if part)
+    lines = [line.strip() for line in result["note"].splitlines() if line.strip()]
+    result["note_title"] = lines[0][:350] if lines else ""
+    result["note_preview"] = lines[1][:500] if len(lines) > 1 else ""
     return result
 
 
@@ -269,7 +280,12 @@ class Store:
         self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         self.path.touch(mode=0o600, exist_ok=True)
         with self.connection() as db:
-            db.executescript("BEGIN IMMEDIATE;\n" + SCHEMA + "\nUPDATE knowledge SET status = 'new' WHERE status = 'learning';\nCOMMIT;")
+            db.executescript("BEGIN IMMEDIATE;\n" + SCHEMA)
+            # Additive migration preserves source fields for deduplication and rollback.
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(knowledge)")}
+            if "note" not in columns:
+                db.execute("ALTER TABLE knowledge ADD COLUMN note TEXT")
+            db.execute("UPDATE knowledge SET status = 'new' WHERE status = 'learning'")
 
     @contextmanager
     def connection(self, *, write=False):
@@ -424,12 +440,12 @@ class Store:
             filters.append("(language = ? OR (? AND language LIKE ?))")
             params.extend((language, include_variants, language + "-%"))
         if keyword is not None:
-            columns = ("title", "sense_key", "meaning", "context", "corrected_sentence", "explanation")
+            columns = ("title", "sense_key", "meaning", "context", "corrected_sentence", "explanation", "examples", "note")
             clauses = [f"instr(normalize(coalesce({column}, '')), ?) > 0" for column in columns]
             filters.append("(" + " OR ".join(clauses) + ")")
             params.extend([normalized(keyword)] * len(columns))
         if needs_enrichment:
-            filters.append("(explanation IS NULL OR trim(explanation) = '' OR examples IS NULL OR examples = '[]')")
+            filters.append("(note IS NULL AND (explanation IS NULL OR trim(explanation) = '' OR examples IS NULL OR examples = '[]'))")
         return filters, params
 
     def query(self, *, keyword=None, kind=None, language=None, status=None, limit=10, offset=0,

@@ -119,7 +119,7 @@ class Dashboard:
                         return
                     try:
                         length = int(self.headers.get("Content-Length", "0"))
-                        if not 0 < length <= 32768:
+                        if not 0 < length <= 524288:
                             raise ValueError("Invalid body size")
                         request = json.loads(self.rfile.read(length))
                         if route == "export":

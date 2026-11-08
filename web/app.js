@@ -259,10 +259,10 @@ function card(record, expanded = false) {
   const body = element("div", undefined, "entry-body");
   function renderSummary(point) {
     const heading = element("div", undefined, "entry-heading");
-    const title = element("h3", point.title);
+    const title = element("h3", point.note_title || t("untitledNote"));
     title.lang = point.language;
     heading.append(title, translated("span", point.status, {}, "status-tag"), element("span", undefined, "entry-chevron"));
-    summary.replaceChildren(heading, element("p", point.meaning, "entry-preview"),
+    summary.replaceChildren(heading, element("p", point.note_preview, "entry-preview"),
       translated("small", "lastSeen", { date: point.last_seen_at }));
   }
   renderSummary(record);

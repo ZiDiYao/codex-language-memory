@@ -6,7 +6,7 @@ Recording is automatic for all languages and enabled by default on new installat
 
 ## Install the local Beta
 
-Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.5), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
+Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.6), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
 
 To upgrade, download the next Beta and run its **Install.command**. The installer validates the package, tests its runtime, backs up the database and switches versions while preserving learning records and settings. Repeating the same installation is safe. It also migrates the earlier source-checkout installation automatically.
 
@@ -54,11 +54,13 @@ MCP operations follow the client's approval policy. A rejected write is reported
 Ask Codex to open the learning page. `open_memory_page` returns a local URL that Codex can open in its browser side panel when that capability is available. Otherwise, open the returned URL in a browser.
 
 - Select a language from the dropdown to see its recent learning history. Use **All**, **Word**, **Expression**, or **Grammar** to filter that history in place. **All** also includes correction records. There are no separate category or document pages.
-- Expand a record in place to edit its title, meaning, explanation, examples, translations and original context. Edits auto-save after a short pause or when leaving a field. Concurrent changes preserve the draft and show a conflict message. Editing does not add encounters or reviews.
+- Expand a record into one freely editable note. Its initial text contains the captured title, meaning, explanation, context and examples. Change, add, reorder or remove any text; there are no required sections. The first nonempty line becomes the card title. Edits auto-save after a short pause or on leaving the note. Concurrent changes preserve the draft and show a conflict message. Editing does not add encounters or reviews.
 - Mark a point **Mastered** with **I know this**, return it to **To Learn**, or delete it. The user decides whether they know it; no score or quiz is required.
 - Open **Settings** in the top-right corner to change recording, captured types, or interface language. English is the initial interface language. Settings save immediately.
 - Scroll to load more records automatically. The visible page checks for database changes every three seconds and when focused. Active edits are preserved. There are no page numbers or Refresh button.
 - Use **Export** to download the selected language's history matching the current search, including records not loaded on screen. Continue explanations and review directly in your Codex conversation.
+
+The current note is returned to Codex and used by PDF, Word, Excel and Notion exports. JSON also retains the original structured capture fields for identity and deduplication. User edits, including empty notes, survive repeated encounters. Existing records are converted to note text on read without discarding their original data. Older Betas cannot display custom notes, but preserve them for a subsequent upgrade.
 
 Expandable records, menus and dialogs use short transitions. System reduced-motion preferences disable movement. Search updates as you type; background synchronization preserves expanded records and active edits.
 

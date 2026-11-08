@@ -43,9 +43,7 @@ class ExportFile:
 
 COLUMNS = [
     ("title", "Title"), ("language", "Language"), ("kind", "Type"),
-    ("meaning", "Definition"), ("explanation", "Explanation"),
-    ("context", "Original context"), ("corrected_sentence", "Corrected sentence"),
-    ("examples", "Examples"), ("status", "Learning status"),
+    ("note", "Note"), ("status", "Learning status"),
     ("encounter_count", "Times seen"), ("created_at", "Created at"),
     ("last_seen_at", "Last seen at"), ("last_reviewed_at", "Last reviewed at"),
     ("last_review_result", "Last review result"), ("id", "ID"), ("sense_key", "Sense key"),
@@ -53,21 +51,17 @@ COLUMNS = [
 PDF_LOCK = Lock()
 
 
-def examples_text(record):
-    return "\n\n".join(example["text"] + (
-        "\n" + example["translation"] if example.get("translation") else ""
-    ) for example in record["examples"])
+def note_title(record):
+    return record["note_title"] or "Untitled note"
 
 
 def values(record):
-    return [examples_text(record) if key == "examples" else record.get(key) for key, _ in COLUMNS]
+    return [note_title(record) if key == "title" else record.get(key) for key, _ in COLUMNS]
 
 
 def sections(record):
-    for key, label in COLUMNS[3:8]:
-        value = examples_text(record) if key == "examples" else record.get(key)
-        if value:
-            yield label, value
+    if record["note"]:
+        yield "Note", record["note"]
 
 
 def metadata(record):
@@ -85,10 +79,10 @@ def markdown(record):
     def literal(value):
         value = escape(plain(value))
         return re.sub(r"([\\`*_{\[\]}()#+.!|>~-])", r"\\\1", value)
-    lines = [f'# {literal(record["title"])}', "", metadata(record), ""]
+    lines = [f'# {literal(note_title(record))}', "", metadata(record), ""]
     for label, value in sections(record):
         lines += [f"## {label}", "", literal(value), ""]
-    for key, label in COLUMNS[10:]:
+    for key, label in COLUMNS[6:]:
         if record.get(key) is not None:
             lines += [f"{label}: {literal(record[key])}", ""]
     return "\n".join(lines)
@@ -115,7 +109,7 @@ def spreadsheet(records):
         cell.fill = PatternFill("solid", fgColor="292929")
     for index, (key, _) in enumerate(COLUMNS, 1):
         sheet.column_dimensions[get_column_letter(index)].width = (
-            52 if key in {"meaning", "explanation", "context", "examples", "corrected_sentence"}
+            80 if key == "note"
             else 30 if key == "title" else 23
         )
     sheet.freeze_panes = "A2"
@@ -153,7 +147,7 @@ def word_document(records):
     document.add_paragraph(f"{len(records)} saved knowledge points. Definitions, explanations and examples for review.")
     for record in records:
         start = len(document.paragraphs)
-        document.add_heading(plain(record["title"]), 1)
+        document.add_heading(plain(note_title(record)), 1)
         document.add_paragraph(metadata(record), style="Caption")
         for label, value in sections(record):
             document.add_heading(label, 2)
@@ -219,7 +213,7 @@ def pdf_document(records):
         story = [paragraph("Language learning records", "title"), paragraph(f"{len(records)} saved knowledge points.")]
         for record in records:
             start = len(story)
-            story += [paragraph(record["title"], "heading"), paragraph(metadata(record), "label")]
+            story += [paragraph(note_title(record), "heading"), paragraph(metadata(record), "label")]
             for label, value in sections(record):
                 story += [paragraph(label, "label"), paragraph(value)]
             story += [paragraph(f'ID {record["id"]} | Last seen: {record["last_seen_at"][:10]} | Last review: {(record["last_reviewed_at"] or "Not yet")[:10]}', "label"), Spacer(1, 8)]

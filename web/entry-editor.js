@@ -30,22 +30,24 @@ export class EntryEditor {
     input.style.height = `${Math.max(input.scrollHeight, 32)}px`;
   }
 
-  field(label, value, change, { title = false, language = null, max = 2000 } = {}) {
-    const wrapper = document.createElement("label");
-    wrapper.className = "entry-field";
-    wrapper.append(this.text("span", this.t(label), "entry-label"));
+  note(value) {
     const input = document.createElement("textarea");
-    input.className = "entry-input";
-    input.rows = 1;
-    input.maxLength = max;
-    input.value = value || "";
-    input.placeholder = this.t("addContent");
-    if (language) input.lang = language;
-    input.addEventListener("input", () => { this.resize(input); change(input.value.trim()); });
+    input.className = "entry-note";
+    input.setAttribute("aria-label", this.t("note"));
+    input.rows = 6;
+    input.maxLength = 30000;
+    input.value = value;
+    input.placeholder = this.t("notePlaceholder");
+    input.dir = "auto";
+    input.addEventListener("compositionstart", () => { this.composing = true; clearTimeout(this.timer); });
+    input.addEventListener("compositionend", () => {
+      this.composing = false;
+      this.queue({ note: input.value });
+    });
+    input.addEventListener("input", () => { this.resize(input); this.queue({ note: input.value }); });
     input.addEventListener("blur", () => this.flush());
-    wrapper.append(input);
     requestAnimationFrame(() => this.resize(input));
-    return wrapper;
+    return input;
   }
 
   queue(patch) {
@@ -53,7 +55,7 @@ export class EntryEditor {
     if (this.error !== "editConflict") this.error = null;
     this.reflect(this.error || "saving");
     clearTimeout(this.timer);
-    if (!this.error) this.timer = setTimeout(() => this.flush(), 650);
+    if (!this.error && !this.composing) this.timer = setTimeout(() => this.flush(), 650);
   }
 
   reflect(key) {
@@ -65,6 +67,7 @@ export class EntryEditor {
 
   async flush() {
     clearTimeout(this.timer);
+    if (this.composing) return false;
     if (this.running) return this.running;
     if (this.error === "editConflict") return false;
     this.running = (async () => {
@@ -129,34 +132,7 @@ export class EntryEditor {
     });
     actions.append(mastery);
     meta.append(actions);
-    article.append(meta, this.field("title", record.title, (title) => this.queue({ title }), { title: true, language: record.language, max: 350 }));
-    for (const [key, label] of [["meaning", "meaning"], ["explanation", "explanation"], ["context", "context"], ["corrected_sentence", "corrected"]]) {
-      if (key === "corrected_sentence" && record.kind !== "correction" && !record[key]) continue;
-      article.append(this.field(label, record[key], (value) => this.queue({ [key]: value || (key === "meaning" ? "" : null) }),
-        { language: key === "corrected_sentence" ? record.language : null }));
-    }
-    const examples = document.createElement("div");
-    examples.className = "entry-examples";
-    this.examples = record.examples.map((item) => ({ ...item }));
-    const changed = () => this.queue({ examples: this.examples.filter((item) => item.text || item.translation).map((item) => ({ text: item.text, translation: item.translation || null })) });
-    const renderExamples = () => {
-      examples.replaceChildren(this.text("h3", this.t("examples"), "entry-label"));
-      this.examples.forEach((example, index) => {
-        const block = this.text("div", "", "entry-example");
-        block.append(
-          this.field("exampleText", example.text, (value) => { example.text = value; changed(); }, { language: record.language }),
-          this.field("exampleTranslation", example.translation, (value) => { example.translation = value; changed(); }),
-          this.button("removeExample", () => { this.examples.splice(index, 1); renderExamples(); changed(); }),
-        );
-        examples.append(block);
-      });
-      if (this.examples.length < 5) examples.append(this.button("addExample", () => {
-        this.examples.push({ text: "", translation: null }); renderExamples();
-        examples.querySelectorAll("textarea")[Math.max(0, this.examples.length * 2 - 2)]?.focus();
-      }));
-    };
-    renderExamples();
-    article.append(examples);
+    article.append(meta, this.note(record.note));
     const footer = this.text("div", "", "entry-footer");
     this.feedback = this.text("span", this.t("autoSave"), "help");
     this.feedback.setAttribute("role", "status");

@@ -539,13 +539,11 @@ summary[aria-expanded="true"] .entry-chevron { transform: translateY(2px) rotate
 .entry-body { border-top: 1px solid var(--line); }
 .entry-editor { padding: 18px 20px; }
 .entry-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 11px; color: var(--muted); margin-bottom: 18px; }
-.entry-actions button, .entry-footer button, .entry-example button, .entry-examples > button { border-color: transparent; font-size: 12px; }
-.entry-field { display: block; margin: 0 0 16px; }
-.entry-label { display: block; font-size: 11px; color: var(--muted); font-weight: 400; margin-bottom: 5px; }
-.entry-input { display: block; width: 100%; padding: 8px 10px; resize: none; overflow: hidden; border: 1px solid var(--line); background: var(--bg); border-radius: 7px; font-size: 13px; line-height: 1.8; }
-.entry-input::placeholder { color: var(--muted); }
-.entry-example { border-left: 2px solid var(--line); padding-left: 14px; margin: 14px 0; }
-.entry-example .entry-field { margin-bottom: 8px; }
+.entry-actions button, .entry-footer button { border-color: transparent; font-size: 12px; }
+.entry-note { display: block; width: 100%; min-height: 180px; padding: 4px 0; resize: none; overflow: hidden; border: 0; background: transparent; border-radius: 0; font-size: 14px; line-height: 1.9; }
+.entry-note:focus { outline: none; box-shadow: none; }
+.entry-note:focus-visible { outline: 1px solid var(--line); outline-offset: 8px; border-radius: 3px; }
+.entry-note::placeholder { color: var(--muted); }
 .entry-footer { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
 .entry-footer .help { flex: 1; margin: 0; }
 [hidden] {
