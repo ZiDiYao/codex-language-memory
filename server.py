@@ -11,6 +11,7 @@ from pydantic import Field
 from store import (CaptureMode, Kind, Language, Limit, Patch, RecordId, RequestId,
                    SettingsPatch, Status, Store, Title)
 from dashboard import Dashboard
+from exports import ExportError, ExportRequest, save_export
 
 
 def create_server(store: Store) -> FastMCP:
@@ -63,8 +64,9 @@ def create_server(store: Store) -> FastMCP:
         """Save one batch from a learning encounter. Reuse request_id and exact items on retry.
 
         Each item needs kind (word/expression/grammar/correction), language (e.g. en),
-        title, sense_key (stable short meaning/use label) and meaning. Optional fields
-        are context, corrected_sentence, explanation and examples (text, optional translation).
+        title, sense_key (stable short meaning/use label) and meaning. Codex must also provide
+        a useful explanation and at least one example (text, optional translation).
+        Optional fields are context and corrected_sentence. Generate content before saving; never ask the user to fill a form.
         Set source=explicit only when the user requested this save.
         Returns one added/merged/skipped/failed outcome per item when processed.
         Skipped means the current capture settings exclude the item.
@@ -80,14 +82,30 @@ def create_server(store: Store) -> FastMCP:
         limit: Limit = 10,
         offset: Annotated[int, Field(ge=0)] = 0,
         include_variants: bool = False,
+        cursor: Annotated[str, Field(max_length=300)] | None = None,
+        needs_enrichment: bool = False,
     ) -> dict[str, Any]:
         """Find points by keyword and filters, most recently seen first.
         Set language to isolate a learning language and include_variants=true to include regional forms.
+        Use needs_enrichment=true for older records missing explanations/examples.
+        Pass next_cursor to continue reading; omit offset when using a cursor.
         """
         return store.query(
             keyword=keyword, kind=kind, language=language, status=status,
             limit=limit, offset=offset, include_variants=include_variants,
+            cursor=cursor, needs_enrichment=needs_enrichment,
         )
+
+    @server.tool(annotations=local_write)
+    def export_points(request: ExportRequest) -> dict[str, Any]:
+        """Export all matching points as PDF, XLSX, DOCX, a Notion import ZIP, or JSON.
+        Returns a local file path and count. Notion ZIP contains Markdown and CSV;
+        it does not publish to Notion. Use find_points for direct conversational reading.
+        """
+        try:
+            return save_export(store, request)
+        except ExportError as error:
+            return {"status": "failed", "error": str(error)}
 
     @server.tool(annotations=read_only)
     def review_queue(

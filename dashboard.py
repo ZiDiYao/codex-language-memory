@@ -13,6 +13,8 @@ from urllib.parse import urlsplit
 
 from pydantic import Field, ValidationError
 
+from exports import ExportError, ExportRequest, build_export
+
 from store import (Kind, Language, Limit, Patch, RecordId, SettingsPatch,
                    Status, Store, StrictModel, Title)
 
@@ -22,9 +24,11 @@ class Query(StrictModel):
     kind: Kind | None = None
     language: Language | None = None
     status: Status | None = None
-    limit: Limit = 20
+    limit: Annotated[int, Field(ge=1)] = 20
     offset: Annotated[int, Field(ge=0)] = 0
     include_variants: bool = False
+    cursor: Annotated[str, Field(max_length=300)] | None = None
+    needs_enrichment: bool = False
 
 
 class PointUpdate(StrictModel):
@@ -39,6 +43,7 @@ class PointDelete(StrictModel):
 ASSETS = {
     "": ("index.html", "text/html; charset=utf-8"),
     "app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "picker.js": ("picker.js", "text/javascript; charset=utf-8"),
     "i18n.js": ("i18n.js", "text/javascript; charset=utf-8"),
     "style.css": ("style.css", "text/css; charset=utf-8"),
 }
@@ -63,10 +68,13 @@ class Dashboard:
                     # URLs contain a local access token and must stay out of logs.
                     pass
 
-                def respond(self, status, body, content_type="application/json; charset=utf-8"):
+                def respond(self, status, body, content_type="application/json; charset=utf-8", filename=None, count=None):
                     data = body if isinstance(body, bytes) else json.dumps(body).encode()
                     self.send_response(status)
                     self.send_header("Content-Type", content_type)
+                    if filename:
+                        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+                        self.send_header("X-Record-Count", str(count))
                     self.send_header("Content-Length", str(len(data)))
                     self.send_header("Cache-Control", "no-store")
                     self.send_header("Referrer-Policy", "no-referrer")
@@ -96,7 +104,7 @@ class Dashboard:
 
                 def do_POST(self):
                     route = self.route()
-                    if route != "api":
+                    if route not in {"api", "export"}:
                         self.respond(404, {"error": "not_found"})
                         return
                     origin = f"http://127.0.0.1:{self.server.server_port}"
@@ -110,7 +118,14 @@ class Dashboard:
                         if not 0 < length <= 32768:
                             raise ValueError("Invalid body size")
                         request = json.loads(self.rfile.read(length))
+                        if route == "export":
+                            exported = build_export(store, ExportRequest.model_validate(request))
+                            self.respond(200, exported.data, exported.mime_type, exported.filename, exported.count)
+                            return
                         result = dispatch(store, request)
+                    except ExportError as error:
+                        self.respond(400, {"error": str(error)})
+                        return
                     except (ValueError, TypeError, KeyError, ValidationError):
                         self.respond(400, {"error": "invalid_request"})
                         return
@@ -139,6 +154,9 @@ def dispatch(store, request):
         raise ValueError("Invalid envelope")
     action = request["action"]
     arguments = request["arguments"]
+    if action == "changes/read":
+        StrictModel.model_validate(arguments)
+        return store.versions()
     if action == "settings/read":
         StrictModel.model_validate(arguments)
         return store.settings()

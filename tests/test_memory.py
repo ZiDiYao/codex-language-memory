@@ -1,4 +1,5 @@
 import os
+import json
 import sqlite3
 import sys
 import tempfile
@@ -19,7 +20,8 @@ APPROACH = {
     "language": "en",
     "title": "approach",
     "sense_key": "method",
-    "meaning": "方法、做事的方式",
+    "meaning": "A method or way of doing something.",
+    "explanation": "Here approach is a countable noun describing a method, not movement toward something.",
     "context": "The new approach worked.",
     "examples": [{"text": "Try a different approach.", "translation": "试试另一种方法。"}],
 }
@@ -107,13 +109,13 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(self.store.query(limit=1, offset=1)["records"][0]["id"], ids[1])
 
         updated = self.store.update(ids[0], Patch(
-            status="learning", review_result="correct", meaning="办法", context=None,
+            status="new", review_result="correct", meaning="办法", context=None,
         ))["record"]
         self.assertIsNone(updated["context"])
         self.assertEqual(updated["meaning"], "办法")
         self.assertEqual(updated["last_review_result"], "correct")
         self.assertTrue(updated["last_reviewed_at"])
-        self.assertEqual(self.store.query(keyword="办法", status="learning")["records"], [updated])
+        self.assertEqual(self.store.query(keyword="办法", status="new")["records"], [updated])
         self.assertEqual([r["id"] for r in self.store.review(language="en")["records"]],
                          [ids[1], ids[0]])
         self.store.update(ids[1], Patch(status="mastered"))
@@ -129,7 +131,7 @@ class StoreTests(unittest.TestCase):
                          "identity_conflict")
         self.assertEqual(self.store.delete(ids[0])["status"], "deleted")
         self.assertEqual(self.store.delete(ids[0])["status"], "not_found")
-        self.assertEqual(self.store.update(ids[0], Patch(status="learning"))["status"], "not_found")
+        self.assertEqual(self.store.update(ids[0], Patch(status="new"))["status"], "not_found")
         self.assertTrue(self.store.save("delete-test", points)["results"][0]["deleted"])
         self.assertEqual([r["id"] for r in self.store.query()["records"]], [ids[1]])
         recreated = self.store.save("fresh-after-delete", [APPROACH])["results"][0]
@@ -156,7 +158,7 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual({tool.name for tool in tools.tools}, {
                     "get_recording", "set_recording", "save_points", "find_points",
                     "review_queue", "update_point", "delete_point",
-                    "get_settings", "update_settings", "open_memory_page", "list_languages",
+                    "get_settings", "update_settings", "open_memory_page", "list_languages", "export_points",
                 })
                 self.assertTrue((await self.call(session, "get_recording"))["enabled"])
                 self.assertTrue((await self.call(session, "set_recording", {"enabled": True}))["enabled"])
@@ -174,6 +176,11 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                 await session.initialize()
                 settings = await self.call(session, "get_settings")
                 self.assertEqual(settings["ui_language"], "ko")
+                exported = await self.call(session, "export_points", {
+                    "request": {"format": "json", "language": "en"},
+                })
+                self.assertEqual(exported["count"], 1)
+                self.assertEqual(json.loads(Path(exported["path"]).read_bytes())["records"][0]["id"], record_id)
                 merged = await self.call(session, "save_points", {
                     "request_id": "new-automatic-request", "items": [APPROACH],
                 })

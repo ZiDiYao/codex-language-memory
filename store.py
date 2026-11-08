@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 import sqlite3
@@ -10,7 +11,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError, model_validator
 
 Kind = Literal["word", "expression", "grammar", "correction"]
-Status = Literal["new", "learning", "mastered"]
+Status = Literal["new", "mastered"]
 ReviewResult = Literal["correct", "partial", "incorrect", "skipped"]
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=350)]
 SenseKey = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=150)]
@@ -47,6 +48,8 @@ class KnowledgePoint(Content):
     title: Title
     sense_key: SenseKey
     meaning: Text
+    explanation: Text
+    examples: Annotated[list[Example], Field(min_length=1, max_length=5)]
 
 
 class Patch(Content):
@@ -110,7 +113,7 @@ CREATE TABLE IF NOT EXISTS knowledge (
     created_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
     encounter_count INTEGER NOT NULL DEFAULT 1,
-    status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'learning', 'mastered')),
+    status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'mastered')),
     last_reviewed_at TEXT,
     last_review_result TEXT,
     UNIQUE (kind, language, title_key, sense_key)
@@ -121,6 +124,24 @@ CREATE TABLE IF NOT EXISTS save_requests (
     fingerprint TEXT NOT NULL,
     results TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS change_versions (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    content INTEGER NOT NULL DEFAULT 0,
+    preferences INTEGER NOT NULL DEFAULT 0
+);
+INSERT OR IGNORE INTO change_versions (id) VALUES (1);
+CREATE TRIGGER IF NOT EXISTS knowledge_added AFTER INSERT ON knowledge
+BEGIN UPDATE change_versions SET content = content + 1 WHERE id = 1; END;
+CREATE TRIGGER IF NOT EXISTS knowledge_updated AFTER UPDATE ON knowledge
+BEGIN UPDATE change_versions SET content = content + 1 WHERE id = 1; END;
+CREATE TRIGGER IF NOT EXISTS knowledge_deleted AFTER DELETE ON knowledge
+BEGIN UPDATE change_versions SET content = content + 1 WHERE id = 1; END;
+CREATE TRIGGER IF NOT EXISTS preferences_updated AFTER UPDATE ON capture_preferences
+BEGIN UPDATE change_versions SET preferences = preferences + 1 WHERE id = 1; END;
+CREATE TRIGGER IF NOT EXISTS recording_updated AFTER UPDATE ON settings
+BEGIN UPDATE change_versions SET preferences = preferences + 1 WHERE id = 1; END;
+
 """
 
 
@@ -140,6 +161,7 @@ def record(row: sqlite3.Row) -> dict:
     result = dict(row)
     result.pop("title_key")
     result["examples"] = json.loads(result["examples"]) if result["examples"] else []
+    result["content_ready"] = bool(result["explanation"] and result["examples"])
     return result
 
 
@@ -159,7 +181,7 @@ class Store:
         self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         self.path.touch(mode=0o600, exist_ok=True)
         with self.connection() as db:
-            db.executescript("BEGIN IMMEDIATE;\n" + SCHEMA + "\nCOMMIT;")
+            db.executescript("BEGIN IMMEDIATE;\n" + SCHEMA + "\nUPDATE knowledge SET status = 'new' WHERE status = 'learning';\nCOMMIT;")
 
     @contextmanager
     def connection(self, *, write=False):
@@ -173,6 +195,11 @@ class Store:
                 yield db
         finally:
             db.close()
+
+    def versions(self):
+        with self.connection() as db:
+            row = db.execute("SELECT content, preferences FROM change_versions WHERE id = 1").fetchone()
+            return dict(row)
 
     def recording(self, enabled: bool | None = None) -> dict:
         with self.connection(write=enabled is not None) as db:
@@ -250,8 +277,11 @@ class Store:
                     # Keep curated content. Refresh the latest supplied learning context.
                     db.execute(
                         """UPDATE knowledge SET encounter_count = encounter_count + 1,
-                           last_seen_at = ?, context = COALESCE(?, context) WHERE id = ?""",
-                        (timestamp, point.context, existing["id"]),
+                           last_seen_at = ?, context = COALESCE(?, context),
+                           explanation = COALESCE(NULLIF(explanation, ''), ?),
+                           examples = CASE WHEN examples IS NULL OR examples = '[]' THEN ? ELSE examples END,
+                           corrected_sentence = COALESCE(corrected_sentence, ?) WHERE id = ?""",
+                        (timestamp, point.context, point.explanation, data["examples"], point.corrected_sentence, existing["id"]),
                     )
                     result = {"status": "merged", "id": existing["id"],
                               "encounter_count": existing["encounter_count"] + 1}
@@ -271,8 +301,8 @@ class Store:
             )
             return {"status": "processed", "replayed": False, "results": results}
 
-    def query(self, *, keyword=None, kind=None, language=None, status=None, limit=10, offset=0,
-              include_variants=False):
+    def _filters(self, *, keyword=None, kind=None, language=None, status=None,
+                 include_variants=False, needs_enrichment=False):
         filters = []
         params = []
         for column, value in (("kind", kind), ("status", status)):
@@ -287,6 +317,25 @@ class Store:
             clauses = [f"instr(normalize(coalesce({column}, '')), ?) > 0" for column in columns]
             filters.append("(" + " OR ".join(clauses) + ")")
             params.extend([normalized(keyword)] * len(columns))
+        if needs_enrichment:
+            filters.append("(explanation IS NULL OR trim(explanation) = '' OR examples IS NULL OR examples = '[]')")
+        return filters, params
+
+    def query(self, *, keyword=None, kind=None, language=None, status=None, limit=10, offset=0,
+              include_variants=False, cursor=None, needs_enrichment=False):
+        filters, params = self._filters(keyword=keyword, kind=kind, language=language,
+                                        status=status, include_variants=include_variants,
+                                        needs_enrichment=needs_enrichment)
+        if cursor is not None:
+            try:
+                stamp, identifier = json.loads(base64.urlsafe_b64decode(cursor).decode())
+                datetime.fromisoformat(stamp)
+                if type(identifier) is not int or identifier < 1 or offset:
+                    raise ValueError()
+            except (ValueError, TypeError, UnicodeError):
+                raise ValueError("Invalid query cursor") from None
+            filters.append("(last_seen_at < ? OR (last_seen_at = ? AND id < ?))")
+            params.extend((stamp, stamp, identifier))
         where = " AND ".join(filters) or "1"
         with self.connection() as db:
             rows = db.execute(
@@ -295,7 +344,22 @@ class Store:
                 (*params, limit + 1, offset),
             )
             records = [record(row) for row in rows]
-            return {"records": records[:limit], "has_more": len(records) > limit}
+        more = len(records) > limit
+        records = records[:limit]
+        next_cursor = None
+        if more:
+            last = records[-1]
+            next_cursor = base64.urlsafe_b64encode(encode([last["last_seen_at"], last["id"]]).encode()).decode()
+        return {"records": records, "has_more": more, "next_cursor": next_cursor}
+
+    def export_records(self, **filters):
+        clauses, params = self._filters(**filters)
+        where = " AND ".join(clauses) or "1"
+        # Read the full filtered result from one SQLite snapshot, independent of UI pagination.
+        with self.connection() as db:
+            return [record(row) for row in db.execute(
+                f"SELECT * FROM knowledge WHERE {where} ORDER BY last_seen_at DESC, id DESC", params,
+            )]
 
     def review(self, *, language=None, kind=None, limit=5, include_variants=False):
         with self.connection() as db:

@@ -15,8 +15,8 @@
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
-              width="24"
-              height="24"
+              width="22"
+              height="22"
               fill="none"
               stroke="currentColor"
               stroke-width="1.5"
@@ -27,18 +27,35 @@
             </svg>
             <h1 data-i18n="appTitle">Language memory</h1>
           </div>
-          <label class="locale-control"
-            ><span data-i18n="uiLanguage">Interface language</span
-            ><select id="ui-language"></select
-          ></label>
+          <div class="header-actions">
+            <button id="export-open" class="subtle" data-i18n="export">
+              Export
+            </button>
+            <button
+              id="settings-open"
+              class="icon-button"
+              aria-haspopup="dialog"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="m9 3-.6 2.5-2.1 1.2L4 6l-2 3.5 1.7 1.8v2.4L2 15.5 4 19l2.3-.7 2.1 1.2L9 22h4l.6-2.5 2.1-1.2 2.3.7 2-3.5-1.7-1.8v-2.4L20 9.5 18 6l-2.3.7-2.1-1.2L13 3z"
+                />
+                <circle cx="11" cy="12.5" r="3" />
+              </svg>
+              <span class="sr-only" data-i18n="settings">Settings</span>
+            </button>
+          </div>
         </div>
-        <p class="intro" data-i18n="subtitle"></p>
-        <div class="navigation-row">
-          <nav aria-label="Navigation">
-            <button id="records-tab" aria-current="page" data-i18n="records">
-              Knowledge</button
-            ><button id="settings-tab" data-i18n="settings">Settings</button>
-          </nav>
+        <div class="intro-row">
+          <p data-i18n="subtitle"></p>
           <span
             id="recording-badge"
             class="badge"
@@ -47,121 +64,123 @@
         </div>
       </header>
       <section id="records-panel">
-        <div class="notebook-row">
-          <label
-            ><span data-i18n="notebook">Learning language</span
-            ><select id="language"></select></label
-          ><button id="refresh" class="subtle" data-i18n="refresh"></button>
-        </div>
-        <form id="search-form">
-          <div class="search-line">
-            <label class="sr-only" for="search" data-i18n="search"></label
-            ><input
-              id="search"
-              type="search"
-              maxlength="350"
-              data-placeholder="searchPlaceholder"
-            /><button type="submit" data-i18n="search"></button>
-          </div>
-          <div class="filters">
-            <label
-              ><span data-i18n="kind"></span
-              ><select id="kind">
-                <option value="" data-i18n="allTypes"></option>
-                <option value="word" data-i18n="word"></option>
-                <option value="expression" data-i18n="expression"></option>
-                <option value="grammar" data-i18n="grammar"></option>
-                <option
-                  value="correction"
-                  data-i18n="correction"
-                ></option></select
-            ></label>
-            <label
-              ><span data-i18n="status"></span
-              ><select id="status">
-                <option value="" data-i18n="allStatuses"></option>
-                <option value="new" data-i18n="new"></option>
-                <option value="learning" data-i18n="learning"></option>
-                <option value="mastered" data-i18n="mastered"></option></select
-            ></label>
-          </div>
+        <form id="search-form" class="search-line">
+          <label class="sr-only" for="search" data-i18n="search"></label>
+          <input
+            id="search"
+            type="search"
+            maxlength="350"
+            data-placeholder="searchPlaceholder"
+          />
+          <button type="submit" data-i18n="search"></button>
         </form>
-        <div id="records" aria-live="polite">
-          <p class="empty" data-i18n="loading"></p>
+        <div class="filters">
+          <div>
+            <span class="field-label" data-i18n="notebook"></span>
+            <div id="language"></div>
+          </div>
+          <div>
+            <span class="field-label" data-i18n="kind"></span>
+            <div id="kind"></div>
+          </div>
+          <div>
+            <span class="field-label" data-i18n="status"></span>
+            <div id="status"></div>
+          </div>
         </div>
-        <div class="pagination">
-          <button id="previous" disabled data-i18n="previous"></button
-          ><span id="page-number"></span
-          ><button id="next" disabled data-i18n="next"></button>
+        <div id="records" aria-live="polite"></div>
+        <div id="load-sentinel">
+          <span id="load-state" data-i18n="loading"></span
+          ><button id="retry-load" hidden data-i18n="retry"></button>
         </div>
-        <aside>
-          <strong data-i18n="reviewTitle"></strong>
-          <p data-i18n="reviewHelp"></p>
-        </aside>
       </section>
-      <section id="settings-panel" hidden>
-        <div class="section-heading">
-          <h2 data-i18n="settingsTitle"></h2>
-          <p data-i18n="settingsHelp"></p>
-        </div>
-        <form id="settings-form">
-          <fieldset id="settings-fields" disabled>
-            <label class="toggle-row"
-              ><span
-                ><strong data-i18n="recording"></strong
-                ><small data-i18n="recordingHelp"></small></span
-              ><input id="enabled" type="checkbox" role="switch"
-            /></label>
-            <div class="setting">
-              <h3 data-i18n="recordTypes"></h3>
-              <div class="type-grid">
-                <label class="choice"
-                  ><input
-                    type="checkbox"
-                    name="enabled-type"
-                    value="word"
-                    checked /><span
-                    ><strong data-i18n="word"></strong
-                    ><small data-i18n="wordHelp"></small></span
-                ></label>
-                <label class="choice"
-                  ><input
-                    type="checkbox"
-                    name="enabled-type"
-                    value="expression"
-                    checked /><span
-                    ><strong data-i18n="expression"></strong
-                    ><small data-i18n="expressionHelp"></small></span
-                ></label>
-                <label class="choice"
-                  ><input
-                    type="checkbox"
-                    name="enabled-type"
-                    value="grammar"
-                    checked /><span
-                    ><strong data-i18n="grammar"></strong
-                    ><small data-i18n="grammarHelp"></small></span
-                ></label>
-                <label class="choice"
-                  ><input
-                    type="checkbox"
-                    name="enabled-type"
-                    value="correction"
-                    checked /><span
-                    ><strong data-i18n="correction"></strong
-                    ><small data-i18n="correctionHelp"></small></span
-                ></label>
-              </div>
-            </div>
-          </fieldset>
-        </form>
-        <aside>
-          <strong data-i18n="limitsTitle"></strong>
-          <p data-i18n="limitsHelp"></p>
-        </aside>
-      </section>
-      <div id="notice" role="status" hidden></div>
-      <footer data-i18n="footer"></footer>
     </main>
+    <dialog id="settings-dialog" aria-labelledby="settings-title">
+      <div class="dialog-heading">
+        <h2 id="settings-title" data-i18n="settingsTitle"></h2>
+        <button class="icon-button dialog-close">
+          <span aria-hidden="true">×</span
+          ><span class="sr-only" data-i18n="close"></span>
+        </button>
+      </div>
+      <p class="help" data-i18n="settingsHelp"></p>
+      <div class="setting">
+        <span class="field-label" data-i18n="uiLanguage"></span>
+        <div id="ui-language"></div>
+      </div>
+      <fieldset id="settings-fields" disabled>
+        <label class="toggle-row"
+          ><span
+            ><strong data-i18n="recording"></strong
+            ><small data-i18n="recordingHelp"></small></span
+          ><input id="enabled" type="checkbox" role="switch"
+        /></label>
+        <div class="setting">
+          <h3 data-i18n="recordTypes"></h3>
+          <div class="type-grid">
+            <label class="choice"
+              ><input
+                type="checkbox"
+                name="enabled-type"
+                value="word"
+                checked /><span
+                ><strong data-i18n="word"></strong
+                ><small data-i18n="wordHelp"></small></span
+            ></label>
+            <label class="choice"
+              ><input
+                type="checkbox"
+                name="enabled-type"
+                value="expression"
+                checked /><span
+                ><strong data-i18n="expression"></strong
+                ><small data-i18n="expressionHelp"></small></span
+            ></label>
+            <label class="choice"
+              ><input
+                type="checkbox"
+                name="enabled-type"
+                value="grammar"
+                checked /><span
+                ><strong data-i18n="grammar"></strong
+                ><small data-i18n="grammarHelp"></small></span
+            ></label>
+            <label class="choice"
+              ><input
+                type="checkbox"
+                name="enabled-type"
+                value="correction"
+                checked /><span
+                ><strong data-i18n="correction"></strong
+                ><small data-i18n="correctionHelp"></small></span
+            ></label>
+          </div>
+        </div>
+      </fieldset>
+      <p class="help" data-i18n="limitsHelp"></p>
+      <div class="settings-feedback help" role="status"></div>
+    </dialog>
+    <dialog id="export-dialog" aria-labelledby="export-title">
+      <div class="dialog-heading">
+        <h2 id="export-title" data-i18n="export"></h2>
+        <button class="icon-button dialog-close">
+          <span aria-hidden="true">×</span
+          ><span class="sr-only" data-i18n="close"></span>
+        </button>
+      </div>
+      <p class="help" data-i18n="exportHelp"></p>
+      <div class="export-options">
+        <button data-format="pdf">PDF <span>.pdf</span></button>
+        <button data-format="xlsx">Excel <span>.xlsx</span></button>
+        <button data-format="docx">Word <span>.docx</span></button>
+        <button data-format="notion">
+          <span data-i18n="notionImport"></span><span>.zip</span>
+        </button>
+        <button data-format="json">JSON <span>.json</span></button>
+      </div>
+      <p class="help" data-i18n="notionHelp"></p>
+      <div class="export-feedback help" role="status"></div>
+    </dialog>
+    <div id="notice" role="status" hidden></div>
   </body>
 </html>
