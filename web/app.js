@@ -26,7 +26,8 @@ let noticeTimer;
 const displayed = new Map();
 const editors = new Map();
 let selectedLanguage = "";
-let switchingLanguage = false;
+let selectedKind = "";
+let switchingFilters = false;
 
 function t(key, params = {}) {
   return messages[locale][key].replace(/\{(\w+)\}/g, (_, name) => {
@@ -56,6 +57,10 @@ function languageName(code) {
     return code;
   }
 }
+const languagePicker = new Picker($("#language"), {
+  label: "Learning language",
+  onChange: (value) => changeFilter("language", value),
+});
 const localePicker = new Picker($("#ui-language"), {
   label: "Interface language",
   value: locale,
@@ -90,28 +95,44 @@ function renderLanguagePreferences() {
 function renderCatalog() {
   const selection = languageSelection(catalog.counts, selectedLanguage);
   selectedLanguage = selection.value;
-  const nav = $("#languages");
+  languagePicker.setLabel(t("notebook"));
+  languagePicker.setOptions(selection.languages.map((code) => ({
+    value: code, label: languageName(code), count: catalog.counts[code],
+  })));
+  languagePicker.setValue(selectedLanguage);
+  languagePicker.button.disabled = selection.languages.length === 0;
+}
+function renderKinds() {
+  const nav = $("#kinds");
   const restoreFocus = nav.contains(document.activeElement);
-  nav.setAttribute("aria-label", t("notebook"));
-  nav.replaceChildren(...selection.languages.map((code) => {
-    const button = element("button", undefined, "language-tab");
+  nav.setAttribute("aria-label", t("kind"));
+  nav.replaceChildren(...["", "word", "expression", "grammar"].map((kind) => {
+    const button = element("button", t(kind || "all"), "type-tab");
     button.type = "button";
-    button.setAttribute("aria-pressed", String(code === selectedLanguage));
-    button.append(element("span", languageName(code)), element("small", catalog.counts[code]));
-    button.addEventListener("click", async () => {
-      if (code === selectedLanguage || switchingLanguage) return;
-      switchingLanguage = true;
-      try {
-        if (!(await flushEditors())) return;
-        selectedLanguage = code;
-        renderCatalog();
-        await loadRecords(true);
-      } finally { switchingLanguage = false; }
-    });
+    button.setAttribute("aria-pressed", String(kind === selectedKind));
+    button.addEventListener("click", () => changeFilter("kind", kind));
     return button;
   }));
-  nav.hidden = selection.languages.length === 0;
   if (restoreFocus) nav.querySelector('[aria-pressed="true"]')?.focus({ preventScroll: true });
+}
+async function changeFilter(name, value) {
+  if (switchingFilters) {
+    languagePicker.setValue(selectedLanguage);
+    return;
+  }
+  if (value === (name === "language" ? selectedLanguage : selectedKind)) return;
+  switchingFilters = true;
+  try {
+    if (!(await flushEditors())) {
+      languagePicker.setValue(selectedLanguage);
+      return;
+    }
+    if (name === "language") selectedLanguage = value;
+    else selectedKind = value;
+    renderCatalog();
+    renderKinds();
+    await loadRecords(true);
+  } finally { switchingFilters = false; }
 }
 async function flushEditors() {
   for (const editor of editors.values()) {
@@ -141,6 +162,7 @@ function applyLocale() {
   localePicker.setLabel(t("uiLanguage"));
   localePicker.setValue(locale);
   renderCatalog();
+  renderKinds();
   renderLanguagePreferences();
   refreshEditorLocales();
 }
@@ -212,6 +234,7 @@ function filters() {
   for (const [key, value] of Object.entries({
     keyword: $("#search").value.trim(),
     language: selectedLanguage,
+    kind: selectedKind,
   })) {
     if (value) result[key] = value;
   }

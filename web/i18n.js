@@ -1,5 +1,6 @@
 export const messages = {
   en: {
+    all: "All",
     addContent: "Add content…",
     autoSave: "Changes save automatically",
     editConflict: "This record changed in Codex or another page. Your draft is kept here. Copy it before discarding, or reload the saved version.",
@@ -103,6 +104,7 @@ export const messages = {
     allLoaded: "Loaded all records · {count}",
   },
   zh: {
+    all: "全部",
     addContent: "添加内容…",
     autoSave: "修改自动保存",
     editConflict: "这条记录已被 Codex 或其他页面修改。草稿仍保留在这里。请先复制草稿，或放弃草稿并重新加载已保存版本。",
@@ -202,6 +204,7 @@ export const messages = {
     allLoaded: "已加载全部 {count} 条记录",
   },
   ja: {
+    all: "すべて",
     addContent: "内容を追加…",
     autoSave: "変更は自動保存されます",
     editConflict: "この記録は Codex または別のページで変更されました。下書きは保持されています。必要ならコピーしてから保存済みの内容を読み込んでください。",
@@ -307,6 +310,7 @@ export const messages = {
     allLoaded: "全 {count} 件を読み込みました",
   },
   ko: {
+    all: "전체",
     addContent: "내용 추가…",
     autoSave: "변경 사항이 자동 저장됩니다",
     editConflict: "Codex 또는 다른 페이지에서 이 기록을 수정했습니다. 초안은 유지됩니다. 필요하면 복사한 후 저장된 내용을 다시 불러오세요.",
@@ -410,6 +414,7 @@ export const messages = {
     allLoaded: "기록 {count}개를 모두 불러왔습니다",
   },
   fr: {
+    all: "Tout",
     addContent: "Ajouter du contenu…",
     autoSave: "Les modifications sont enregistrées automatiquement",
     editConflict: "Cette fiche a été modifiée dans Codex ou une autre page. Votre brouillon est conservé ici. Copiez-le avant de le supprimer ou rechargez la version enregistrée.",
@@ -514,6 +519,7 @@ export const messages = {
     allLoaded: "Les {count} points sont chargés",
   },
   es: {
+    all: "Todo",
     addContent: "Añadir contenido…",
     autoSave: "Los cambios se guardan automáticamente",
     editConflict: "Este registro cambió en Codex u otra página. Tu borrador se conserva aquí. Cópialo antes de descartarlo o vuelve a cargar la versión guardada.",

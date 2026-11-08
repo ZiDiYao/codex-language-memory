@@ -64,7 +64,13 @@
         </div>
       </header>
       <section id="records-panel">
-        <nav id="languages" class="language-tabs" aria-label="Learning language"></nav>
+        <div class="history-filters">
+          <nav id="kinds" class="type-tabs" aria-label="Type"></nav>
+          <div class="history-language">
+            <span class="field-label" data-i18n="notebook"></span>
+            <div id="language"></div>
+          </div>
+        </div>
         <form id="search-form" class="search-line" role="search">
           <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
           <label class="sr-only" for="search" data-i18n="search"></label>
