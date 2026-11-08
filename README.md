@@ -6,7 +6,7 @@ Recording is automatic for all languages and enabled by default on new installat
 
 ## Install the local Beta
 
-Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.1), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
+Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.2), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
 
 To upgrade, download the next Beta and run its **Install.command**. The installer validates the package, tests its runtime, backs up the database and switches versions while preserving learning records and settings. Repeating the same installation is safe. It also migrates the earlier source-checkout installation automatically.
 
@@ -153,3 +153,18 @@ Source identifiers, comments, documentation, and skill instructions are written 
 - [Plugin packaging](https://developers.openai.com/plugins/build/plugins)
 
 This MVP uses a skill and local stdio MCP configuration. It does not require a hosted service, account system, native settings extension, chat UI, vector database, or review-generation service.
+
+### First language and explanations
+
+Settings asks for the user's first language; it is never inferred from the interface
+or target language. The UI still defaults to English. Definitions, grammar notes,
+feedback and example translations use the confirmed first language by default.
+The user can override the explanation language globally in Settings or per learning
+language through Codex. Specific preferences take precedence over global ones.
+Original expressions and examples stay in the language being studied.
+Changing a preference does not instantly translate the library: Codex adapts relevant
+records when reading them. The backend does not make a second AI request.
+
+To add the installed Beta to the native Codex Plugins directory, double-click
+**Connect Extension.command**. After its first successful connection, future installs
+also refresh the native plugin. See [release operations](docs/beta-release.md).

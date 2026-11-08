@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from store import Patch, SettingsPatch, Store
+from store import LearnerPreferences, Patch, SettingsPatch, Store
 from test_memory import APPROACH
 
 
@@ -16,6 +16,52 @@ class LanguageTests(unittest.TestCase):
         self.path = Path(directory.name) / "languages.sqlite3"
         self.store = Store(self.path)
         self.store.recording(True)
+
+    def test_first_language_is_confirmed_not_inferred_from_interface_or_target(self):
+        self.store.settings(SettingsPatch(ui_language="fr"))
+        self.store.save("chinese-learning", [dict(APPROACH, language="zh")])
+        policy = self.store.learning_profile(language="zh")["language_preferences"]
+        self.assertTrue(policy["needs_first_language_confirmation"])
+        self.assertIsNone(policy["explanation_language"])
+        self.store.settings(SettingsPatch(first_language="fr"))
+        reopened = Store(self.path)
+        policy = reopened.learning_profile(language="zh")["language_preferences"]
+        self.assertEqual(policy["explanation_language"], "fr")
+        self.assertEqual(policy["explanation_source"], "first_language")
+        self.assertFalse(policy["needs_first_language_confirmation"])
+        self.assertEqual(reopened.query()["records"][0]["language"], "zh")
+
+    def test_explanation_overrides_are_shared_by_page_and_conversation(self):
+        self.store.settings(SettingsPatch(first_language="zh", ui_language="en"))
+        self.assertEqual(self.store.learning_profile(language="ja")["language_preferences"]["explanation_language"], "zh")
+        self.store.learning_preferences(patch=LearnerPreferences(explanation_language="en", interests=["travel"]))
+        self.assertEqual(self.store.settings()["explanation_language"], "en")
+        self.store.learning_preferences("ja", LearnerPreferences(explanation_language="ko"))
+        self.assertEqual(self.store.learning_profile(language="ja")["language_preferences"]["explanation_language"], "ko")
+        self.store.settings(SettingsPatch(explanation_language="fr"))
+        self.assertEqual(self.store.learning_profile(language="zh")["language_preferences"]["explanation_language"], "fr")
+        self.assertEqual(self.store.learning_preferences()["preferences"]["interests"], ["travel"])
+        self.store.settings(SettingsPatch(explanation_language=None))
+        self.assertEqual(self.store.learning_profile(language="fr")["language_preferences"]["explanation_language"], "zh")
+        self.assertEqual(self.store.learning_profile(language="ja")["language_preferences"]["explanation_language"], "ko")
+        self.assertEqual(self.store.settings()["ui_language"], "en")
+
+    def test_language_preference_changes_preserve_records_and_can_be_reset(self):
+        self.store.save("unchanged-record", [APPROACH])
+        before = self.store.query()["records"]
+        self.store.settings(SettingsPatch(first_language="fr", explanation_language="es"))
+        self.assertEqual(self.store.query()["records"], before)
+        # Older Betas reject unknown capture fields. Keep new preferences in the
+        # extensible learner data so a binary rollback can still read settings.
+        with self.store.connection() as db:
+            capture = json.loads(db.execute("SELECT data FROM capture_preferences").fetchone()[0])
+        self.assertEqual(set(capture), {"ui_language", "enabled_types"})
+        self.store.settings(SettingsPatch(first_language=None, explanation_language=None))
+        self.assertTrue(Store(self.path).learning_profile()["language_preferences"]["needs_first_language_confirmation"])
+        settings = self.store.settings()
+        with self.assertRaises(ValidationError):
+            SettingsPatch(first_language="not a language")
+        self.assertEqual(self.store.settings(), settings)
 
     def test_retired_language_and_manual_preferences_no_longer_block_capture(self):
         original = self.store.save("before-upgrade", [APPROACH])
@@ -28,6 +74,7 @@ class LanguageTests(unittest.TestCase):
         upgraded = Store(self.path)
         self.assertEqual(upgraded.settings(), {
             "enabled": True, "ui_language": "ko", "enabled_types": ["word"],
+            "first_language": None, "explanation_language": None,
         })
         self.assertEqual(upgraded.save("before-upgrade", [APPROACH])["results"], original["results"])
         result = upgraded.save("after-upgrade", [dict(APPROACH, language="fr")])

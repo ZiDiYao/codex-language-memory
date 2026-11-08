@@ -3,9 +3,8 @@
   "mcpServers": {
     "language_memory": {
       "type": "stdio",
-      "command": "${PLUGIN_ROOT}/runtime/language-memory",
-      "args": ["serve"],
-      "cwd": "${PLUGIN_ROOT}"
+      "command": "./runtime/language-memory",
+      "args": ["serve"]
     }
   }
 }

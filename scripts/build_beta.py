@@ -92,7 +92,7 @@ def main():
     plugin = json.loads((package / "plugin.json").read_text())
     plugin["version"] = version
     (package / "plugin.json").write_text(json.dumps(plugin, indent=2) + "\n")
-    for label, action in (("Install", "install"), ("Check Installation", "status"), ("Roll Back", "rollback"), ("Uninstall", "uninstall")):
+    for label, action in (("Install", "install"), ("Connect Extension", "connect-extension"), ("Check Installation", "status"), ("Roll Back", "rollback"), ("Uninstall", "uninstall")):
         entry = package / f"{label}.command"
         entry.write_text(command_file(action))
         entry.chmod(0o755)

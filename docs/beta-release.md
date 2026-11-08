@@ -66,10 +66,20 @@ must start from a trusted release, and a checksum copied from that same source i
 independent authentication. Only package files are copied; developer databases, secrets,
 Codex credentials, logs and virtual environments are excluded.
 
-This Beta connects MCP and Skill directly through the documented Codex configuration.
-Portable `plugin.json`, `mcp.json` and `skills/` are also present in the release for
-plugin authoring. The installer does not register a public-directory or native-marketplace
-entry. Installing both integrations simultaneously would duplicate the tools.
+The default installer connects MCP and Skill directly. To show the Beta in Codex's
+native Plugins directory, run **Connect Extension.command** after installation.
+It uses the installed Codex CLI to add a personal local marketplace and verifies
+that `language-memory@language-memory-local` is installed and enabled before removing
+the duplicate direct MCP and Skill registration. No public listing is created.
+The plugin points at the managed `current` runtime and the same database.
+
+Once connected, future Install.command and Roll Back.command runs refresh the native
+plugin's cached Skill automatically. If refresh fails, the direct MCP installation
+remains a usable fallback and the command reports the failure. Run Connect Extension.command
+to retry. Uninstall.command removes the native registration as well as the direct
+connection, retaining learning data. Native registration requires an installed Codex CLI (detected automatically);
+the default direct installation still needs no CLI. Restart Codex and start a new chat
+after connecting or updating. Existing chats may retain their original tools.
 
 ## Building and checking a release
 
@@ -81,7 +91,7 @@ python3.12 -m venv .venv
 .venv/bin/python -m unittest discover -s tests -v
 node --test tests/test_locales.mjs
 .venv/bin/python scripts/build_beta.py
-.venv/bin/python scripts/test_beta.py dist/language-memory-0.2.0-beta.1-macos-arm64.zip
+.venv/bin/python scripts/test_beta.py dist/language-memory-0.2.0-beta.2-macos-arm64.zip
 ```
 
 Change `VERSION` for the next Beta. The builder copies that version into the packaged

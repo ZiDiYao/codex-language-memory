@@ -76,6 +76,26 @@ const localePicker = new Picker($("#ui-language"), {
   onChange: (ui_language) => saveSettings({ ui_language }),
 });
 localePicker.button.disabled = true;
+const firstLanguagePicker = new Picker($("#first-language"), {
+  label: "First language",
+  onChange: (first_language) => saveSettings({ first_language: first_language || null }),
+});
+const explanationLanguagePicker = new Picker($("#explanation-language"), {
+  label: "Explanation language",
+  onChange: (explanation_language) => saveSettings({ explanation_language: explanation_language || null }),
+});
+
+function renderLanguagePreferences() {
+  const codes = [...new Set(["en", "zh", "ja", "ko", "fr", "es", ...catalog.languages,
+    settings?.first_language, settings?.explanation_language].filter(Boolean))];
+  const options = codes.map((value) => ({ value, label: languageName(value) }));
+  firstLanguagePicker.setLabel(t("firstLanguage"));
+  firstLanguagePicker.setOptions([{ value: "", label: t("chooseFirstLanguage") }, ...options]);
+  firstLanguagePicker.setValue(settings?.first_language || "");
+  explanationLanguagePicker.setLabel(t("explanationLanguage"));
+  explanationLanguagePicker.setOptions([{ value: "", label: t("useFirstLanguage") }, ...options]);
+  explanationLanguagePicker.setValue(settings?.explanation_language || "");
+}
 
 function renderCatalog() {
   const bases = [
@@ -131,6 +151,7 @@ function applyLocale() {
   ]);
   localePicker.setValue(locale);
   renderCatalog();
+  renderLanguagePreferences();
 }
 function notice(key, error = false, params = {}) {
   clearTimeout(noticeTimer);
@@ -207,6 +228,7 @@ function renderSettings() {
   badge.dataset.i18n = settings.enabled ? "active" : "paused";
   badge.textContent = t(badge.dataset.i18n);
   $("#settings-fields").disabled = false;
+  renderLanguagePreferences();
 }
 function card(record) {
   const details = element("details", undefined, "card");
@@ -620,6 +642,7 @@ async function initialize() {
     localePicker.button.disabled = false;
     ready = true;
     await loadRecords(true);
+    if (!settings.first_language) openDialog($("#settings-dialog"));
   } catch (error) {
     showError(error);
   }

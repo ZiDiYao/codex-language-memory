@@ -319,7 +319,7 @@ def install(package, locations, *, allow_downgrade=False, runner=run_runtime):
         settings["env"]["LANGUAGE_MEMORY_DB"] = str(database)
         after = tomlkit.dumps(document).encode()
         new_state = {"version": metadata["version"], "release": key, "package_id": digest,
-                     "previous_release": state.get("previous_release") if same_package else state.get("release"),
+                     "previous_release": state.get("previous_release") if same_package or state.get("version") == metadata["version"] else state.get("release"),
                      "database": str(database),
                      "database_backup": str(backup) if backup else None}
         switched = wrote_config = linked_skill = False

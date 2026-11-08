@@ -91,6 +91,8 @@ UILanguage = Literal["en", "zh", "ja", "ko", "fr", "es"]
 class LearningSettings(StrictModel):
     enabled: bool = True
     ui_language: UILanguage = "en"
+    first_language: Language | None = None
+    explanation_language: Language | None = None
     enabled_types: CaptureTypes = ["word", "expression", "grammar", "correction"]
 
     @model_validator(mode="before")
@@ -105,6 +107,8 @@ class LearningSettings(StrictModel):
 class SettingsPatch(StrictModel):
     enabled: bool | None = None
     ui_language: UILanguage | None = None
+    first_language: Language | None = None
+    explanation_language: Language | None = None
     enabled_types: CaptureTypes | None = None
 
 
@@ -290,6 +294,10 @@ class Store:
     def _settings(self, db) -> dict:
         preferences = json.loads(db.execute("SELECT data FROM capture_preferences").fetchone()[0])
         preferences["enabled"] = bool(db.execute("SELECT recording FROM settings").fetchone()[0])
+        row = db.execute("SELECT data FROM learner_preferences WHERE language = '*' ").fetchone()
+        learner = json.loads(row[0]) if row else {}
+        preferences["first_language"] = learner.get("first_language")
+        preferences["explanation_language"] = learner.get("explanation_language")
         return LearningSettings.model_validate(preferences).model_dump()
 
     def settings(self, patch: SettingsPatch | None = None) -> dict:
@@ -300,8 +308,19 @@ class Store:
                 current.update(changes)
                 current = LearningSettings.model_validate(current).model_dump()
                 db.execute("UPDATE settings SET recording = ? WHERE id = 1", (current["enabled"],))
-                preferences = {key: value for key, value in current.items() if key != "enabled"}
+                preferences = {key: value for key, value in current.items() if key not in ("enabled", "first_language", "explanation_language")}
                 db.execute("UPDATE capture_preferences SET data = ? WHERE id = 1", (encode(preferences),))
+                if {"first_language", "explanation_language"} & changes.keys():
+                    row = db.execute("SELECT data FROM learner_preferences WHERE language = '*' ").fetchone()
+                    learner = json.loads(row[0]) if row else {}
+                    for key in ("first_language", "explanation_language"):
+                        if key in changes:
+                            if current[key] is None:
+                                learner.pop(key, None)
+                            else:
+                                learner[key] = current[key]
+                    db.execute("INSERT INTO learner_preferences VALUES ('*', ?, ?) ON CONFLICT(language) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at",
+                               (encode(learner), now()))
             return current
 
     def save(self, request_id: str, items: list, source: CaptureMode = "automatic") -> dict:
@@ -635,6 +654,16 @@ class Store:
             for item in preferences:
                 item["preferences"] = json.loads(item.pop("data"))
                 item["source"] = "user_stated"
+            settings = self._settings(db)
+            explanation_language = settings["first_language"]
+            explanation_source = "first_language" if explanation_language else None
+            for scope in ("*", language):
+                if scope is None:
+                    continue
+                match = next((item for item in preferences if item["language"] == scope), None)
+                if match and match["preferences"].get("explanation_language"):
+                    explanation_language = match["preferences"]["explanation_language"]
+                    explanation_source = "global_preference" if scope == "*" else "language_preference"
             rated = db.execute(
                 f"""SELECT COUNT(*) FROM review_events JOIN knowledge ON knowledge.id = record_id
                     WHERE {where} AND rating IS NOT NULL""", params,
@@ -643,6 +672,12 @@ class Store:
                 "scope": "Observed learning interactions only; not an overall proficiency assessment",
                 "language": language, "groups": groups, "review_outcomes": outcomes,
                 "recurring_points": recurring, "preferences": preferences,
+                "language_preferences": {
+                    "first_language": settings["first_language"],
+                    "needs_first_language_confirmation": settings["first_language"] is None,
+                    "explanation_language": explanation_language,
+                    "explanation_source": explanation_source,
+                },
                 "rated_reviews": rated, "evidence_status": "observed_practice" if rated else "not_assessed",
                 "prediction_evaluation": evaluation, "algorithm": ALGORITHM,
             }

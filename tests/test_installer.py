@@ -93,6 +93,15 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual((self.locations.base / "installation.json").read_bytes(), state)
         self.assertFalse((self.locations.database.parent / "backups").exists())
 
+    def test_repackaging_same_version_keeps_previous_version_for_rollback(self):
+        first = self.install()
+        upgrade = self.make_package("0.2.0-beta.2")
+        self.install(upgrade)
+        (upgrade / "runtime/language-memory").write_text("#!/bin/sh\n# Repaired build\nexit 0\n")
+        self.seal(upgrade, "0.2.0-beta.2")
+        repaired = self.install(upgrade)
+        self.assertEqual(repaired["previous_release"], first["release"])
+
     def test_upgrade_preserves_full_history_and_creates_consistent_database_backup(self):
         self.install()
         self.seed()

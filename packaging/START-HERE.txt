@@ -52,3 +52,10 @@ a plugin marketplace while using the installer, as that would duplicate registra
 
 Releases: https://github.com/ZiDiYao/codex-language-memory/releases
 Support: https://github.com/ZiDiYao/codex-language-memory/issues
+
+To show Language Memory in the Codex Plugins directory, run Connect Extension.command
+once after installing. This detects your installed Codex CLI automatically. Later Beta installs refresh
+this connection automatically. Restart Codex and open a new conversation afterwards.
+
+Open Settings and confirm your first language. Codex uses it for explanations by
+default; you can choose a different explanation language independently of the UI.

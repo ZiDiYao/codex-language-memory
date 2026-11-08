@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 
 from installer import InstallError, Locations, install, rollback, status, uninstall
+from extension import connect_extension, extension_status, remove_extension
 from server import create_server
 from store import Review, Store
 
@@ -48,7 +49,7 @@ def healthcheck(database):
 
 def main():
     parser = argparse.ArgumentParser(description="Install, update or run Codex Language Memory.")
-    parser.add_argument("action", choices=("install", "serve", "healthcheck", "migrate", "status", "rollback", "uninstall"))
+    parser.add_argument("action", choices=("install", "serve", "healthcheck", "migrate", "status", "rollback", "uninstall", "connect-extension"))
     parser.add_argument("--package", type=Path)
     parser.add_argument("--sandbox-root", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--db", type=Path)
@@ -82,12 +83,23 @@ def main():
         elif args.action == "rollback":
             result = rollback(locations)
         elif args.action == "uninstall":
+            remove_extension(locations)
             result = uninstall(locations)
+        elif args.action == "connect-extension":
+            result = connect_extension(locations)
         else:
             result = status(locations)
+            result["extension"] = extension_status(locations)
+        if args.action in ("install", "rollback") and extension_status(locations)["installed"]:
+            try:
+                result["extension"] = connect_extension(locations)
+            except (InstallError, OSError, subprocess.TimeoutExpired) as error:
+                result["extension_warning"] = str(error)
+                print("The Beta is installed through MCP, but its native extension could not be refreshed. "
+                      "Run Connect Extension.command to retry.", file=sys.stderr)
         if args.json:
             print(json.dumps(result, indent=2))
-        elif args.action in ("install", "rollback"):
+        elif args.action in ("install", "rollback", "connect-extension"):
             label = "Already installed" if result["status"] == "already_installed" else "Ready"
             print(f"{label}: Language Memory {result['version']}.")
             print("Your learning records and settings are preserved.")
@@ -100,8 +112,12 @@ def main():
             print(result["next_step"])
         elif args.action == "status":
             print(f"Language Memory: {result['version'] or 'not installed'}")
-            for key, label in (("runtime_available", "Runtime"), ("mcp_registered", "MCP connection"),
-                               ("mcp_enabled", "MCP enabled"), ("skill_registered", "Skill")):
+            if result["extension"]["enabled"]:
+                print("Native Codex extension: connected")
+            checks = (("runtime_available", "Runtime"),) if result["extension"]["enabled"] else (
+                ("runtime_available", "Runtime"), ("mcp_registered", "MCP connection"),
+                ("mcp_enabled", "MCP enabled"), ("skill_registered", "Skill"))
+            for key, label in checks:
                 print(f"{label}: {'ready' if result[key] else 'not active'}")
             print(f"Learning data: {result['database']}")
         else:

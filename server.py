@@ -30,12 +30,18 @@ def create_server(store: Store) -> FastMCP:
 
     @server.tool(annotations=read_only)
     def get_settings() -> dict[str, Any]:
-        """Read recording, ui_language and enabled record types. Capture is automatic for all languages."""
+        """Read recording, interface language, confirmed first_language and default explanation override.
+
+        A null first_language means the user has not confirmed it. Never infer it from the UI or learning language.
+        A null explanation_language uses first_language unless a target-language preference overrides it.
+        """
         return store.settings()
 
     @server.tool(annotations=local_write)
     def update_settings(patch: SettingsPatch) -> dict[str, Any]:
         """Update supplied settings immediately. ui_language is en/zh/ja/ko/fr/es.
+        Set first_language only from the user's confirmation. explanation_language is a global override;
+        null resets it to first_language. These do not change the target language or translate old records.
         Capture automatically covers every language while recording is enabled.
         """
         return store.settings(patch)
