@@ -25,6 +25,8 @@ Language = Annotated[str, StringConstraints(
 RequestId = Annotated[str, StringConstraints(pattern=r"^[a-zA-Z0-9_-]{8,100}$")]
 Limit = Annotated[int, Field(ge=1, le=50)]
 RecordId = Annotated[int, Field(gt=0)]
+RecordIds = Annotated[list[RecordId], Field(min_length=1, max_length=500)]
+Revision = Annotated[str, StringConstraints(pattern=r"^[a-f0-9]{64}$")]
 
 
 class StrictModel(BaseModel):
@@ -245,6 +247,9 @@ def record(row: sqlite3.Row) -> dict:
     result.pop("title_key")
     result["examples"] = json.loads(result["examples"]) if result["examples"] else []
     result["content_ready"] = bool(result["explanation"] and result["examples"])
+    result["revision"] = hashlib.sha256(encode({key: result.get(key) for key in (
+        "title", "sense_key", "meaning", "context", "corrected_sentence", "explanation", "examples", "status",
+    )}).encode()).hexdigest()
     return result
 
 
@@ -405,9 +410,12 @@ class Store:
             return {"status": "processed", "replayed": False, "results": results}
 
     def _filters(self, *, keyword=None, kind=None, language=None, status=None,
-                 include_variants=False, needs_enrichment=False):
+                 include_variants=False, needs_enrichment=False, record_ids=None):
         filters = []
         params = []
+        if record_ids is not None:
+            filters.append("knowledge.id IN (" + ",".join("?" for _ in record_ids) + ")")
+            params.extend(record_ids)
         for column, value in (("kind", kind), ("status", status)):
             if value is not None:
                 filters.append(f"{column} = ?")
@@ -493,16 +501,26 @@ class Store:
 
     def languages(self) -> dict:
         with self.connection() as db:
-            codes = {"en", "zh", "ja", "ko", "fr", "de", "es", "it", "pt", "ru"}
+            codes = set()
             counts = {}
-            for row in db.execute("SELECT language, COUNT(*) AS total FROM knowledge GROUP BY language"):
+            kinds = {}
+            by_language = {}
+            for row in db.execute("SELECT language, kind, COUNT(*) AS total FROM knowledge GROUP BY language, kind"):
                 codes.add(row["language"])
                 base = row["language"].split("-")[0]
                 counts[base] = counts.get(base, 0) + row["total"]
+                kinds[row["kind"]] = kinds.get(row["kind"], 0) + row["total"]
+                group = by_language.setdefault(base, {})
+                group[row["kind"]] = group.get(row["kind"], 0) + row["total"]
             codes.update(counts)
-            return {"languages": sorted(codes), "counts": counts}
+            return {"languages": sorted(codes), "counts": counts, "kinds": kinds, "by_language": by_language}
 
-    def update(self, record_id: int, patch: Patch) -> dict:
+    def get_point(self, record_id: int) -> dict:
+        with self.connection() as db:
+            row = db.execute("SELECT * FROM knowledge WHERE id = ?", (record_id,)).fetchone()
+            return {"status": "found", "record": record(row)} if row else {"status": "not_found"}
+
+    def update(self, record_id: int, patch: Patch, expected_revision: str | None = None) -> dict:
         changes = patch.model_dump(exclude_unset=True)
         if not changes:
             return {"status": "failed", "error": "empty_patch"}
@@ -514,6 +532,12 @@ class Store:
         data = content_fields(changes)
         assignments = ", ".join(f"{column} = ?" for column in data)
         with self.connection(write=True) as db:
+            if expected_revision is not None:
+                current = db.execute("SELECT * FROM knowledge WHERE id = ?", (record_id,)).fetchone()
+                if current is None:
+                    return {"status": "not_found"}
+                if record(current)["revision"] != expected_revision:
+                    return {"status": "failed", "error": "edit_conflict", "record": record(current)}
             try:
                 cursor = db.execute(
                     f"UPDATE knowledge SET {assignments} WHERE id = ?",

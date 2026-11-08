@@ -17,5 +17,5 @@ jobs:
           node-version: '24'
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m unittest discover -s tests -v
-      - run: node --test tests/test_locales.mjs
+      - run: node --test tests/*.mjs
       - run: git diff --check

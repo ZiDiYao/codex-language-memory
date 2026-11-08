@@ -14,7 +14,7 @@ from uuid import uuid4
 from xml.sax.saxutils import escape
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from store import Kind, Language, Status, StrictModel, Title
+from store import Kind, Language, RecordIds, Status, StrictModel, Title
 
 ExportFormat = Literal["pdf", "xlsx", "docx", "notion", "json"]
 
@@ -26,6 +26,7 @@ class ExportRequest(StrictModel):
     language: Language | None = None
     status: Status | None = None
     include_variants: bool = True
+    record_ids: RecordIds | None = None
 
 
 class ExportError(ValueError):

@@ -1,12 +1,15 @@
 import { messages } from "./i18n.js";
 import { Picker } from "./picker.js";
-import { enter, reveal, conceal, openDialog, closeDialog, disclosure as animateDisclosure } from "./motion.js";
+import { enter, reveal, conceal, openDialog, closeDialog } from "./motion.js";
+
+import { DocumentEditor } from "./documents.js";
+import { kinds, languageSelection, pageFromHash, codexPrompt, codexLink } from "./page-model.js";
 
 const $ = (selector) => document.querySelector(selector);
 const pageSize = 20;
 let locale = "en";
 let settings;
-let catalog = { languages: ["en", "zh", "ja", "ko", "fr", "es"], counts: {} };
+let catalog = { languages: [], counts: {}, kinds: {}, by_language: {} };
 let cursor = null;
 let hasMore = true;
 let loading = false;
@@ -21,6 +24,12 @@ let pendingSettingWrites = 0;
 let settingsWriteError;
 let noticeTimer;
 const displayed = new Map();
+const editors = new Map();
+let view = pageFromHash(location.hash);
+let currentHash = location.hash;
+let navigating = false;
+let askContext;
+
 
 function t(key, params = {}) {
   return messages[locale][key].replace(/\{(\w+)\}/g, (_, name) => {
@@ -55,12 +64,7 @@ function typeOptions(keys) {
 }
 const languagePicker = new Picker($("#language"), {
   label: "Learning language",
-  value: "en",
-  onChange: () => loadRecords(true),
-});
-const kindPicker = new Picker($("#kind"), {
-  label: "Type",
-  onChange: () => loadRecords(true),
+  onChange: () => { renderCollections(); loadRecords(true); },
 });
 const statusPicker = new Picker($("#status"), {
   label: "Learning status",
@@ -98,29 +102,63 @@ function renderLanguagePreferences() {
 }
 
 function renderCatalog() {
-  const bases = [
-    ...new Set([
-      "en",
-      "zh",
-      "ja",
-      "ko",
-      "fr",
-      "es",
-      ...catalog.languages.map((code) => code.split("-")[0]),
-    ]),
-  ];
+  const selection = languageSelection(catalog.counts, languagePicker.value);
   languagePicker.setOptions([
-    {
-      value: "",
-      label: t("allLanguages"),
-      count: Object.values(catalog.counts).reduce((a, b) => a + b, 0),
-    },
-    ...bases.map((code) => ({
-      value: code,
-      label: languageName(code),
-      count: catalog.counts[code] || 0,
-    })),
+    { value: "", label: t("allLanguages"), count: Object.values(catalog.counts).reduce((a, b) => a + b, 0) },
+    ...selection.languages.map((value) => ({ value, label: languageName(value), count: catalog.counts[value] })),
   ]);
+  languagePicker.setValue(selection.value);
+  $("#language-field").hidden = !selection.showPicker;
+  renderCollections();
+}
+function renderCollections() {
+  const nav = $("#collections");
+  nav.hidden = view.type !== "library";
+  nav.setAttribute("aria-label", t("pages"));
+  const counts = languagePicker.value ? catalog.by_language?.[languagePicker.value] || {} : catalog.kinds || {};
+  nav.replaceChildren(...kinds.filter((kind) => counts[kind] > 0).map((kind) => {
+    const button = element("button", undefined, "collection-link");
+    button.append(element("span", "▤", "page-icon"), element("strong", t(kind + "Page")), element("small", counts[kind]));
+    button.addEventListener("click", () => navigate("#collection-" + kind));
+    return button;
+  }));
+}
+function renderView() {
+  const point = view.type === "point";
+  $("#page-heading").hidden = view.type === "library";
+  $("#page-ask").hidden = view.type !== "collection";
+  $("#page-title").hidden = view.type !== "collection";
+  $("#page-title").textContent = view.type === "collection" ? t(view.kind + "Page") : "";
+  $("#browse-controls").hidden = point;
+  $("#records").classList.toggle("document-page", view.type !== "library");
+  renderCollections();
+}
+async function flushEditors() {
+  for (const editor of editors.values()) {
+    if (!(await editor.flush())) {
+      editor.node.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      return false;
+    }
+  }
+  return true;
+}
+async function navigate(hash, fromHistory = false) {
+  if (navigating) return;
+  navigating = true;
+  try {
+    if (!(await flushEditors())) {
+      if (fromHistory) history.replaceState(null, "", currentHash || location.pathname);
+      return;
+    }
+    ++queryVersion;
+    if (!fromHistory) history.pushState(null, "", hash || location.pathname);
+    currentHash = hash;
+    view = pageFromHash(hash);
+    renderView();
+    await loadRecords(true);
+    window.scrollTo({ top: 0 });
+    (view.type === "collection" ? $("#page-title") : view.type === "point" ? $(".document-title") : $("#search"))?.focus({ preventScroll: true });
+  } finally { navigating = false; }
 }
 function applyLocale() {
   document.documentElement.lang = locale;
@@ -138,13 +176,8 @@ function applyLocale() {
     node.textContent = languageName(node.dataset.language);
   });
   languagePicker.setLabel(t("notebook"));
-  kindPicker.setLabel(t("kind"));
   statusPicker.setLabel(t("status"));
   localePicker.setLabel(t("uiLanguage"));
-  kindPicker.setOptions([
-    { value: "", label: t("allTypes") },
-    ...typeOptions(["word", "expression", "grammar", "correction"]),
-  ]);
   statusPicker.setOptions([
     { value: "", label: t("allStatuses") },
     ...typeOptions(["new", "mastered"]),
@@ -152,6 +185,17 @@ function applyLocale() {
   localePicker.setValue(locale);
   renderCatalog();
   renderLanguagePreferences();
+  renderView();
+  refreshEditorLocales();
+}
+function refreshEditorLocales() {
+  for (const editor of editors.values()) {
+    if (editor.uiLocale === locale || editor.dirty || editor.node.contains(document.activeElement)) continue;
+    const old = editor.node;
+    editor.node = editor.render();
+    editor.uiLocale = locale;
+    old.replaceWith(editor.node);
+  }
 }
 function notice(key, error = false, params = {}) {
   clearTimeout(noticeTimer);
@@ -197,7 +241,7 @@ async function api(action, arguments_ = {}) {
     );
   if (data.status === "failed" || data.status === "not_found")
     throw new Error(
-      data.error === "identity_conflict" ? "conflict" : "notFound",
+      data.error === "identity_conflict" ? "conflict" : data.error === "edit_conflict" ? "editConflict" : data.status === "not_found" ? "notFound" : "invalid",
     );
   return data;
 }
@@ -212,7 +256,7 @@ function filters() {
   for (const [key, value] of Object.entries({
     keyword: $("#search").value.trim(),
     language: languagePicker.value,
-    kind: kindPicker.value,
+    kind: view.type === "collection" ? view.kind : "",
     status: statusPicker.value,
   })) {
     if (value) result[key] = value;
@@ -231,124 +275,36 @@ function renderSettings() {
   renderLanguagePreferences();
 }
 function card(record) {
-  const details = element("details", undefined, "card");
-  details.dataset.id = record.id;
-  details.dataset.status = record.status;
-  const summary = element("summary");
-  const heading = element("div", undefined, "card-heading");
-  const kind = element("span", undefined, "kind");
-  const language = element("span", languageName(record.language));
-  language.dataset.language = record.language;
-  kind.append(
-    translated("span", record.kind),
-    element("span", " · "),
-    language,
-  );
-  const title = element("h3", record.title);
+  const row = element("button", undefined, "knowledge-row");
+  row.dataset.id = record.id;
+  const content = element("span", undefined, "row-content");
+  const title = element("strong", record.title);
   title.lang = record.language;
-  heading.append(title, kind);
-  const meta = element("div", undefined, "meta");
-  meta.append(
-    translated("span", record.status, {}, "status-tag"),
-    translated("span", "encounters", { count: record.encounter_count }),
-    translated("span", "lastSeen", { date: record.last_seen_at }),
-  );
-  const disclosure = translated("span", "expand", {}, "sr-only");
-  heading.append(element("span", undefined, "card-chevron"));
-  summary.append(
-    heading,
-    element("p", record.meaning, "meaning"),
-    meta,
-    disclosure,
-  );
-  details.append(summary);
-  const body = element("div", undefined, "detail");
-  for (const [key, value] of [
-    ["explanation", record.explanation],
-    ["context", record.context],
-    ["corrected", record.corrected_sentence],
-  ]) {
-    if (value) body.append(translated("h4", key), element("p", value));
-  }
-  if (!record.content_ready)
-    body.append(translated("p", "needsExplanation", {}, "help"));
-  if (record.examples.length) body.append(translated("h4", "examples"));
-  for (const example of record.examples) {
-    const block = element("div", undefined, "example");
-    const sentence = element("p", example.text);
-    sentence.lang = record.language;
-    block.append(sentence);
-    if (example.translation)
-      block.append(element("small", example.translation));
-    body.append(block);
-  }
-  const dates = element("div", undefined, "meta detail-meta");
-  dates.append(
-    translated("span", "created", { date: record.created_at }),
-    translated("span", "reviewed", { date: record.last_reviewed_at }),
-  );
-  body.append(dates);
-  const actions = element("div", undefined, "actions");
-  const mastery = translated(
-    "button",
-    record.status === "mastered" ? "keepLearning" : "markMastered",
-    {}, "mastery-action",
-  );
-  mastery.dataset.action = "mastery";
-  const remove = translated("button", "delete", {}, "subtle delete-action");
-  remove.dataset.action = "delete";
-  actions.append(mastery, remove);
-  const confirmation = element("div", undefined, "actions delete-confirmation");
-  confirmation.hidden = true;
-  const confirm = translated("button", "confirmDelete", {}, "danger");
-  const cancel = translated("button", "cancel");
-  confirmation.append(translated("span", "deleteQuestion"), confirm, cancel);
-  remove.addEventListener("click", () => {
-    reveal(confirmation);
-    cancel.focus();
-  });
-  cancel.addEventListener("click", () => {
-    conceal(confirmation);
-    remove.focus();
-  });
-  mastery.addEventListener("click", async () => {
-    mastery.disabled = true;
-    try {
-      await api("points/update", {
-        record_id: record.id,
-        patch: {
-          status: record.status === "mastered" ? "new" : "mastered",
-        },
-      });
-      await loadRecords(true, true);
-      notice("saved");
-    } catch (error) {
-      showError(error);
-    } finally {
-      mastery.disabled = false;
-    }
-  });
-  confirm.addEventListener("click", async () => {
-    confirm.disabled = true;
-    try {
-      await api("points/delete", { record_id: record.id });
-      await loadRecords(true, true);
+  content.append(title, element("span", record.meaning, "row-meaning"));
+  const meta = element("span", undefined, "row-meta");
+  meta.append(translated("span", record.kind), element("span", languageName(record.language)), translated("span", record.status, {}, "status-tag"));
+  row.append(element("span", "▤", "page-icon"), content, meta, element("span", "↗", "row-arrow"));
+  row.addEventListener("click", () => navigate("#point-" + record.id));
+  return row;
+}
+function documentBlock(record) {
+  const editor = new DocumentEditor(record, {
+    t, api, languageName, uiLocale: locale,
+    onChange: (updated) => { displayed.set(updated.id, updated); },
+    onDeleted: async (deleted) => {
+      editors.delete(deleted.id);
+      displayed.delete(deleted.id);
+      editor.node.remove();
       catalog = await api("languages/list");
       renderCatalog();
+      if (view.type === "point") await navigate("");
+      else await loadRecords(true, true);
       notice("deleted");
-    } catch (error) {
-      showError(error);
-    } finally {
-      confirm.disabled = false;
-    }
+    },
+    onAsk: (point) => openCodex({ type: "point", id: point.id }),
   });
-  body.append(actions, confirmation);
-  details.append(body);
-  animateDisclosure(details, summary, body, (open) => {
-    disclosure.dataset.i18n = open ? "collapse" : "expand";
-    disclosure.textContent = t(disclosure.dataset.i18n);
-  });
-  return details;
+  editors.set(record.id, editor);
+  return editor.node;
 }
 function updateLoadState(key, params = {}) {
   $("#load-sentinel").hidden = key === "allLoaded";
@@ -368,87 +324,71 @@ function maybeLoadMore() {
     loadRecords();
 }
 async function loadRecords(reset = false, preserve = false) {
-  if (!ready || (!reset && (loading || !hasMore || loadFailed))) return;
+  if (!ready || (!reset && (loading || !hasMore || loadFailed))) return false;
+  if (reset && !preserve && !(await flushEditors())) return false;
+  if (preserve && (document.activeElement?.closest(".document-block") || [...editors.values()].some((editor) => editor.dirty))) return false;
   const version = reset ? ++queryVersion : queryVersion;
-  const existing = [...document.querySelectorAll(".card")];
-  const anchor = preserve
-    ? existing.find((node) => node.getBoundingClientRect().top >= 0)
-    : null;
+  const anchor = preserve ? [...$("#records").children].find((node) => node.getBoundingClientRect().top >= 0) : null;
   const anchorId = anchor?.dataset.id;
   const anchorTop = anchor?.getBoundingClientRect().top;
-  const expanded = new Set(
-    preserve
-      ? existing.filter((node) => node.open).map((node) => node.dataset.id)
-      : [],
-  );
-  const focusElement = document.activeElement;
-  const focusOwner = preserve ? focusElement?.closest(".card") : null;
-  const focusId = focusOwner?.dataset.id;
-  const focusAction = focusElement?.dataset.action;
   const amount = preserve ? Math.max(pageSize, displayed.size) : pageSize;
-  if (reset) {
-    cursor = null;
-    hasMore = true;
-    loadFailed = false;
-  }
+  if (reset) { cursor = null; hasMore = true; loadFailed = false; }
   loading = true;
   $("#retry-load").hidden = true;
   updateLoadState("loading");
   $("#records").setAttribute("aria-busy", "true");
   $("#records").classList.toggle("is-filtering", reset && !preserve);
   try {
-    const args = { ...filters(), limit: amount };
-    if (cursor) args.cursor = cursor;
-    const data = await api("points/query", args);
-    if (version !== queryVersion) return;
-    const restoreFocus = focusId && document.activeElement === focusElement;
-    if (reset) {
-      displayed.clear();
-      $("#records").replaceChildren();
+    let data;
+    if (view.type === "point") {
+      const result = await api("points/read", { record_id: view.id });
+      data = { records: [result.record], has_more: false, next_cursor: null };
+    } else {
+      data = { records: [], has_more: true, next_cursor: cursor };
+      do {
+        const args = { ...filters(), limit: Math.min(50, amount - data.records.length) };
+        if (data.next_cursor) args.cursor = data.next_cursor;
+        const batch = await api("points/query", args);
+        data = { ...batch, records: [...data.records, ...batch.records] };
+      } while (data.has_more && data.records.length < amount && version === queryVersion);
     }
+    if (version !== queryVersion || [...editors.values()].some((editor) => editor.dirty) || (preserve && document.activeElement?.closest(".document-block"))) return false;
+    if (reset) { displayed.clear(); editors.clear(); $("#records").replaceChildren(); }
     const added = [];
     for (const record of data.records) {
       if (displayed.has(record.id)) continue;
       displayed.set(record.id, record);
-      const node = card(record);
-      node.open = expanded.has(String(record.id));
+      const node = view.type === "library" ? card(record) : documentBlock(record);
       $("#records").append(node);
       added.push(node);
     }
     if (!displayed.size) {
       const empty = element("div", undefined, "empty");
-      empty.append(
-        translated("strong", "emptyTitle"),
-        translated("p", "emptyHelp"),
-      );
+      empty.append(translated("strong", "emptyTitle"), translated("p", "emptyHelp"));
       $("#records").append(empty);
     }
     if (!preserve) {
       if (reset) enter($("#records"), 5);
       else added.forEach((node) => enter(node, 4));
     }
-    if (restoreFocus) {
-      const restored = [...document.querySelectorAll(".card")].find((node) => node.dataset.id === focusId);
-      (restored?.querySelector(focusAction ? `[data-action="${focusAction}"]` : "summary") || $("#search")).focus({ preventScroll: true });
-    }
     cursor = data.next_cursor;
     hasMore = data.has_more;
-    updateLoadState(hasMore ? "scrollMore" : "allLoaded", {
-      count: displayed.size,
-    });
+    updateLoadState(hasMore ? "scrollMore" : "allLoaded", { count: displayed.size });
     if (anchorId) {
-      const restored = [...document.querySelectorAll(".card")].find(
-        (node) => node.dataset.id === anchorId,
-      );
-      if (restored)
-        window.scrollBy(0, restored.getBoundingClientRect().top - anchorTop);
+      const restored = [...$("#records").children].find((node) => node.dataset.id === anchorId);
+      if (restored) window.scrollBy(0, restored.getBoundingClientRect().top - anchorTop);
     }
+    return true;
   } catch (error) {
     if (version === queryVersion) {
       loadFailed = true;
+      if (error.message === "notFound" && ![...editors.values()].some((editor) => editor.dirty)) {
+        displayed.clear(); editors.clear(); $("#records").replaceChildren();
+      }
       updateLoadState(errorKey(error));
       $("#retry-load").hidden = false;
     }
+    return false;
   } finally {
     if (version === queryVersion) {
       loading = false;
@@ -503,12 +443,12 @@ async function synchronize() {
     return;
   syncing = true;
   try {
+    refreshEditorLocales();
     const latest = await api("changes/read");
     if (latest.content !== versions.content) {
       catalog = await api("languages/list");
       renderCatalog();
-      await loadRecords(true, true);
-      if (!loadFailed) versions.content = latest.content;
+      if (await loadRecords(true, true)) versions.content = latest.content;
     }
     if (latest.preferences !== versions.preferences && !pendingSettingWrites) {
       await loadSettings();
@@ -521,13 +461,15 @@ async function synchronize() {
   }
 }
 async function download(format) {
+  if (!(await flushEditors())) return;
   const buttons = [...document.querySelectorAll("[data-format]")];
   buttons.forEach((button) => {
     button.disabled = true;
   });
   feedback(".export-feedback", "exporting");
   try {
-    const response = await request("export", { format, ...filters() });
+    const scope = view.type === "point" ? { record_ids: [view.id] } : filters();
+    const response = await request("export", { format, ...scope });
     if (!response.ok) {
       const data = await response.json();
       throw new Error(data.error);
@@ -568,6 +510,7 @@ document.querySelectorAll('[name="enabled-type"]').forEach((input) =>
   }),
 );
 $("#settings-open").addEventListener("click", async () => {
+  if (!(await flushEditors())) return;
   openDialog($("#settings-dialog"));
   try {
     await loadSettings();
@@ -575,7 +518,8 @@ $("#settings-open").addEventListener("click", async () => {
     feedback(".settings-feedback", errorKey(error), true);
   }
 });
-$("#export-open").addEventListener("click", () => {
+$("#export-open").addEventListener("click", async () => {
+  if (!(await flushEditors())) return;
   $(".export-feedback").textContent = "";
   openDialog($("#export-dialog"));
 });
@@ -620,11 +564,37 @@ $("#search").addEventListener("input", () => {
 });
 $("#retry-load").addEventListener("click", () => {
   loadFailed = false;
-  loadRecords();
+  loadRecords(view.type === "point");
 });
 new IntersectionObserver(maybeLoadMore, { rootMargin: "250px" }).observe(
   $("#load-sentinel"),
 );
+$("#back-library").addEventListener("click", () => navigate(""));
+$("#page-ask").addEventListener("click", async () => { if (await flushEditors()) openCodex(view); });
+window.addEventListener("hashchange", () => navigate(location.hash, true));
+window.addEventListener("beforeunload", (event) => {
+  if ([...editors.values()].some((editor) => editor.dirty)) { event.preventDefault(); event.returnValue = ""; }
+});
+function openCodex(context) {
+  askContext = { page: { ...context }, filters: filters() };
+  $("#codex-question").value = "";
+  $("#codex-feedback").textContent = "";
+  $("#prompt-fallback").hidden = true;
+  updateCodexLink();
+  openDialog($("#codex-dialog"));
+  $("#codex-question").focus();
+}
+function updateCodexLink() {
+  if (!askContext) return;
+  const prompt = codexPrompt(askContext.page, askContext.filters, $("#codex-question").value);
+  $("#codex-open").href = codexLink(prompt);
+  $("#codex-prompt").value = prompt;
+}
+$("#codex-question").addEventListener("input", updateCodexLink);
+$("#codex-copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("#codex-prompt").value); feedback("#codex-feedback", "copied"); }
+  catch { $("#prompt-fallback").hidden = false; $("#codex-prompt").select(); }
+});
 document.addEventListener("visibilitychange", synchronize);
 window.addEventListener("focus", synchronize);
 setInterval(synchronize, 3000);

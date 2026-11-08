@@ -9,7 +9,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from store import (CaptureMode, Kind, Language, LearnerPreferences, Limit, Patch, RecordId, RequestId, Review,
-                   SettingsPatch, Status, Store, Title)
+                   Revision, SettingsPatch, Status, Store, Title)
 from dashboard import Dashboard
 from exports import ExportError, ExportRequest, save_export
 
@@ -48,7 +48,7 @@ def create_server(store: Store) -> FastMCP:
 
     @server.tool(annotations=read_only)
     def list_languages() -> dict[str, Any]:
-        """List available languages and saved record counts grouped by base language."""
+        """List languages with saved records and counts grouped by base language. No empty language notebooks are created."""
         return store.languages()
 
     @server.tool(annotations=read_only)
@@ -169,12 +169,14 @@ def create_server(store: Store) -> FastMCP:
         return store.learning_preferences(language, patch)
 
     @server.tool(annotations=ToolAnnotations(openWorldHint=False))
-    def update_point(record_id: RecordId, patch: Patch) -> dict[str, Any]:
+    def update_point(record_id: RecordId, patch: Patch, expected_revision: Revision | None = None) -> dict[str, Any]:
         """Edit supplied fields only. Use null to clear optional content.
         Status changes only when supplied. Record quiz results with record_review and its
         idempotent request_id; legacy review_result patches fail without changing data.
+        Pass the record's revision to avoid overwriting a concurrent page edit. On edit_conflict,
+        reread and reconcile the change; do not blindly retry without the revision.
         """
-        return store.update(record_id, patch)
+        return store.update(record_id, patch, expected_revision)
 
     @server.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
     def delete_point(record_id: RecordId) -> dict[str, Any]:

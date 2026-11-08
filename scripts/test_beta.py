@@ -96,6 +96,18 @@ async def exercise(archive):
             page = await call(session, "open_memory_page")
             with urlopen(page["url"]) as response:
                 assert "Language memory" in response.read().decode()
+            for asset in ("documents.js", "page-model.js"):
+                with urlopen(page["url"] + asset) as response:
+                    assert response.status == 200 and response.read()
+            point = (await call(session, "find_points"))["records"][0]
+            changed = await call(session, "update_point", {"record_id": point["id"],
+                "patch": {"explanation": "Edited in a document page."}, "expected_revision": point["revision"]})
+            assert changed["status"] == "updated"
+            stale = await call(session, "update_point", {"record_id": point["id"],
+                "patch": {"explanation": "Stale edit."}, "expected_revision": point["revision"]})
+            assert stale["error"] == "edit_conflict"
+            scoped = await call(session, "export_points", {"request": {"format": "json", "record_ids": [point["id"]]}})
+            assert scoped["count"] == 1
             for kind in ("pdf", "docx", "xlsx", "notion", "json"):
                 export = await call(session, "export_points", {"request": {"format": kind}})
                 assert export["count"] == 2 and export["format"] == kind, export

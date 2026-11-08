@@ -15,7 +15,7 @@ from pydantic import Field, ValidationError
 
 from exports import ExportError, ExportRequest, build_export
 
-from store import (Kind, Language, Limit, Patch, RecordId, SettingsPatch,
+from store import (Kind, Language, Limit, Patch, RecordId, Revision, SettingsPatch,
                    Status, Store, StrictModel, Title)
 
 
@@ -34,6 +34,7 @@ class Query(StrictModel):
 class PointUpdate(StrictModel):
     record_id: RecordId
     patch: Patch
+    expected_revision: Revision | None = None
 
 
 class PointDelete(StrictModel):
@@ -44,6 +45,8 @@ ASSETS = {
     "": ("index.html", "text/html; charset=utf-8"),
     "app.js": ("app.js", "text/javascript; charset=utf-8"),
     "motion.js": ("motion.js", "text/javascript; charset=utf-8"),
+    "documents.js": ("documents.js", "text/javascript; charset=utf-8"),
+    "page-model.js": ("page-model.js", "text/javascript; charset=utf-8"),
     "picker.js": ("picker.js", "text/javascript; charset=utf-8"),
     "i18n.js": ("i18n.js", "text/javascript; charset=utf-8"),
     "style.css": ("style.css", "text/css; charset=utf-8"),
@@ -168,9 +171,12 @@ def dispatch(store, request):
         return store.languages()
     if action == "points/query":
         return store.query(**Query.model_validate(arguments).model_dump())
+    if action == "points/read":
+        point = PointDelete.model_validate(arguments)
+        return store.get_point(point.record_id)
     if action == "points/update":
         update = PointUpdate.model_validate(arguments)
-        return store.update(update.record_id, update.patch)
+        return store.update(update.record_id, update.patch, update.expected_revision)
     if action == "points/delete":
         delete = PointDelete.model_validate(arguments)
         return store.delete(delete.record_id)
