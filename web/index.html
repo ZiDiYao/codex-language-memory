@@ -64,7 +64,8 @@
         </div>
       </header>
       <section id="records-panel">
-        <form id="search-form" class="search-line">
+        <form id="search-form" class="search-line" role="search">
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
           <label class="sr-only" for="search" data-i18n="search"></label>
           <input
             id="search"
@@ -72,7 +73,6 @@
             maxlength="350"
             data-placeholder="searchPlaceholder"
           />
-          <button type="submit" data-i18n="search"></button>
         </form>
         <div class="filters">
           <div>

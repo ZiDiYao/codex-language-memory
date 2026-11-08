@@ -1,3 +1,5 @@
+import { reveal, conceal } from "./motion.js";
+
 /** Small accessible listbox with the same styling as the surrounding page. */
 export class Picker {
   constructor(host, { label, options = [], value = "", onChange }) {
@@ -6,6 +8,7 @@ export class Picker {
     this.options = options;
     this.value = value;
     this.onChange = onChange;
+    this.expanded = false;
     this.button = document.createElement("button");
     this.button.type = "button";
     this.button.className = "picker-trigger";
@@ -21,7 +24,7 @@ export class Picker {
     host.classList.add("picker");
     host.append(this.button, this.list);
     this.button.addEventListener("click", () =>
-      this.list.hidden ? this.open() : this.close(),
+      this.expanded ? this.close(true) : this.open(),
     );
     this.button.addEventListener("keydown", (event) => {
       if (["ArrowDown", "ArrowUp"].includes(event.key)) {
@@ -38,7 +41,7 @@ export class Picker {
         this.close(true);
         return;
       }
-      if (event.key === "Tab") return this.close();
+      if (event.key === "Tab") return this.close(true);
       if (event.key === "ArrowDown") index = (index + 1) % buttons.length;
       else if (event.key === "ArrowUp")
         index = (index - 1 + buttons.length) % buttons.length;
@@ -58,27 +61,32 @@ export class Picker {
       if (!host.contains(event.target)) this.close();
     });
     host.addEventListener("focusout", (event) => {
-      if (!host.contains(event.relatedTarget)) this.close();
+      if (!this.rendering && !host.contains(event.relatedTarget)) this.close();
     });
     this.render();
   }
 
   setOptions(options) {
+    if (JSON.stringify(options) === JSON.stringify(this.options)) return;
     this.options = options;
     this.render();
   }
 
   setValue(value) {
+    if (this.value === value) return;
     this.value = value;
     this.render();
   }
 
   setLabel(label) {
     this.label = label;
-    this.render();
+    this.button.setAttribute("aria-label", label);
+    this.list.setAttribute("aria-label", label);
   }
 
   render() {
+    this.rendering = true;
+    const focusedIndex = [...this.list.children].indexOf(document.activeElement);
     this.button.setAttribute("aria-label", this.label);
     this.list.setAttribute("aria-label", this.label);
     this.button.textContent =
@@ -103,19 +111,23 @@ export class Picker {
           button.append(count);
         }
         button.addEventListener("click", () => {
+          this.close(true);
           this.value = option.value;
           this.render();
-          this.close(true);
           this.onChange?.(option.value);
         });
         return button;
       }),
     );
+    if (this.expanded && focusedIndex >= 0) this.list.children[focusedIndex]?.focus();
+    this.rendering = false;
   }
 
   open() {
     if (!this.options.length) return;
-    this.list.hidden = false;
+    if (this.expanded) return;
+    this.expanded = true;
+    reveal(this.list);
     this.button.setAttribute("aria-expanded", "true");
     (
       this.list.querySelector('[aria-selected="true"]') ||
@@ -124,8 +136,10 @@ export class Picker {
   }
 
   close(focus = false) {
-    this.list.hidden = true;
+    if (!this.expanded) return;
+    this.expanded = false;
     this.button.setAttribute("aria-expanded", "false");
+    conceal(this.list);
     if (focus) this.button.focus();
   }
 }

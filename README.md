@@ -53,6 +53,8 @@ Ask Codex to open the learning page. `open_memory_page` returns a local URL that
 - Scroll to load more records automatically. The visible page checks for database changes every three seconds and when focused, preserving expanded cards and scroll position. There are no page numbers or Refresh button.
 - Use **Export** in the top-right corner to download every record matching the current filters, including records that have not loaded on screen.
 
+Cards, menus, dialogs, and feedback use short, interruptible transitions. Native keyboard activation, Escape dismissal, and focus restoration remain available. System reduced-motion preferences disable movement. Search updates as you type, keeping the previous results visible until the next response arrives; background synchronization does not replay entrance animations.
+
 Language selectors use keyboard-accessible menus styled to match the page. Every language is eligible for capture. The language dropdown filters displayed records only. The interface language is independent of the language being learned and does not translate saved content. Language groups include regional variants, while each record keeps its actual language tag.
 
 The server binds only to loopback and uses a random URL token. The page shares the MCP database. A page started by MCP stops with that MCP process; ask Codex to open it again if its URL expires. To run a standalone page against the same database:

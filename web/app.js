@@ -1,5 +1,6 @@
 import { messages } from "./i18n.js";
 import { Picker } from "./picker.js";
+import { enter, reveal, conceal, openDialog, closeDialog, disclosure as animateDisclosure } from "./motion.js";
 
 const $ = (selector) => document.querySelector(selector);
 const pageSize = 20;
@@ -138,11 +139,11 @@ function notice(key, error = false, params = {}) {
   node.dataset.params = JSON.stringify(params);
   node.textContent = t(key, params);
   node.className = error ? "error" : "";
-  node.hidden = false;
+  reveal(node);
   if (!error && !["saving", "exporting"].includes(key))
     noticeTimer = setTimeout(() => {
-      node.hidden = true;
-    }, 4000);
+      conceal(node);
+    }, 3200);
 }
 function feedback(selector, key, error = false) {
   const node = $(selector);
@@ -210,6 +211,7 @@ function renderSettings() {
 function card(record) {
   const details = element("details", undefined, "card");
   details.dataset.id = record.id;
+  details.dataset.status = record.status;
   const summary = element("summary");
   const heading = element("div", undefined, "card-heading");
   const kind = element("span", undefined, "kind");
@@ -225,11 +227,12 @@ function card(record) {
   heading.append(title, kind);
   const meta = element("div", undefined, "meta");
   meta.append(
-    translated("span", record.status),
+    translated("span", record.status, {}, "status-tag"),
     translated("span", "encounters", { count: record.encounter_count }),
     translated("span", "lastSeen", { date: record.last_seen_at }),
   );
-  const disclosure = translated("span", "expand", {}, "disclosure");
+  const disclosure = translated("span", "expand", {}, "sr-only");
+  heading.append(element("span", undefined, "card-chevron"));
   summary.append(
     heading,
     element("p", record.meaning, "meaning"),
@@ -237,10 +240,6 @@ function card(record) {
     disclosure,
   );
   details.append(summary);
-  details.addEventListener("toggle", () => {
-    disclosure.dataset.i18n = details.open ? "collapse" : "expand";
-    disclosure.textContent = t(disclosure.dataset.i18n);
-  });
   const body = element("div", undefined, "detail");
   for (const [key, value] of [
     ["explanation", record.explanation],
@@ -271,19 +270,24 @@ function card(record) {
   const mastery = translated(
     "button",
     record.status === "mastered" ? "keepLearning" : "markMastered",
+    {}, "mastery-action",
   );
-  const remove = translated("button", "delete", {}, "subtle");
+  mastery.dataset.action = "mastery";
+  const remove = translated("button", "delete", {}, "subtle delete-action");
+  remove.dataset.action = "delete";
   actions.append(mastery, remove);
-  const confirmation = element("div", undefined, "actions");
+  const confirmation = element("div", undefined, "actions delete-confirmation");
   confirmation.hidden = true;
   const confirm = translated("button", "confirmDelete", {}, "danger");
   const cancel = translated("button", "cancel");
   confirmation.append(translated("span", "deleteQuestion"), confirm, cancel);
   remove.addEventListener("click", () => {
-    confirmation.hidden = false;
+    reveal(confirmation);
+    cancel.focus();
   });
   cancel.addEventListener("click", () => {
-    confirmation.hidden = true;
+    conceal(confirmation);
+    remove.focus();
   });
   mastery.addEventListener("click", async () => {
     mastery.disabled = true;
@@ -318,6 +322,10 @@ function card(record) {
   });
   body.append(actions, confirmation);
   details.append(body);
+  animateDisclosure(details, summary, body, (open) => {
+    disclosure.dataset.i18n = open ? "collapse" : "expand";
+    disclosure.textContent = t(disclosure.dataset.i18n);
+  });
   return details;
 }
 function updateLoadState(key, params = {}) {
@@ -351,6 +359,10 @@ async function loadRecords(reset = false, preserve = false) {
       ? existing.filter((node) => node.open).map((node) => node.dataset.id)
       : [],
   );
+  const focusElement = document.activeElement;
+  const focusOwner = preserve ? focusElement?.closest(".card") : null;
+  const focusId = focusOwner?.dataset.id;
+  const focusAction = focusElement?.dataset.action;
   const amount = preserve ? Math.max(pageSize, displayed.size) : pageSize;
   if (reset) {
     cursor = null;
@@ -360,26 +372,26 @@ async function loadRecords(reset = false, preserve = false) {
   loading = true;
   $("#retry-load").hidden = true;
   updateLoadState("loading");
-  if (!preserve && reset) {
-    displayed.clear();
-    $("#records").replaceChildren();
-  }
   $("#records").setAttribute("aria-busy", "true");
+  $("#records").classList.toggle("is-filtering", reset && !preserve);
   try {
     const args = { ...filters(), limit: amount };
     if (cursor) args.cursor = cursor;
     const data = await api("points/query", args);
     if (version !== queryVersion) return;
+    const restoreFocus = focusId && document.activeElement === focusElement;
     if (reset) {
       displayed.clear();
       $("#records").replaceChildren();
     }
+    const added = [];
     for (const record of data.records) {
       if (displayed.has(record.id)) continue;
       displayed.set(record.id, record);
       const node = card(record);
       node.open = expanded.has(String(record.id));
       $("#records").append(node);
+      added.push(node);
     }
     if (!displayed.size) {
       const empty = element("div", undefined, "empty");
@@ -388,6 +400,14 @@ async function loadRecords(reset = false, preserve = false) {
         translated("p", "emptyHelp"),
       );
       $("#records").append(empty);
+    }
+    if (!preserve) {
+      if (reset) enter($("#records"), 5);
+      else added.forEach((node) => enter(node, 4));
+    }
+    if (restoreFocus) {
+      const restored = [...document.querySelectorAll(".card")].find((node) => node.dataset.id === focusId);
+      (restored?.querySelector(focusAction ? `[data-action="${focusAction}"]` : "summary") || $("#search")).focus({ preventScroll: true });
     }
     cursor = data.next_cursor;
     hasMore = data.has_more;
@@ -411,6 +431,7 @@ async function loadRecords(reset = false, preserve = false) {
     if (version === queryVersion) {
       loading = false;
       $("#records").removeAttribute("aria-busy");
+      $("#records").classList.remove("is-filtering");
       if (!loadFailed) requestAnimationFrame(maybeLoadMore);
     }
   }
@@ -500,7 +521,7 @@ async function download(format) {
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-    $("#export-dialog").close();
+    await closeDialog($("#export-dialog"));
     notice("exported", false, {
       count: response.headers.get("X-Record-Count"),
     });
@@ -525,7 +546,7 @@ document.querySelectorAll('[name="enabled-type"]').forEach((input) =>
   }),
 );
 $("#settings-open").addEventListener("click", async () => {
-  $("#settings-dialog").showModal();
+  openDialog($("#settings-dialog"));
   try {
     await loadSettings();
   } catch (error) {
@@ -534,12 +555,12 @@ $("#settings-open").addEventListener("click", async () => {
 });
 $("#export-open").addEventListener("click", () => {
   $(".export-feedback").textContent = "";
-  $("#export-dialog").showModal();
+  openDialog($("#export-dialog"));
 });
 document
   .querySelectorAll(".dialog-close")
   .forEach((button) =>
-    button.addEventListener("click", () => button.closest("dialog").close()),
+    button.addEventListener("click", () => closeDialog(button.closest("dialog"))),
   );
 document.querySelectorAll("dialog").forEach((dialog) =>
   dialog.addEventListener("click", (event) => {
@@ -551,9 +572,15 @@ document.querySelectorAll("dialog").forEach((dialog) =>
         event.clientY < rect.top ||
         event.clientY > rect.bottom)
     )
-      dialog.close();
+      closeDialog(dialog);
   }),
 );
+document.querySelectorAll("dialog").forEach((dialog) => {
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeDialog(dialog);
+  });
+});
 document
   .querySelectorAll("[data-format]")
   .forEach((button) =>
@@ -561,6 +588,7 @@ document
   );
 $("#search-form").addEventListener("submit", (event) => {
   event.preventDefault();
+  clearTimeout(searchTimer);
   loadRecords(true);
 });
 let searchTimer;

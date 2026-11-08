@@ -8,9 +8,10 @@
   --line: #e1e0dd;
   --hover: #eae9e6;
   --error: #b4433b;
-  --shadow: 0 12px 35px #0002;
+  --shadow: 0 16px 48px #0002, 0 2px 8px #0001;
+  --ease: cubic-bezier(.2,.8,.2,1);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 13px;
+  font-size: 14px;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -22,7 +23,7 @@
     --line: #353535;
     --hover: #333333;
     --error: #ed9e94;
-    --shadow: 0 12px 35px #0006;
+    --shadow: 0 16px 48px #0007, 0 2px 8px #0004;
   }
 }
 * {
@@ -33,14 +34,16 @@ body {
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  scrollbar-gutter: stable;
 }
 body:has(dialog[open]) {
   overflow: hidden;
 }
 main {
-  max-width: 940px;
+  max-width: 900px;
   margin: auto;
-  padding: 28px 24px 40px;
+  padding: 30px 24px 48px;
 }
 h1,
 h2,
@@ -50,7 +53,7 @@ p {
   margin: 0;
 }
 h1 {
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.4px;
 }
@@ -71,12 +74,17 @@ button {
   cursor: pointer;
   padding: 7px 12px;
   min-height: 36px;
+  transition: background 140ms var(--ease), border-color 140ms var(--ease), opacity 140ms var(--ease), transform 140ms var(--ease);
+  -webkit-tap-highlight-color: transparent;
   border: 1px solid var(--line);
   background: var(--surface);
   border-radius: 8px;
 }
-button:hover {
+button:hover:not(:disabled) {
   background: var(--hover);
+}
+button:active:not(:disabled) {
+  transform: translateY(1px);
 }
 button:disabled {
   opacity: 0.5;
@@ -123,7 +131,7 @@ input:focus-visible {
 .intro-row {
   gap: 16px;
   justify-content: space-between;
-  margin: 12px 0 24px;
+  margin: 8px 0 28px;
   color: var(--muted);
   font-size: 12px;
   flex-wrap: wrap;
@@ -143,9 +151,17 @@ input:focus-visible {
   vertical-align: middle;
 }
 .search-line {
+  position: relative;
   display: flex;
-  gap: 8px;
   margin-bottom: 14px;
+}
+.search-line > svg {
+  position: absolute;
+  top: 50%;
+  left: 13px;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
 }
 input[type="search"] {
   width: 100%;
@@ -153,7 +169,8 @@ input[type="search"] {
   border: 1px solid var(--line);
   background: var(--surface);
   border-radius: 8px;
-  padding: 9px 12px;
+  padding: 11px 12px 11px 40px;
+  transition: background 140ms var(--ease), border-color 140ms var(--ease);
 }
 input::placeholder {
   color: var(--muted);
@@ -162,13 +179,13 @@ input::placeholder {
   display: grid;
   grid-template-columns: 1.2fr 1fr 1fr;
   gap: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 .field-label {
   display: block;
   font-size: 11px;
   color: var(--muted);
-  margin-bottom: 5px;
+  margin-bottom: 6px;
 }
 .picker {
   position: relative;
@@ -192,6 +209,13 @@ input::placeholder {
   transform: rotate(45deg);
   margin: -3px 2px 0 0;
   flex-shrink: 0;
+  transition: transform 160ms var(--ease);
+}
+.picker-trigger[aria-expanded="true"] {
+  background: var(--raised);
+}
+.picker-trigger[aria-expanded="true"]::after {
+  transform: translateY(3px) rotate(225deg);
 }
 .picker-options {
   position: absolute;
@@ -208,6 +232,15 @@ input::placeholder {
   border-radius: 10px;
   box-shadow: var(--shadow);
   z-index: 10;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.picker-options[inert] {
+  pointer-events: none;
+}
+.filters > :last-child .picker-options {
+  left: auto;
+  right: 0;
 }
 .picker-options button {
   display: flex;
@@ -215,6 +248,8 @@ input::placeholder {
   justify-content: space-between;
   gap: 24px;
   width: 100%;
+  position: relative;
+  padding-left: 29px;
   text-align: left;
   border: 0;
   min-height: 36px;
@@ -230,8 +265,15 @@ input::placeholder {
   background: var(--raised);
 }
 .picker-options [aria-selected="true"] span::before {
-  content: "✓";
-  margin-right: 7px;
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  width: 4px;
+  height: 8px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
 }
 .picker-options small {
   margin: 0;
@@ -243,11 +285,26 @@ input::placeholder {
   background: var(--surface);
   border-radius: 12px;
   margin: 10px 0;
+  transition: border-color 160ms var(--ease), background 160ms var(--ease);
+}
+.card:hover {
+  border-color: color-mix(in srgb, var(--muted) 45%, var(--line));
+}
+.card[data-animating] {
+  overflow: hidden;
+  overflow-anchor: none;
+}
+#records {
+  transition: opacity 140ms var(--ease);
+}
+#records.is-filtering {
+  opacity: .55;
 }
 summary {
   list-style: none;
   cursor: pointer;
-  padding: 17px 18px;
+  padding: 18px 20px;
+  -webkit-tap-highlight-color: transparent;
 }
 summary::-webkit-details-marker {
   display: none;
@@ -257,13 +314,15 @@ summary:focus-visible {
   border-radius: 12px;
 }
 .card-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 12px;
+  align-items: center;
   gap: 12px;
 }
 .card h3 {
-  font-size: 17px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -.2px;
   overflow-wrap: anywhere;
 }
 .kind {
@@ -283,22 +342,32 @@ summary:focus-visible {
   color: var(--muted);
   font-size: 11px;
 }
-.disclosure {
-  display: flex;
+.card-chevron {
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 200ms var(--ease);
+}
+.card summary[aria-expanded="true"] .card-chevron {
+  transform: translateY(2px) rotate(225deg);
+}
+.status-tag {
+  color: var(--text);
+  background: var(--raised);
+  padding: 1px 7px;
+  border-radius: 5px;
+}
+.card[data-status="mastered"] .status-tag::before {
+  content: "✓";
+  margin-right: 4px;
+}
+.meta {
   align-items: center;
-  gap: 6px;
-  margin-top: 12px;
-  font-size: 11px;
-  color: var(--muted);
-}
-.disclosure::after {
-  content: "+";
-}
-.card[open] .disclosure::after {
-  content: "−";
 }
 .detail {
-  padding: 0 18px 18px;
+  padding: 2px 20px 20px;
   border-top: 1px solid var(--line);
 }
 .detail h4 {
@@ -310,9 +379,12 @@ summary:focus-visible {
 .detail p {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  line-height: 1.85;
 }
 .example {
-  padding: 8px 12px;
+  padding: 10px 14px;
+  border-radius: 0 6px 6px 0;
+  background: color-mix(in srgb, var(--raised) 55%, transparent);
   border-left: 2px solid var(--line);
   margin: 8px 0;
 }
@@ -332,13 +404,27 @@ small {
   flex-wrap: wrap;
   gap: 8px;
 }
+.delete-action {
+  margin-left: auto;
+  color: var(--muted);
+  border-color: transparent;
+}
+.delete-action:hover {
+  color: var(--error);
+}
+.delete-confirmation {
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--raised);
+  font-size: 12px;
+}
 .actions + .actions {
   margin-top: 10px;
 }
 .actions button {
   min-height: 32px;
   padding: 5px 10px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .danger,
 .error {
@@ -367,33 +453,15 @@ small {
   margin-left: 10px;
   font-size: 11px;
 }
-aside {
-  border-top: 1px solid var(--line);
-  padding-top: 18px;
-  margin-top: 12px;
-  font-size: 12px;
-  color: var(--muted);
-}
-aside strong {
-  color: var(--text);
-  font-weight: 500;
-}
-aside p {
-  margin-top: 6px;
-}
-footer {
-  color: var(--muted);
-  font-size: 10px;
-  text-align: center;
-  margin-top: 30px;
-}
 dialog {
   width: min(460px, calc(100vw - 32px));
   max-height: calc(100dvh - 40px);
   overflow-y: auto;
   border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 22px;
+  border-radius: 18px;
+  padding: 24px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
   background: var(--bg);
   color: var(--text);
   box-shadow: var(--shadow);
@@ -401,6 +469,18 @@ dialog {
 dialog::backdrop {
   background: #0007;
   backdrop-filter: blur(3px);
+  animation: backdrop-in 220ms var(--ease) both;
+}
+dialog[data-closing]::backdrop {
+  animation: backdrop-out 140ms var(--ease) both;
+}
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 .dialog-heading {
   margin-bottom: 8px;
@@ -416,7 +496,7 @@ dialog::backdrop {
 .setting {
   padding: 18px 0;
   border-bottom: 1px solid var(--line);
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 fieldset {
   border: 0;
@@ -428,7 +508,8 @@ fieldset {
   justify-content: space-between;
   align-items: center;
   gap: 18px;
-  padding: 5px 0;
+  padding: 4px 0;
+  cursor: pointer;
 }
 .toggle-row strong,
 .choice strong {
@@ -439,10 +520,40 @@ input[type="checkbox"] {
   accent-color: var(--text);
   flex-shrink: 0;
 }
+input[role="switch"] {
+  appearance: none;
+  width: 34px;
+  height: 20px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  position: relative;
+  cursor: pointer;
+  transition: background 160ms var(--ease), border-color 160ms var(--ease);
+}
+input[role="switch"]::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  top: 2px;
+  left: 2px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 160ms var(--ease), background 160ms var(--ease);
+}
+input[role="switch"]:checked {
+  background: var(--text);
+  border-color: var(--text);
+}
+input[role="switch"]:checked::after {
+  transform: translateX(14px);
+  background: var(--bg);
+}
 .type-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px 16px;
+  gap: 8px;
   margin-top: 8px;
 }
 .choice {
@@ -450,7 +561,17 @@ input[type="checkbox"] {
   gap: 8px;
   align-items: start;
   cursor: pointer;
-  padding-top: 6px;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  transition: background 140ms var(--ease), border-color 140ms var(--ease);
+}
+.choice:has(input:checked) {
+  background: var(--surface);
+  border-color: var(--line);
+}
+.choice:hover {
+  background: var(--hover);
 }
 .settings-feedback,
 .export-feedback {
@@ -472,12 +593,16 @@ input[type="checkbox"] {
 .export-options button > span:last-child {
   color: var(--muted);
   font-size: 11px;
+  background: var(--raised);
+  border-radius: 4px;
+  padding: 2px 6px;
 }
 #notice {
   position: fixed;
   bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
   width: max-content;
   max-width: calc(100vw - 32px);
   border: 1px solid var(--line);
@@ -523,8 +648,21 @@ input[type="checkbox"] {
     grid-column: 1 / -1;
   }
   .card-heading {
-    flex-wrap: wrap;
-    gap: 4px;
+    grid-template-columns: minmax(0, 1fr) 12px;
+    gap: 4px 10px;
+  }
+  .card-heading .kind {
+    grid-row: 2;
+  }
+  .card-chevron {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  summary {
+    padding: 16px;
+  }
+  .detail {
+    padding: 2px 16px 16px;
   }
   .card h3 {
     font-size: 16px;
@@ -534,5 +672,14 @@ input[type="checkbox"] {
   }
   dialog {
     padding: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
