@@ -84,7 +84,7 @@ class DocumentTests(unittest.TestCase):
         call("points/update", record_id=first, patch={"meaning": "Updated meaning"}, expected_revision=original["revision"])
         self.assertEqual(call("points/update", record_id=first, patch={"meaning": "Old meaning"}, expected_revision=original["revision"])["error"], "edit_conflict")
         request = ExportRequest(format="json", record_ids=[second])
-        filters = request.model_dump(exclude={"format"})
+        filters = request.filters()
         self.assertEqual([record["id"] for record in self.store.export_records(**filters)], [second])
 
 

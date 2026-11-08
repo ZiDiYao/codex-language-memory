@@ -502,8 +502,17 @@ class Store:
             next_cursor = base64.urlsafe_b64encode(encode([last["last_seen_at"], last["id"]]).encode()).decode()
         return {"records": records, "has_more": more, "next_cursor": next_cursor}
 
-    def export_records(self, **filters):
+    def export_records(self, *, kinds=None, date_field="created_at", start_at=None, end_at=None, **filters):
+        if date_field not in {"created_at", "last_seen_at"}:
+            raise ValueError("Invalid export date field")
         clauses, params = self._filters(**filters)
+        if kinds is not None:
+            clauses.append("kind IN (" + ",".join("?" for _ in kinds) + ")")
+            params.extend(kinds)
+        for value, operator in ((start_at, ">="), (end_at, "<")):
+            if value is not None:
+                clauses.append(f"julianday({date_field}) {operator} julianday(?)")
+                params.append(value)
         where = " AND ".join(clauses) or "1"
         # Read the full filtered result from one SQLite snapshot, independent of UI pagination.
         with self.connection() as db:

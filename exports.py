@@ -9,24 +9,66 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import uuid4
 from xml.sax.saxutils import escape
 from zipfile import ZIP_DEFLATED, ZipFile
+
+from pydantic import AwareDatetime, Field, model_validator
 
 from store import Kind, Language, RecordIds, Status, StrictModel, Title
 
 ExportFormat = Literal["pdf", "xlsx", "docx", "notion", "json"]
 
 
-class ExportRequest(StrictModel):
-    format: ExportFormat
+ExportField = Literal["meaning", "explanation", "examples", "translations", "context", "corrected_sentence"]
+
+
+class ExportSelection(StrictModel):
     keyword: Title | None = None
     kind: Kind | None = None
     language: Language | None = None
     status: Status | None = None
     include_variants: bool = True
     record_ids: RecordIds | None = None
+    kinds: Annotated[list[Kind], Field(min_length=1, max_length=4)] | None = None
+    date_field: Literal["created_at", "last_seen_at"] = "created_at"
+    start_at: Annotated[AwareDatetime, Field(strict=False)] | None = None
+    end_at: Annotated[AwareDatetime, Field(strict=False)] | None = None
+    content: Literal["notes", "terms", "sections"] = "notes"
+    fields: Annotated[list[ExportField], Field(max_length=6)] = []
+    include_metadata: bool | None = None
+
+    @model_validator(mode="after")
+    def valid_selection(self):
+        if self.start_at and self.end_at and self.start_at >= self.end_at:
+            raise ValueError("start_at must precede the exclusive end_at")
+        if self.kind is not None and self.kinds is not None:
+            raise ValueError("Choose kind or kinds, not both")
+        if self.kinds and len(set(self.kinds)) != len(self.kinds):
+            raise ValueError("Kinds must be unique")
+        if len(set(self.fields)) != len(self.fields):
+            raise ValueError("Content fields must be unique")
+        if (self.content == "sections") != bool(self.fields):
+            raise ValueError("Choose content fields only for sections")
+        if "translations" in self.fields and "examples" not in self.fields:
+            raise ValueError("Example translations require examples")
+        return self
+
+    @property
+    def metadata_enabled(self):
+        return self.include_metadata if self.include_metadata is not None else self.content == "notes"
+
+    def filters(self):
+        filters = self.model_dump(exclude={"format", "content", "fields", "include_metadata"})
+        for key in ("start_at", "end_at"):
+            if filters[key]:
+                filters[key] = filters[key].astimezone(timezone.utc).isoformat(timespec="microseconds")
+        return filters
+
+
+class ExportRequest(ExportSelection):
+    format: ExportFormat
 
 
 class ExportError(ValueError):
@@ -49,19 +91,57 @@ COLUMNS = [
     ("last_review_result", "Last review result"), ("id", "ID"), ("sense_key", "Sense key"),
 ]
 PDF_LOCK = Lock()
+SECTION_COLUMNS = [
+    ("meaning", "Meaning / translation"), ("explanation", "Explanation"),
+    ("examples", "Examples"), ("context", "Original context"),
+    ("corrected_sentence", "Corrected sentence"),
+]
+
+
+def project(records, selection):
+    columns = COLUMNS[:3] if selection.metadata_enabled else COLUMNS[:1]
+    if selection.content == "notes":
+        columns = columns + [("note", "Note")]
+    elif selection.content == "sections":
+        columns = columns + [(key, label) for key, label in SECTION_COLUMNS if key in selection.fields]
+    if selection.metadata_enabled:
+        columns = columns + COLUMNS[4:]
+    projected = []
+    for record in records:
+        row = {key: record.get(key) for key, _ in columns}
+        row["title"] = record["title"] if selection.content == "sections" else note_title(record)
+        if "examples" in row:
+            row["examples"] = [
+                {key: value for key, value in example.items() if key == "text" or "translations" in selection.fields}
+                for example in record["examples"]
+            ]
+        projected.append(row)
+    return projected, columns
+
+
+def preview_export(store, selection):
+    records = store.export_records(**selection.filters())
+    projected, _ = project(records, selection)
+    return {"count": len(records), "titles": [row["title"] for row in projected[:3]],
+            "custom_note_count": sum(record["note_is_custom"] for record in records)}
 
 
 def note_title(record):
-    return record["note_title"] or "Untitled note"
+    return record.get("note_title", record["title"]) or "Untitled note"
 
 
-def values(record):
-    return [note_title(record) if key == "title" else record.get(key) for key, _ in COLUMNS]
+def example_text(examples):
+    return "\n\n".join("\n".join(filter(None, (item["text"], item.get("translation")))) for item in examples)
+
+
+def values(record, columns=COLUMNS):
+    return [example_text(record[key]) if key == "examples" else record.get(key) for key, _ in columns]
 
 
 def sections(record):
-    if record["note"]:
-        yield "Note", record["note"]
+    for key, label in [("note", "Note"), *SECTION_COLUMNS]:
+        if record.get(key):
+            yield label, example_text(record[key]) if key == "examples" else record[key]
 
 
 def metadata(record):
@@ -74,30 +154,32 @@ def plain(value):
     return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", str(value))
 
 
-def markdown(record):
+def markdown(record, include_metadata=True):
     # Escape Markdown syntax and HTML so learning content remains literal text.
     def literal(value):
         value = escape(plain(value))
         return re.sub(r"([\\`*_{\[\]}()#+.!|>~-])", r"\\\1", value)
-    lines = [f'# {literal(note_title(record))}', "", metadata(record), ""]
+    lines = [f'# {literal(note_title(record))}', ""]
+    if include_metadata:
+        lines += [metadata(record), ""]
     for label, value in sections(record):
         lines += [f"## {label}", "", literal(value), ""]
-    for key, label in COLUMNS[6:]:
+    for key, label in COLUMNS[6:] if include_metadata else []:
         if record.get(key) is not None:
             lines += [f"{label}: {literal(record[key])}", ""]
     return "\n".join(lines)
 
 
-def spreadsheet(records):
+def spreadsheet(records, columns=COLUMNS, include_metadata=True):
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
     book = Workbook()
     sheet = book.active
     sheet.title = "Knowledge"
-    sheet.append([label for _, label in COLUMNS])
+    sheet.append([label for _, label in columns])
     for record in records:
-        sheet.append([plain(value) if isinstance(value, str) else value for value in values(record)])
+        sheet.append([plain(value) if isinstance(value, str) else value for value in values(record, columns)])
     for row in sheet:
         for cell in row:
             if isinstance(cell.value, str):
@@ -107,9 +189,9 @@ def spreadsheet(records):
     for cell in sheet[1]:
         cell.font = Font(name="Arial", bold=True, color="FFFFFF")
         cell.fill = PatternFill("solid", fgColor="292929")
-    for index, (key, _) in enumerate(COLUMNS, 1):
+    for index, (key, _) in enumerate(columns, 1):
         sheet.column_dimensions[get_column_letter(index)].width = (
-            80 if key == "note"
+            80 if key in {"note", "explanation", "examples"}
             else 30 if key == "title" else 23
         )
     sheet.freeze_panes = "A2"
@@ -119,7 +201,7 @@ def spreadsheet(records):
     return buffer.getvalue()
 
 
-def word_document(records):
+def word_document(records, columns=COLUMNS, include_metadata=True):
     from docx import Document
     from docx.oxml import OxmlElement
     from docx.oxml.ns import qn
@@ -144,18 +226,23 @@ def word_document(records):
     document.styles["Normal"].font.size = Pt(10)
     document.styles["Normal"].paragraph_format.space_after = Pt(6)
     document.add_heading("Language learning records", 0)
-    document.add_paragraph(f"{len(records)} saved knowledge points. Definitions, explanations and examples for review.")
+    document.add_paragraph(f"{len(records)} saved knowledge points.")
     for record in records:
         start = len(document.paragraphs)
-        document.add_heading(plain(note_title(record)), 1)
-        document.add_paragraph(metadata(record), style="Caption")
+        if columns == COLUMNS[:1]:
+            document.add_paragraph(plain(note_title(record)))
+        else:
+            document.add_heading(plain(note_title(record)), 1)
+        if include_metadata:
+            document.add_paragraph(metadata(record), style="Caption")
         for label, value in sections(record):
             document.add_heading(label, 2)
             document.add_paragraph(plain(value))
-        document.add_paragraph(
-            f'ID {record["id"]} | Last seen: {record["last_seen_at"][:10]} | Last review: {(record["last_reviewed_at"] or "Not yet")[:10]}',
-            style="Caption",
-        )
+        if include_metadata:
+            document.add_paragraph(
+                f'ID {record["id"]} | Last seen: {record["last_seen_at"][:10]} | Last review: {(record["last_reviewed_at"] or "Not yet")[:10]}',
+                style="Caption",
+            )
         if sum(len(paragraph.text) for paragraph in document.paragraphs[start:]) < 2500:
             for paragraph in document.paragraphs[start:-1]:
                 paragraph.paragraph_format.keep_with_next = True
@@ -169,7 +256,7 @@ def word_document(records):
     return buffer.getvalue()
 
 
-def pdf_document(records):
+def pdf_document(records, columns=COLUMNS, include_metadata=True):
     import reportlab
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
@@ -186,7 +273,7 @@ def pdf_document(records):
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         str(Path(reportlab.__file__).parent / "fonts" / "Vera.ttf"),
     ]
-    text = "".join(plain(value) for record in records for value in values(record) if value is not None)
+    text = "".join(plain(value) for record in records for value in values(record, columns) if value is not None)
     needed = {ord(char) for char in text if not char.isspace()}
     with PDF_LOCK:
         for index, path in enumerate(candidates):
@@ -213,11 +300,15 @@ def pdf_document(records):
         story = [paragraph("Language learning records", "title"), paragraph(f"{len(records)} saved knowledge points.")]
         for record in records:
             start = len(story)
-            story += [paragraph(note_title(record), "heading"), paragraph(metadata(record), "label")]
+            story += [paragraph(note_title(record), "body" if columns == COLUMNS[:1] else "heading")]
+            if include_metadata:
+                story += [paragraph(metadata(record), "label")]
             for label, value in sections(record):
                 story += [paragraph(label, "label"), paragraph(value)]
-            story += [paragraph(f'ID {record["id"]} | Last seen: {record["last_seen_at"][:10]} | Last review: {(record["last_reviewed_at"] or "Not yet")[:10]}', "label"), Spacer(1, 8)]
-            if sum(len(str(value or "")) for value in values(record)) < 2500:
+            if include_metadata:
+                story += [paragraph(f'ID {record["id"]} | Last seen: {record["last_seen_at"][:10]} | Last review: {(record["last_reviewed_at"] or "Not yet")[:10]}', "label")]
+            story += [Spacer(1, 8)]
+            if sum(len(str(value or "")) for value in values(record, columns)) < 2500:
                 story[start:] = [KeepTogether(story[start:])]
         def footer(canvas, document):
             canvas.setFont(name, 8)
@@ -230,36 +321,39 @@ def pdf_document(records):
         return buffer.getvalue()
 
 
-def notion_archive(records):
+def notion_archive(records, columns=COLUMNS, include_metadata=True):
     buffer = io.BytesIO()
     with ZipFile(buffer, "w", compression=ZIP_DEFLATED) as archive:
         table = io.StringIO(newline="")
         writer = csv.writer(table)
-        writer.writerow([label for _, label in COLUMNS])
-        for record in records:
-            cells = values(record)
+        writer.writerow([label for _, label in columns])
+        for index, record in enumerate(records, 1):
+            cells = values(record, columns)
             # Protect spreadsheet apps that may open the optional CSV directly.
             writer.writerow(["'" + value if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")) else value for value in cells])
-            archive.writestr(f'pages/point-{record["id"]}.md', markdown(record))
+            archive.writestr(f'pages/point-{record.get("id", index)}.md', markdown(record, include_metadata))
         archive.writestr("knowledge.csv", table.getvalue().encode("utf-8-sig"))
         archive.writestr("README.txt", "Import the pages folder as Markdown using Notion's ZIP importer, or import knowledge.csv as a database.\nThe CSV and Markdown pages are alternative views of the same records.\nhttps://www.notion.com/help/import-data-into-notion\n")
     return buffer.getvalue()
 
 
 def build_export(store, request: ExportRequest) -> ExportFile:
-    records = store.export_records(**request.model_dump(exclude={"format"}))
+    records = store.export_records(**request.filters())
     if not records:
         raise ExportError("exportEmpty")
+    records, columns = project(records, request)
     formats = {
         "pdf": ("pdf", "application/pdf", pdf_document),
         "xlsx": ("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", spreadsheet),
         "docx": ("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", word_document),
         "notion": ("zip", "application/zip", notion_archive),
-        "json": ("json", "application/json", lambda rows: json.dumps({"records": rows}, ensure_ascii=False, indent=2).encode()),
+        "json": ("json", "application/json", lambda rows, *_: json.dumps({"records": rows}, ensure_ascii=False, indent=2).encode()),
     }
     extension, mime_type, render = formats[request.format]
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    return ExportFile(f"language-memory-{stamp}.{extension}", mime_type, render(records), len(records))
+    source = "-captured" if request.content == "sections" else ""
+    return ExportFile(f"language-memory-{stamp}{source}.{extension}", mime_type,
+                      render(records, columns, request.metadata_enabled), len(records))
 
 
 def save_export(store, request):

@@ -106,6 +106,12 @@ def create_server(store: Store) -> FastMCP:
     @server.tool(annotations=local_write)
     def export_points(request: ExportRequest) -> dict[str, Any]:
         """Export all matching points as PDF, XLSX, DOCX, a Notion import ZIP, or JSON.
+        Filter by kind or kinds, language, status, keyword, and timezone-aware start_at
+        (inclusive) / end_at (exclusive), using date_field created_at or last_seen_at.
+        content=notes exports current editable notes; terms exports current titles only.
+        content=sections requires fields (meaning, explanation, examples, translations,
+        context, corrected_sentence) and uses original captured fields, not freeform edits.
+        translations requires examples. include_metadata controls learning dates/history.
         Returns a local file path and count. Notion ZIP contains Markdown and CSV;
         it does not publish to Notion. Use find_points for direct conversational reading.
         """

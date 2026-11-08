@@ -97,7 +97,7 @@ async def exercise(archive):
             page = await call(session, "open_memory_page")
             with urlopen(page["url"]) as response:
                 assert "Language memory" in response.read().decode()
-            for asset in ("entry-editor.js", "history-model.js"):
+            for asset in ("entry-editor.js", "history-model.js", "export-dialog.js", "export-model.js"):
                 with urlopen(page["url"] + asset) as response:
                     assert response.status == 200 and response.read()
             point = (await call(session, "find_points"))["records"][0]
@@ -110,6 +110,17 @@ async def exercise(archive):
             assert stale["error"] == "edit_conflict"
             scoped = await call(session, "export_points", {"request": {"format": "json", "record_ids": [point["id"]]}})
             assert scoped["count"] == 1
+            terms = await call(session, "export_points", {"request": {
+                "format": "json", "record_ids": [point["id"]], "content": "terms",
+                "kinds": ["word", "expression"], "start_at": point["created_at"],
+            }})
+            assert json.loads(Path(terms["path"]).read_text())["records"] == [{"title": "My editable note"}]
+            selected = await call(session, "export_points", {"request": {
+                "format": "json", "record_ids": [point["id"]], "content": "sections", "fields": ["explanation"],
+            }})
+            assert json.loads(Path(selected["path"]).read_text())["records"] == [
+                {"title": point["title"], "explanation": point["explanation"]}]
+            checks.append("Frozen MCP filters by date and multiple types and excludes unselected content from exports")
             for kind in ("pdf", "docx", "xlsx", "notion", "json"):
                 export = await call(session, "export_points", {"request": {"format": kind}})
                 assert export["count"] == 2 and export["format"] == kind, export

@@ -4,6 +4,7 @@ import { enter, reveal, conceal, openDialog, closeDialog, disclosure } from "./m
 
 import { EntryEditor } from "./entry-editor.js";
 import { languageSelection } from "./history-model.js";
+import { ExportDialog } from "./export-dialog.js";
 
 const $ = (selector) => document.querySelector(selector);
 const pageSize = 20;
@@ -78,6 +79,10 @@ const firstLanguagePicker = new Picker($("#first-language"), {
 const explanationLanguagePicker = new Picker($("#explanation-language"), {
   label: "Explanation language",
   onChange: (explanation_language) => saveSettings({ explanation_language: explanation_language || null }),
+});
+const exportDialog = new ExportDialog($("#export-dialog"), {
+  t, api, languageName, download, flushEditors, feedback, errorKey,
+  getFilters: filters, getCatalog: () => catalog,
 });
 
 function renderLanguagePreferences() {
@@ -171,6 +176,7 @@ function applyLocale() {
   renderKinds();
   renderLanguagePreferences();
   refreshEditorLocales();
+  exportDialog.relabel();
 }
 function refreshEditorLocales() {
   for (const editor of editors.values()) {
@@ -472,15 +478,15 @@ async function synchronize() {
     syncing = false;
   }
 }
-async function download(format) {
+async function download(format, selection) {
   if (!(await flushEditors())) return;
-  const buttons = [...document.querySelectorAll("[data-format]")];
+  const buttons = [...document.querySelectorAll("[data-format], #export-back")];
   buttons.forEach((button) => {
     button.disabled = true;
   });
   feedback(".export-feedback", "exporting");
   try {
-    const response = await request("export", { format, ...filters() });
+    const response = await request("export", { format, ...selection });
     if (!response.ok) {
       const data = await response.json();
       throw new Error(data.error);
@@ -529,11 +535,7 @@ $("#settings-open").addEventListener("click", async () => {
     feedback(".settings-feedback", errorKey(error), true);
   }
 });
-$("#export-open").addEventListener("click", async () => {
-  if (!(await flushEditors())) return;
-  $(".export-feedback").textContent = "";
-  openDialog($("#export-dialog"));
-});
+$("#export-open").addEventListener("click", () => exportDialog.open());
 document
   .querySelectorAll(".dialog-close")
   .forEach((button) =>
@@ -558,11 +560,6 @@ document.querySelectorAll("dialog").forEach((dialog) => {
     closeDialog(dialog);
   });
 });
-document
-  .querySelectorAll("[data-format]")
-  .forEach((button) =>
-    button.addEventListener("click", () => download(button.dataset.format)),
-  );
 $("#search-form").addEventListener("submit", (event) => {
   event.preventDefault();
   clearTimeout(searchTimer);

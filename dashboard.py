@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 
 from pydantic import Field, ValidationError
 
-from exports import ExportError, ExportRequest, build_export
+from exports import ExportError, ExportRequest, ExportSelection, build_export, preview_export
 
 from store import (Kind, Language, Limit, Patch, RecordId, Revision, SettingsPatch,
                    Status, Store, StrictModel, Title)
@@ -47,6 +47,8 @@ ASSETS = {
     "motion.js": ("motion.js", "text/javascript; charset=utf-8"),
     "entry-editor.js": ("entry-editor.js", "text/javascript; charset=utf-8"),
     "history-model.js": ("history-model.js", "text/javascript; charset=utf-8"),
+    "export-dialog.js": ("export-dialog.js", "text/javascript; charset=utf-8"),
+    "export-model.js": ("export-model.js", "text/javascript; charset=utf-8"),
     "picker.js": ("picker.js", "text/javascript; charset=utf-8"),
     "i18n.js": ("i18n.js", "text/javascript; charset=utf-8"),
     "style.css": ("style.css", "text/css; charset=utf-8"),
@@ -169,6 +171,8 @@ def dispatch(store, request):
     if action == "languages/list":
         StrictModel.model_validate(arguments)
         return store.languages()
+    if action == "exports/preview":
+        return preview_export(store, ExportSelection.model_validate(arguments))
     if action == "points/query":
         return store.query(**Query.model_validate(arguments).model_dump())
     if action == "points/read":

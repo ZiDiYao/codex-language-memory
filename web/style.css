@@ -552,6 +552,17 @@ summary[aria-expanded="true"] .entry-last-seen { display: none; }
 .entry-note::placeholder { color: var(--muted); }
 .entry-footer { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .entry-footer .help { flex: 1; margin: 0; }
+.export-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
+.export-search { display: block; margin-top: 14px; }
+.export-grid input, .export-search input { width: 100%; min-width: 0; }
+.export-content { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.export-metadata { margin-top: 12px; font-size: 12px; color: var(--muted); }
+.export-next { width: 100%; margin-top: 16px; background: var(--text); color: var(--bg); }
+.export-next:hover:not(:disabled) { background: var(--text); opacity: .88; }
+#export-back { padding-left: 0; border-color: transparent; margin: 10px 0; color: var(--muted); }
+#export-selection-preview { overflow-wrap: anywhere; }
+#export-fields { font-size: 12px; }
+@media (max-width: 380px) { .export-grid { grid-template-columns: 1fr; } }
 [hidden] {
   display: none !important;
 }
