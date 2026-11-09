@@ -12,6 +12,7 @@
   --ease: cubic-bezier(.2,.8,.2,1);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 14px;
+  scrollbar-gutter: stable;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -35,8 +36,9 @@ body {
   color: var(--text);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
-  scrollbar-gutter: stable;
 }
+html:has(.history-entry[data-animating]) { overflow-anchor: none; }
+.disclosure-scroll-space { position: absolute; top: 0; left: 0; width: 1px; pointer-events: none; }
 body:has(dialog[open]) {
   overflow: hidden;
 }

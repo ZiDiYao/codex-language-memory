@@ -349,7 +349,7 @@ function maybeLoadMore() {
 async function loadRecords(reset = false, preserve = false) {
   if (!ready || (!reset && (loading || !hasMore || loadFailed))) return false;
   if (reset && !preserve && !(await flushEditors())) return false;
-  if (preserve && (document.activeElement?.closest(".entry-editor") || [...editors.values()].some((editor) => editor.dirty))) return false;
+  if (preserve && (document.querySelector(".history-entry[data-animating]") || document.activeElement?.closest(".entry-editor") || [...editors.values()].some((editor) => editor.dirty))) return false;
   const version = reset ? ++queryVersion : queryVersion;
   const anchor = preserve ? [...$("#records").children].find((node) => node.getBoundingClientRect().top >= 0) : null;
   const expanded = new Set(preserve ? [...document.querySelectorAll(".history-entry[open]")].map((node) => node.dataset.id) : []);
@@ -370,7 +370,7 @@ async function loadRecords(reset = false, preserve = false) {
       const batch = await api("points/query", args);
       data = { ...batch, records: [...data.records, ...batch.records] };
     } while (data.has_more && data.records.length < amount && version === queryVersion);
-    if (version !== queryVersion || [...editors.values()].some((editor) => editor.dirty) || (preserve && document.activeElement?.closest(".entry-editor"))) return false;
+    if (version !== queryVersion || [...editors.values()].some((editor) => editor.dirty) || (preserve && (document.querySelector(".history-entry[data-animating]") || document.activeElement?.closest(".entry-editor")))) return false;
     if (reset) { displayed.clear(); editors.clear(); $("#records").replaceChildren(); }
     const added = [];
     for (const record of data.records) {

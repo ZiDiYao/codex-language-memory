@@ -2,10 +2,11 @@
 const running = new WeakMap();
 const preference = matchMedia("(prefers-reduced-motion: reduce)");
 
-export async function animate(node, frames, duration = 180) {
+export async function animate(node, frames, duration = 180, onFrame) {
   running.get(node)?.cancel();
   if (preference.matches || !node.animate) {
     running.delete(node);
+    onFrame?.(1);
     return true;
   }
   const animation = node.animate(frames, {
@@ -13,14 +14,23 @@ export async function animate(node, frames, duration = 180) {
     easing: "cubic-bezier(.2,.8,.2,1)",
   });
   running.set(node, animation);
+  let frame;
+  const follow = () => {
+    if (running.get(node) !== animation) return;
+    onFrame(animation.effect.getComputedTiming().progress ?? 0);
+    frame = requestAnimationFrame(follow);
+  };
+  if (onFrame) frame = requestAnimationFrame(follow);
   const finish = () => animation.finish();
   preference.addEventListener("change", finish, { once: true });
   try {
     await animation.finished;
+    if (running.get(node) === animation) onFrame?.(1);
     return running.get(node) === animation;
   } catch {
     return false;
   } finally {
+    cancelAnimationFrame(frame);
     preference.removeEventListener("change", finish);
     if (running.get(node) === animation) running.delete(node);
   }
@@ -72,6 +82,8 @@ export async function closeDialog(dialog) {
 }
 
 export function disclosure(details, summary, body, onChange, beforeClose) {
+  let revision = 0;
+  let scrollSpace;
   const reflect = (open) => {
     summary.setAttribute("aria-expanded", String(open));
     body.inert = !open;
@@ -83,17 +95,51 @@ export function disclosure(details, summary, body, onChange, beforeClose) {
   });
   summary.addEventListener("click", async (event) => {
     event.preventDefault();
+    const request = ++revision;
     const open = !(details.dataset.animating ? details.dataset.expanded === "true" : details.open);
     if (!open && beforeClose && !(await beforeClose())) return;
+    if (request !== revision) return;
     const from = details.getBoundingClientRect().height;
+    const documentHeight = Math.max(window.innerHeight, document.body.offsetHeight);
+    const scrollStart = window.scrollY;
+    // Hold the current size while the summary and editor change their layout.
+    details.style.height = `${from}px`;
     details.dataset.animating = "true";
     details.dataset.expanded = String(open);
     details.open = true;
     reflect(open);
     const border = parseFloat(getComputedStyle(details).borderTopWidth) * 2;
     const to = summary.offsetHeight + (open ? body.offsetHeight : 0) + border;
-    if (await animate(details, [{ height: `${from}px` }, { height: `${to}px` }], 220)) {
+    const scrollEnd = Math.min(scrollStart, Math.max(0, documentHeight - from + to - window.innerHeight));
+    const input = new AbortController();
+    let following = !open && scrollEnd < scrollStart;
+    if (following) {
+      // A short final page cannot accommodate the old scroll offset. Reserve that
+      // space until both transitions finish, including when the motion reverses.
+      if (!scrollSpace) {
+        scrollSpace = document.createElement("div");
+        scrollSpace.className = "disclosure-scroll-space";
+        scrollSpace.setAttribute("aria-hidden", "true");
+        document.body.append(scrollSpace);
+      }
+      scrollSpace.style.height = `${Math.ceil(window.innerHeight + scrollStart)}px`;
+      // Give scrolling back immediately if the user interacts during the transition.
+      for (const type of ["wheel", "touchstart", "pointerdown", "keydown"]) {
+        window.addEventListener(type, () => { following = false; }, { passive: true, signal: input.signal });
+      }
+    }
+    const finished = animate(details, [{ height: `${from}px` }, { height: `${to}px` }], 280, following ? (progress) => {
+      if (following) window.scrollTo({ top: scrollStart + (scrollEnd - scrollStart) * progress, behavior: "instant" });
+    } : undefined);
+    // The final size must also be the underlying style when the animation finishes.
+    details.style.height = `${to}px`;
+    const completed = await finished;
+    input.abort();
+    if (completed) {
       details.open = open;
+      details.style.removeProperty("height");
+      scrollSpace?.remove();
+      scrollSpace = null;
       delete details.dataset.animating;
       delete details.dataset.expanded;
     }
