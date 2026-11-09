@@ -6,7 +6,7 @@ Recording is automatic for all languages and enabled by default on new installat
 
 ## Install the local Beta
 
-Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.14), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
+Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.15), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
 
 To upgrade, download the next Beta and run its **Install.command**. The installer validates the package, tests its runtime, backs up the database and switches versions while preserving learning records and settings. Repeating the same installation is safe. It also migrates the earlier source-checkout installation automatically.
 
@@ -84,6 +84,16 @@ The Notion ZIP contains a Markdown page per record and a CSV table, as alternati
 
 PDF export embeds a local TrueType font that covers the exported characters. macOS Arial Unicode is detected automatically. On other systems, set `LANGUAGE_MEMORY_PDF_FONT` to an installed `.ttf` file covering the required languages. If no suitable font exists, export fails with a clear message instead of silently producing missing-glyph boxes. Word and Excel require suitable fonts in the application opening the document. No proprietary fonts are bundled.
 
+## Guided study with Codex
+
+Say “Help me study my saved English for five minutes” or “What should I practice today?” Codex resolves the learning language, reads your preferences, and starts a small round from the FSRS queue. The default is three points, one question at a time, using your current editable notes.
+
+FSRS determines when a point is due. Codex uses its category, your last actual answer and explicit interests to choose a contextual vocabulary question, expression exercise, grammar contrast or sentence correction. It waits for your answer, explains the specific gap, and records the outcome. Hints and immediate practice after an explanation are assisted; reading an explanation alone is not a scored review. Your Mastered choice stays independent.
+
+The queue includes selection reasons, the most recent attempt and counts before the batch limit. It excludes empty notes and can exclude IDs already practiced or skipped in the current round, so an unchanged assisted/skipped schedule does not create a loop. When nothing is due, a schedule-only question gets the schedule; an explicit request to practice now can select upcoming points and is identified as early practice. It finishes the agreed round and respects “Stop” immediately.
+
+This uses the existing Skill and 16 MCP tools. There is no additional AI service, session database or chat UI. A new chat reconstructs the next round from persisted records and review evidence; it cannot recover an unsaved unfinished question. Skill activation is model-driven, and the extension does not send proactive messages while you are away.
+
 ## Capture decisions
 
 Codex interprets the conversation and generates the contextual definition, explanation, and examples before saving. New captures require an explanation and two to five distinct example sentences. Codex adds common collocations or natural usage, a relevant pitfall when useful, and example translations in the preferred explanation language. Duplicate example originals are rejected. Saved notes omit routine source links and originality footers unless attribution is requested. The backend validates and stores that content; it does not make a second AI call. For older incomplete records, Codex can retrieve `needs_enrichment=true` records and fill a missing explanation or append examples through `update_point` without adding an encounter or changing mastery. Existing examples and user-edited notes are preserved; the quality checks do not restrict freely edited notes. The page itself does not run a background AI worker.
@@ -112,7 +122,7 @@ FSRS-6 (`fsrs==6.3.2`) updates each point's memory state after actual unassisted
 | `list_languages` | List language groups and record counts |
 | `save_points` | Batch save with per-item added, merged, skipped, or failed outcomes |
 | `find_points` | Search by keyword, type, language, mastery, or missing generated content; follow `next_cursor` for more |
-| `review_queue` | Exclude mastered points; overdue FSRS reviews, then unassessed; optional early practice |
+| `review_queue` | Due FSRS points, then unassessed; current notes, latest attempts, scope counts, round exclusions and optional early practice |
 | `record_review` | Record an actual quiz attempt idempotently and update FSRS when eligible |
 | `get_point_history` | Read encounter contexts, quiz evidence and an explicitly uncalibrated memory estimate |
 | `get_learning_profile` | Read language-scoped practice counts, recurring points and stated preferences |
@@ -136,6 +146,8 @@ Paused recording blocks new saves, including explicit ones. Queries, review, edi
 .venv/bin/python -m unittest discover -s tests -v
 node --test tests/*.mjs
 ```
+
+[Beta 15 guided-study results](docs/beta15-testing.md) cover a 25-step final conversation acceptance set, including targeted reruns for issues found during development. There are now 89 Python tests and five Node tests.
 
 [Beta 14 acceptance results](docs/beta14-testing.md) cover 35 real Codex turns, five replays of model-generated saves through the installed runtime, 86 Python tests, five JavaScript tests, and the packaged installation lifecycle.
 

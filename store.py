@@ -520,11 +520,27 @@ class Store:
                 f"SELECT * FROM knowledge WHERE {where} ORDER BY last_seen_at DESC, id DESC", params,
             )]
 
-    def review(self, *, language=None, kind=None, limit=5, include_variants=False, include_upcoming=False):
+    def review(self, *, language=None, kind=None, limit=5, include_variants=False, include_upcoming=False,
+               exclude_ids=None):
         timestamp = now()
         clauses, params = self._filters(language=language, kind=kind, status="new", include_variants=include_variants)
+        clauses.append("(note IS NULL OR normalize(coalesce(note, '')) <> '')")
+        if exclude_ids:
+            clauses.append("knowledge.id NOT IN (" + ",".join("?" for _ in exclude_ids) + ")")
+            params.extend(exclude_ids)
         where = " AND ".join(clauses)
         with self.connection() as db:
+            db.execute("BEGIN")
+            counts = dict(db.execute(
+                f"""SELECT COUNT(*) AS eligible,
+                    COUNT(CASE WHEN due_at <= ? THEN 1 END) AS due,
+                    COUNT(CASE WHEN due_at IS NULL THEN 1 END) AS unassessed,
+                    COUNT(CASE WHEN due_at > ? THEN 1 END) AS upcoming,
+                    MIN(CASE WHEN due_at > ? THEN due_at END) AS next_due_at
+                    FROM knowledge LEFT JOIN memory_states ON record_id = knowledge.id
+                    WHERE {where}""", (timestamp, timestamp, timestamp, *params),
+            ).fetchone())
+            next_due = counts.pop("next_due_at")
             rows = db.execute(
                 f"""SELECT knowledge.*, card, due_at, rated_reviews FROM knowledge
                     LEFT JOIN memory_states ON record_id = knowledge.id
@@ -532,7 +548,7 @@ class Store:
                     ORDER BY CASE WHEN due_at <= ? THEN 0 WHEN due_at IS NULL THEN 1 ELSE 2 END,
                              due_at ASC, created_at ASC, id ASC LIMIT ?""",
                 (*params, include_upcoming, timestamp, timestamp, limit),
-            )
+            ).fetchall()
             records = []
             for row in rows:
                 item = record(row)
@@ -540,12 +556,14 @@ class Store:
                 due = item.pop("due_at")
                 item["memory"] = memory_snapshot(card, timestamp, item.pop("rated_reviews") or 0)
                 item["review_reason"] = "unassessed" if due is None else "due" if due <= timestamp else "upcoming"
+                attempt = db.execute(
+                    """SELECT occurred_at, result, assisted, prompt, answer FROM review_events
+                       WHERE record_id = ? ORDER BY id DESC LIMIT 1""", (item["id"],),
+                ).fetchone()
+                item["last_attempt"] = dict(attempt) if attempt else None
                 records.append(item)
-            next_due = db.execute(
-                f"""SELECT MIN(due_at) FROM knowledge JOIN memory_states ON record_id = knowledge.id
-                    WHERE {where} AND due_at > ?""", (*params, timestamp),
-            ).fetchone()[0]
-            return {"records": records, "next_due_at": next_due, "algorithm": ALGORITHM}
+            return {"records": records, "counts": counts, "next_due_at": next_due,
+                    "as_of": timestamp, "algorithm": ALGORITHM}
 
     def languages(self) -> dict:
         with self.connection() as db:

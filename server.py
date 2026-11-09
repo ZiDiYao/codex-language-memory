@@ -75,6 +75,8 @@ def create_server(store: Store) -> FastMCP:
         (text, translation in the preferred explanation language when useful).
         Optional fields are context and corrected_sentence. Generate content before saving; never ask the user to fill a form.
         Set source=explicit only when the user requested this save.
+        Do not call this for reading, explaining or practicing already saved notes during
+        study/review; those actions are not new encounters. Use queries and record_review.
         Returns one added/merged/skipped/failed outcome per item when processed.
         Skipped means the current capture settings exclude the item.
         """
@@ -124,20 +126,31 @@ def create_server(store: Store) -> FastMCP:
     def review_queue(
         language: Language | None = None, kind: Kind | None = None, limit: Limit = 5,
         include_variants: bool = False, include_upcoming: bool = False,
+        exclude_ids: Annotated[list[RecordId], Field(max_length=100)] | None = None,
     ) -> dict[str, Any]:
-        """Get unmastered points: overdue FSRS reviews first, then unassessed points.
+        """Choose material for guided study: due FSRS reviews first, then unassessed points.
+        Excludes mastered and empty custom notes. Pass this round's completed/skipped IDs
+        in exclude_ids to avoid repeating an assisted or skipped point with an unchanged schedule.
+        Returns current notes, selection reasons, latest attempts and counts for the filtered
+        scope after exclusions (before limit). limit must be 1 to 50; counts already cover
+        the entire scope. Schedule-only questions can use counts and next_due_at without
+        loading upcoming records. Use last_attempt to address a specific difficulty,
+        but the current note remains authoritative after user edits. Reading never records practice.
         Future reviews are excluded unless include_upcoming=true for requested early practice.
         Memory estimates use population parameters and are not calibrated proficiency scores.
         Supply language to review one language. include_variants includes regional forms.
         """
         return store.review(language=language, kind=kind, limit=limit, include_variants=include_variants,
-                            include_upcoming=include_upcoming)
+                            include_upcoming=include_upcoming, exclude_ids=exclude_ids)
 
     @server.tool(annotations=local_write)
     def record_review(record_id: RecordId, request_id: RequestId, review: Review) -> dict[str, Any]:
         """Record an actual answered quiz once; reuse request_id and exact arguments on retry.
         result is correct/partial/incorrect/skipped. Set assisted=true if hints or the answer
-        were shown before the learner responded; assisted/skipped attempts do not train FSRS.
+        were shown before the learner responded. A quiz immediately after you explained or
+        displayed the same target is assisted even when you use a different example sentence.
+        Check the preceding teaching context before choosing assisted. Assisted/skipped attempts
+        do not train FSRS.
         Correct maps to Good; partial/incorrect to Again. effort=hard/easy applies only to
         an unassisted correct answer when the user explicitly reports recall effort.
         Include only the exercise prompt and relevant learner answer. Never infer a quiz

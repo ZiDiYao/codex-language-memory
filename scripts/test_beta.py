@@ -94,6 +94,14 @@ async def exercise(archive):
             review = {"record_id": record_id, "request_id": "beta-review-once", "review": {"result": "incorrect"}}
             assert (await call(session, "record_review", review))["scheduled"]
             assert (await call(session, "record_review", review))["replayed"]
+            queue = await call(session, "review_queue", {"language": "en", "include_upcoming": True})
+            assert queue["counts"]["eligible"] == 1
+            assert queue["records"][0]["last_attempt"]["result"] == "incorrect"
+            excluded = await call(session, "review_queue", {
+                "language": "en", "include_upcoming": True, "exclude_ids": [record_id],
+            })
+            assert excluded["records"] == [] and excluded["counts"]["eligible"] == 0
+            checks.append("Guided study reads the latest attempt and excludes completed round items without writes")
             page = await call(session, "open_memory_page")
             with urlopen(page["url"]) as response:
                 assert "Language memory" in response.read().decode()
