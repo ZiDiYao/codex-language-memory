@@ -28,7 +28,7 @@ export class DateRange {
     host.querySelector(".calendar-prev").addEventListener("click", () => this.changeMonth(-1));
     host.querySelector(".calendar-next").addEventListener("click", () => this.changeMonth(1));
     host.querySelector(".calendar-clear").addEventListener("click", () => {
-      this.reset(); this.onChange(); this.close(true);
+      this.reset(); this.onChange();
     });
     host.addEventListener("keydown", event => {
       if (event.key === "Escape" && this.expanded) {
@@ -120,7 +120,6 @@ export class DateRange {
         Object.assign(this, selectDate(this.from, value, this.endpoint));
         this.endpoint = this.through ? "start" : "end";
         this.month = value; this.render(value); this.onChange();
-        if (this.through) this.close(true);
       });
       return button;
     }));
