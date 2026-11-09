@@ -35,6 +35,28 @@ class StoreTests(unittest.TestCase):
         self.path = Path(directory.name) / "memory.sqlite3"
         self.store = Store(self.path)
 
+    def test_search_ranks_titles_and_preserves_cursor_order(self):
+        titles = ["mi", "mitigate", "in an academic setting", "approach"]
+        for index, title in enumerate(titles):
+            self.store.save(f"search-{index}", [dict(
+                APPROACH, title=title, sense_key=f"sense-{index}",
+                explanation="A minimal example in context.")])
+        expected = titles
+        self.assertEqual([r["title"] for r in self.store.query(keyword=" MI ")["records"]], expected)
+        found, cursor = [], None
+        for _ in expected:
+            page = self.store.query(keyword="mi", limit=1, cursor=cursor)
+            found.extend(r["title"] for r in page["records"])
+            cursor = page["next_cursor"]
+        self.assertEqual(found, expected)
+        self.assertIsNone(cursor)
+        page = self.store.query(keyword="mi", limit=1)
+        with self.assertRaises(ValueError):
+            self.store.query(keyword="approach", cursor=page["next_cursor"])
+        self.assertEqual(self.store.query(keyword="zzzz")["records"], [])
+        self.assertEqual(len(self.store.query(keyword="mi", language="ja")["records"]), 0)
+        self.assertEqual(self.store.query()["records"][0]["title"], "approach")
+
     def test_pause_is_persistent_and_blocks_only_new_saves(self):
         self.assertEqual(self.store.recording(), {"enabled": True})
         self.store.recording(False)

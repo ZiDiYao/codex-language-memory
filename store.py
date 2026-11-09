@@ -489,30 +489,53 @@ class Store:
         filters, params = self._filters(keyword=keyword, kind=kind, language=language,
                                         status=status, include_variants=include_variants,
                                         needs_enrichment=needs_enrichment)
+        term = normalized(keyword or "")
+        rank_sql = "0"
+        rank_params = []
+        if term:
+            rank_sql = """CASE WHEN normalize(title) = ? THEN 0
+                WHEN instr(normalize(title), ?) = 1 THEN 1
+                WHEN instr(normalize(title), ?) > 0 THEN 2 ELSE 3 END"""
+            rank_params = [term] * 3
+        cursor_filter = ""
+        cursor_params = []
         if cursor is not None:
             try:
-                stamp, identifier = json.loads(base64.urlsafe_b64decode(cursor).decode())
+                values = json.loads(base64.urlsafe_b64decode(cursor).decode())
+                if term:
+                    rank, stamp, identifier, cursor_term = values
+                    if type(rank) is not int or rank not in range(4) or cursor_term != term:
+                        raise ValueError()
+                else:
+                    stamp, identifier = values
+                    rank = 0
                 datetime.fromisoformat(stamp)
                 if type(identifier) is not int or identifier < 1 or offset:
                     raise ValueError()
             except (ValueError, TypeError, UnicodeError):
                 raise ValueError("Invalid query cursor") from None
-            filters.append("(last_seen_at < ? OR (last_seen_at = ? AND id < ?))")
-            params.extend((stamp, stamp, identifier))
+            cursor_filter = """WHERE (search_rank > ? OR (search_rank = ? AND
+                (last_seen_at < ? OR (last_seen_at = ? AND id < ?))))"""
+            cursor_params = [rank, rank, stamp, stamp, identifier]
         where = " AND ".join(filters) or "1"
         with self.connection() as db:
-            rows = db.execute(
-                f"""SELECT * FROM knowledge WHERE {where}
-                    ORDER BY last_seen_at DESC, id DESC LIMIT ? OFFSET ?""",
-                (*params, limit + 1, offset),
-            )
-            records = [record(row) for row in rows]
-        more = len(records) > limit
-        records = records[:limit]
+            rows = list(db.execute(
+                f"""SELECT * FROM (
+                    SELECT knowledge.*, {rank_sql} AS search_rank FROM knowledge WHERE {where}
+                    ) {cursor_filter}
+                    ORDER BY search_rank ASC, last_seen_at DESC, id DESC LIMIT ? OFFSET ?""",
+                (*rank_params, *params, *cursor_params, limit + 1, offset),
+            ))
+            records = [record({key: row[key] for key in row.keys() if key != "search_rank"})
+                       for row in rows[:limit]]
+        more = len(rows) > limit
         next_cursor = None
         if more:
             last = records[-1]
-            next_cursor = base64.urlsafe_b64encode(encode([last["last_seen_at"], last["id"]]).encode()).decode()
+            position = [last["last_seen_at"], last["id"]]
+            if term:
+                position = [rows[limit - 1]["search_rank"], *position, term]
+            next_cursor = base64.urlsafe_b64encode(encode(position).encode()).decode()
         return {"records": records, "has_more": more, "next_cursor": next_cursor}
 
     def export_records(self, *, kinds=None, date_field="created_at", start_at=None, end_at=None, **filters):
