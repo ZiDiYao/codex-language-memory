@@ -165,6 +165,13 @@ a:focus-visible {
   margin-right: 6px;
   vertical-align: middle;
 }
+#recording-badge[data-i18n="active"]::before {
+  animation: recording-pulse 1.8s ease-in-out infinite;
+}
+@keyframes recording-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
 .search-line {
   position: relative;
   display: flex;
@@ -619,6 +626,7 @@ summary[aria-expanded="true"] .entry-last-seen { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  #recording-badge::before { animation: none; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
