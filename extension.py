@@ -4,6 +4,7 @@ import json
 import shlex
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import tomlkit
@@ -72,8 +73,21 @@ def connect_extension(locations, *, runner=run_codex):
         atomic_write(locations.base / "backups/before-extension.toml", before)
     manifest = read_json(locations.current / "plugin.json")
     atomic_write(source / "plugin.json", json.dumps(manifest, indent=2).encode())
-    atomic_write(source / "skills/language-memory/SKILL.md",
-                 (locations.current / "skills/language-memory/SKILL.md").read_bytes())
+    skill = source / "skills/language-memory"
+    skill.parent.mkdir(parents=True, exist_ok=True)
+    # Publish the whole managed Skill, including references, and remove stale
+    # resources on rollback. Stage the copy before replacing the working tree.
+    with tempfile.TemporaryDirectory(prefix=".skill-", dir=source) as temporary:
+        staged, previous = Path(temporary) / "new", Path(temporary) / "previous"
+        shutil.copytree(locations.current / "skills/language-memory", staged)
+        if skill.exists() or skill.is_symlink():
+            skill.rename(previous)
+        try:
+            staged.rename(skill)
+        except OSError:
+            if previous.exists() or previous.is_symlink():
+                previous.rename(skill)
+            raise
     # Portable manifests require a contained executable. The generated launcher
     # follows the managed release link and keeps custom database paths intact.
     launcher = source / "launch"

@@ -6,7 +6,7 @@ from unittest.mock import patch
 import tomlkit
 
 from extension import PLUGIN, connect_extension, extension_status, remove_extension
-from installer import InstallError, Locations
+from installer import InstallError, Locations, rollback
 import test_installer
 
 
@@ -69,6 +69,34 @@ class ExtensionTests(unittest.TestCase):
         self.assertIn("language_memory", document["mcp_servers"])
         self.assertFalse(document["plugins"][PLUGIN]["enabled"])
         self.assertTrue(self.locations.skill.is_symlink())
+        self.assertEqual(self.fixture.snapshot(), self.snapshot)
+
+    def test_native_skill_resources_follow_upgrade_and_rollback(self):
+        connect_extension(self.locations, runner=self.runner)
+        package = self.fixture.make_package("0.2.0-beta.2")
+        (package / "plugin.json").write_text(json.dumps({"name": "language-memory", "version": "0.2.0-beta.2"}))
+        reference = package / "skills/language-memory/references/guided-study.md"
+        reference.parent.mkdir()
+        reference.write_text("Run a short guided study round.")
+        self.fixture.seal(package, "0.2.0-beta.2")
+        self.fixture.install(package)
+        connect_extension(self.locations, runner=self.runner)
+        published = self.locations.base / "extension/skills/language-memory"
+        self.assertEqual((published / "references/guided-study.md").read_text(), reference.read_text())
+        rollback(self.locations, runner=self.fixture.runner)
+        connect_extension(self.locations, runner=self.runner)
+        self.assertTrue((published / "SKILL.md").is_file())
+        self.assertFalse((published / "references").exists())
+        self.assertEqual(self.fixture.snapshot(), self.snapshot)
+
+    def test_failed_skill_staging_keeps_previous_resources(self):
+        connect_extension(self.locations, runner=self.runner)
+        published = self.locations.base / "extension/skills/language-memory/SKILL.md"
+        before = published.read_bytes()
+        with patch("extension.shutil.copytree", side_effect=OSError("Staging failed")):
+            with self.assertRaises(OSError):
+                connect_extension(self.locations, runner=self.runner)
+        self.assertEqual(published.read_bytes(), before)
         self.assertEqual(self.fixture.snapshot(), self.snapshot)
 
     def test_unrelated_extension_is_not_overwritten(self):

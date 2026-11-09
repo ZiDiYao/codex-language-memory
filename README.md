@@ -147,7 +147,7 @@ Paused recording blocks new saves, including explicit ones. Queries, review, edi
 node --test tests/*.mjs
 ```
 
-[Beta 15 guided-study results](docs/beta15-testing.md) cover a 25-step final conversation acceptance set, including targeted reruns for issues found during development. There are now 89 Python tests and five Node tests.
+[Beta 15 guided-study results](docs/beta15-testing.md) cover a 25-step final conversation acceptance set, including targeted reruns for issues found during development. There are now 91 Python tests and five Node tests.
 
 [Beta 14 acceptance results](docs/beta14-testing.md) cover 35 real Codex turns, five replays of model-generated saves through the installed runtime, 86 Python tests, five JavaScript tests, and the packaged installation lifecycle.
 

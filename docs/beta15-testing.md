@@ -48,12 +48,15 @@ The final acceptance set contains **25 passing conversation steps**: seven guide
 - An initial no-due lesson paused to request early-practice permission and quoted internal Skill instructions. The workflow now distinguishes schedule queries from explicit requests to study now. The latter already authorizes practice.
 - One immediate post-explanation answer was incorrectly labeled independent recall. The rule now appears in both the core Skill and `record_review` description, explicitly covering a changed example sentence. All three final teaching-to-practice variants passed.
 - Explaining an existing grammar note added an encounter in an intermediate run. The core Skill and save-tool description now distinguish going over saved material from a new spontaneous learning encounter. Final word and grammar explanation variants left encounter counts unchanged.
+- Native extension registration initially copied only `SKILL.md`, leaving the new referenced workflow out of the installed plugin. It now stages and replaces the entire managed Skill directory. Regression tests cover reference files on upgrade, removal of stale resources on rollback, and preservation of the old Skill if staging fails.
 - A schedule query attempted `limit=100`, was rejected by the existing 50-item bound, and recovered. The tool description now states that bound and explains that full-scope counts do not require loading more records. The final schedule query used valid calls.
 
 ## Deterministic, package and installation checks
 
-- **89 Python tests** and **five Node tests** passed. New coverage checks queue counts before limits, due ordering, regional-language/type scope, latest assisted/skipped attempts, round exclusions, current custom notes, whitespace-only notes, Mastered filtering and deletion.
+- **91 Python tests** and **five Node tests** passed. New coverage checks queue counts before limits, due ordering, regional-language/type scope, latest assisted/skipped attempts, round exclusions, current custom notes, whitespace-only notes, Mastered filtering and deletion.
 - The frozen package passed its install/reinstall/upgrade/backup/restart/rollback/uninstall lifecycle, 16-tool inventory, multilingual persistence and all five export formats. New frozen-MCP checks verify latest-attempt retrieval and round exclusions. The upgrade fixture uses the current executable under two package versions.
+- The native extension was reinstalled and discovered by Codex with all 16 tools. Both the main Skill and its referenced workflow match the repository in the managed installation and Codex plugin cache. All four personal records and preferences were preserved.
+- One additional real conversation used the installed frozen executable and cached Skill files in an isolated workspace/database. It read both Skill files, retrieved the learning profile and queue, and asked one travel-context expression question without revealing the answer or writing a review. The upgraded local page was also opened and verified.
 - Skill validation and Git whitespace checks passed.
 
 ## Limits
