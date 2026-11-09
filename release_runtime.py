@@ -22,7 +22,7 @@ def healthcheck(database):
 
     store = Store(database)
     tools = asyncio.run(create_server(store).list_tools())
-    if len(tools) != 16:
+    if len(tools) != 21:
         raise InstallError("Unexpected MCP tool set")
     # Verify static assets and dynamically imported Office/PDF dependencies in the frozen build.
     if not (Path(__file__).parent / "web" / "app.js").is_file():

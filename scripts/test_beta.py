@@ -59,7 +59,7 @@ async def exercise(archive):
         def snapshot():
             with sqlite3.connect(locations.database) as db:
                 return {name: db.execute(f"SELECT * FROM {name} ORDER BY 1").fetchall() for name in (
-                    "knowledge", "settings", "capture_preferences", "encounters", "review_events", "memory_states", "learner_preferences", "export_receipts")}
+                    "knowledge", "settings", "capture_preferences", "encounters", "review_events", "memory_states", "learner_preferences", "export_receipts", "study_sessions", "study_items", "study_answers")}
 
         # The fixture uses the same executable with an earlier package version. It tests
         # release switching, not compatibility with an unreleased historical executable.
@@ -78,7 +78,7 @@ async def exercise(archive):
         error_log = (root / "runtime-stderr.log").open("w+")
         async with stdio_client(parameters(), errlog=error_log) as streams, ClientSession(*streams) as session:
             await session.initialize()
-            assert len((await session.list_tools()).tools) == 16
+            assert len((await session.list_tools()).tools) == 21
             points = [{"kind": "word", "language": "en", "title": "approach", "sense_key": "method",
                        "meaning": "A way of doing something.", "explanation": "A countable noun describing a method.",
                        "context": "We need a fresh approach.", "examples": [{"text": "Try a different approach."}, {"text": "This approach saves time."}]},
@@ -133,13 +133,32 @@ async def exercise(archive):
                 export = await call(session, "export_points", {"request": {"format": kind}})
                 assert export["count"] == 2 and export["format"] == kind, export
                 assert Path(export["path"]).is_file()
-            checks.append("Frozen MCP exposes 16 tools and saves multilingual data, reviews, preferences, page assets and all five exports")
+            checks.append("Frozen MCP exposes 21 tools and saves multilingual data, reviews, preferences, page assets and all five exports")
             with urlopen(Request(page["url"] + "api", data=json.dumps({
                 "action": "exports/history", "arguments": {},
             }).encode(), headers={"Content-Type": "application/json", "X-Language-Memory": "1"})) as response:
                 receipt = json.load(response)["last_export"]
                 assert receipt["count"] == 2 and receipt["format"] == "json" and receipt["through_at"]
             checks.append("Calendar assets and shared export history are available in the frozen page; receipts survive release switching")
+            study = (await call(session, "start_study", {
+                "request_id": "beta-study-round", "language": "en", "include_upcoming": True}))["session"]
+            point = study["current"]["record"]
+            study = (await call(session, "prepare_study_question", {
+                "session_id": study["id"], "expected_version": study["version"],
+                "record_id": point["id"], "expected_revision": point["revision"],
+                "prompt": "Explain the current note.", "assisted": True}))["session"]
+            answer_args = {"session_id": study["id"], "expected_version": study["version"],
+                           "request_id": "beta-study-answer", "review": {"result": "correct", "answer": "My explanation."}}
+            outcome = await call(session, "submit_study_answer", answer_args)
+            assert outcome["session"]["state"] == "completed" and not outcome["review"]["scheduled"]
+            assert (await call(session, "submit_study_answer", answer_args))["replayed"]
+            study = (await call(session, "start_study", {
+                "request_id": "beta-study-pending", "language": "en", "include_upcoming": True}))["session"]
+            point = study["current"]["record"]
+            await call(session, "prepare_study_question", {
+                "session_id": study["id"], "expected_version": study["version"],
+                "record_id": point["id"], "expected_revision": point["revision"],
+                "prompt": "Explain the current note.", "assisted": True})
             before = snapshot()
             updated = command(package, "Install.command")
             assert updated["status"] == "updated" and updated["version"] == metadata["version"]
@@ -153,8 +172,12 @@ async def exercise(archive):
         async with stdio_client(parameters(), errlog=error_log) as streams, ClientSession(*streams) as session:
             await session.initialize()
             assert (await call(session, "get_settings"))["ui_language"] == "fr"
+            resumed = (await call(session, "get_study", {"language": "en"}))["session"]
+            assert resumed["current"]["prompt"] == "Explain the current note."
+            assert resumed["current"]["assisted"] is True
+            checks.append("A pending study question and assistance flag survive upgrade and runtime restart")
             assert (await call(session, "get_learning_profile", {"language": "en"}))["rated_reviews"] == 1
-            assert len((await call(session, "get_point_history", {"record_id": record_id}))["reviews"]) == 1
+            assert len((await call(session, "get_point_history", {"record_id": record_id}))["reviews"]) == 2
         error_log.flush()
         error_log.seek(0)
         assert "Traceback" not in error_log.read(), "The frozen MCP emitted a traceback during operation or shutdown"

@@ -2,15 +2,16 @@
 
 import os
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from store import (CaptureMode, Kind, Language, LearnerPreferences, Limit, Patch, RecordId, RequestId, Review,
-                   Revision, SettingsPatch, Status, Store, Title)
+                   Revision, SettingsPatch, Status, Store, Title, Text)
 from dashboard import Dashboard
+from study import StudySessions
 from exports import ExportError, ExportRequest, save_export
 
 
@@ -19,6 +20,7 @@ def create_server(store: Store) -> FastMCP:
     read_only = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
     local_write = ToolAnnotations(destructiveHint=False, openWorldHint=False)
     dashboard = Dashboard(store)
+    study = StudySessions(store)
 
     @server.tool(annotations=read_only)
     def open_memory_page() -> dict[str, Any]:
@@ -94,7 +96,8 @@ def create_server(store: Store) -> FastMCP:
         cursor: Annotated[str, Field(max_length=300)] | None = None,
         needs_enrichment: bool = False,
     ) -> dict[str, Any]:
-        """Find points by keyword and filters, most recently seen first.
+        """Find points by keyword and filters. Title exact/prefix matches rank first;
+        without a keyword, list most recently seen first.
         Set language to isolate a learning language and include_variants=true to include regional forms.
         Use needs_enrichment=true for noncustom records missing an explanation or two distinct examples.
         Pass next_cursor to continue reading; omit offset when using a cursor.
@@ -158,6 +161,72 @@ def create_server(store: Store) -> FastMCP:
         This never changes user-controlled mastery or encounter counts.
         """
         return store.record_review(record_id, request_id, review)
+
+    @server.tool(annotations=local_write)
+    def start_study(
+        request_id: RequestId, language: Language, kind: Kind | None = None,
+        limit: Annotated[int, Field(ge=1, le=20)] = 3,
+        include_variants: bool = True, include_upcoming: bool = False,
+    ) -> dict[str, Any]:
+        """Start a persistent round from actual saved notes in FSRS queue order.
+        Read get_learning_profile first. Default to three points for a short round.
+        A requested time budget is approximate. Retry with the same request_id and options.
+        For 'continue', use get_study instead of starting another round. Returns only the
+        current point, not all planned answers. No quiz attempt or encounter is recorded.
+        include_upcoming allows requested early practice. Empty means no eligible material.
+        """
+        return study.start(request_id, language=language, kind=kind, limit=limit,
+                           include_variants=include_variants, include_upcoming=include_upcoming)
+
+    @server.tool(annotations=read_only)
+    def get_study(session_id: RequestId | None = None, language: Language | None = None) -> dict[str, Any]:
+        """Resume from a saved round, current question, hint flag and actual progress.
+        Without an ID, find an unfinished round; choose_session means multiple matches.
+        Read current notes and refresh get_learning_profile on a new chat or preference change.
+        Do not expose the returned answer material when asking the pending question.
+        question_stale requires preparing a fresh question from the edited note.
+        """
+        return study.get(session_id, language)
+
+    @server.tool(annotations=local_write)
+    def prepare_study_question(
+        session_id: RequestId, expected_version: Annotated[int, Field(ge=0)],
+        record_id: RecordId, expected_revision: Revision, prompt: Text, assisted: bool = False,
+    ) -> dict[str, Any]:
+        """Persist one question BEFORE showing it, using the current point and revision.
+        Return the saved prompt to the learner and wait. Reuse its prompt with assisted=true
+        BEFORE giving a hint or showing the answer; assistance cannot be reset for this point.
+        Recent teaching/answer exposure also requires assisted=true. A version conflict means
+        reread get_study; never overwrite another chat's progress blindly.
+        """
+        return study.prepare(session_id, expected_version, record_id, expected_revision, prompt, assisted)
+
+    @server.tool(annotations=local_write)
+    def submit_study_answer(
+        session_id: RequestId, expected_version: Annotated[int, Field(ge=0)],
+        request_id: RequestId, review: Review,
+    ) -> dict[str, Any]:
+        """Atomically save the learner's actual answer and advance the persistent round.
+        Codex grades correct/partial/incorrect/skipped. answer is required except for skipped;
+        never invent a reply. Prompt comes from the prepared question. Persisted assistance
+        overrides assisted=false. Assisted/skipped attempts do not update FSRS.
+        Retries must use the same request_id, expected_version and review, including after
+        a new chat. Do not ALSO call record_review: this tool already records exactly one attempt.
+        Returns actual progress and the next point. Mastery and encounter counts never change.
+        """
+        return study.answer(session_id, expected_version, request_id, review)
+
+    @server.tool(annotations=local_write)
+    def set_study_state(
+        session_id: RequestId, expected_version: Annotated[int, Field(ge=0)],
+        state: Literal["active", "paused", "completed"],
+    ) -> dict[str, Any]:
+        """Pause, resume or finish a round without grading an unanswered question.
+        Pause preserves the question and hint flag across chats. Completed rounds cannot
+        reopen; start a new round when requested. Do not mark a stop request as an incorrect
+        or skipped answer. Use the latest session version from get_study.
+        """
+        return study.set_state(session_id, expected_version, state)
 
     @server.tool(annotations=read_only)
     def get_point_history(

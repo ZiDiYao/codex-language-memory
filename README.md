@@ -6,7 +6,7 @@ Recording is automatic for all languages and enabled by default on new installat
 
 ## Install the local Beta
 
-Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.25), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
+Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.26), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
 
 To upgrade, download the next Beta and run its **Install.command**. The installer validates the package, tests its runtime, backs up the database and switches versions while preserving learning records and settings. Repeating the same installation is safe. It also migrates the earlier source-checkout installation automatically.
 
@@ -96,7 +96,18 @@ FSRS determines when a point is due. Codex uses its category, your last actual a
 
 The queue includes selection reasons, the most recent attempt and counts before the batch limit. It excludes empty notes and can exclude IDs already practiced or skipped in the current round, so an unchanged assisted/skipped schedule does not create a loop. When nothing is due, a schedule-only question gets the schedule; an explicit request to practice now can select upcoming points and is identified as early practice. It finishes the agreed round and respects “Stop” immediately.
 
-This uses the existing Skill and 16 MCP tools. There is no additional AI service, session database or chat UI. A new chat reconstructs the next round from persisted records and review evidence; it cannot recover an unsaved unfinished question. Skill activation is model-driven, and the extension does not send proactive messages while you are away.
+This uses the Skill and 21 MCP tools, with no additional AI service or chat UI. Study rounds live in the existing SQLite database. The current question, hint flag and progress survive process restarts and new chats. Each answer and progress change commit together; retries cannot add another attempt. Concurrent chats must use the current session version, and edited/deleted notes cannot silently receive an answer to an outdated question. Skill activation is model-driven, and the extension does not send proactive messages while you are away.
+
+### Try the persistent round
+
+In a new Codex chat with the updated extension:
+1. Say “Help me review my saved English for five minutes.” Codex must call `get_learning_profile`, `start_study` and `prepare_study_question` before asking the first question.
+2. Say “Give me a hint.” Codex updates the pending question's assistance flag before giving the hint.
+3. Say “Pause here.” Start another chat and say “Continue my English review.” The persisted question and hint flag should return.
+4. Answer. Codex calls `submit_study_answer` exactly once (not also `record_review`). The hint-assisted attempt must not alter FSRS timing.
+5. Finish the round. Check actual attempts with `get_point_history`; mastery remains your choice.
+
+Developer requests to improve the extension must not start a lesson. If tools are missing in an older chat, reconnect/restart Codex and start a new chat. Tool-level tests establish persistence and idempotency, not guaranteed model selection or grading.
 
 ## Capture decisions
 
@@ -127,6 +138,10 @@ FSRS-6 (`fsrs==6.3.2`) updates each point's memory state after actual unassisted
 | `save_points` | Batch save with per-item added, merged, skipped, or failed outcomes |
 | `find_points` | Search by keyword, type, language, mastery, or missing generated content; follow `next_cursor` for more |
 | `review_queue` | Due FSRS points, then unassessed; current notes, latest attempts, scope counts, round exclusions and optional early practice |
+| `start_study`, `get_study` | Start or resume a persistent round from saved records |
+| `prepare_study_question` | Save the current question and irreversible hint flag before display |
+| `submit_study_answer` | Commit one answer and advance progress atomically |
+| `set_study_state` | Pause, resume or finish without grading an unanswered question |
 | `record_review` | Record an actual quiz attempt idempotently and update FSRS when eligible |
 | `get_point_history` | Read encounter contexts, quiz evidence and an explicitly uncalibrated memory estimate |
 | `get_learning_profile` | Read language-scoped practice counts, recurring points and stated preferences |
@@ -151,7 +166,7 @@ Paused recording blocks new saves, including explicit ones. Queries, review, edi
 node --test tests/*.mjs
 ```
 
-[Beta 15 guided-study results](docs/beta15-testing.md) cover a 25-step final conversation acceptance set, including targeted reruns for issues found during development. There are now 95 Python tests and seven Node tests.
+[Beta 15 guided-study results](docs/beta15-testing.md) cover a 25-step final conversation acceptance set, including targeted reruns for issues found during development. There are now 103 Python tests and seven Node tests. [Beta 26 results](docs/beta26-testing.md) additionally cover MCP process restart, atomic review/progress writes, concurrent retries, hint retention, pause/resume, edits and deletion.
 
 [Beta 14 acceptance results](docs/beta14-testing.md) cover 35 real Codex turns, five replays of model-generated saves through the installed runtime, 86 Python tests, five JavaScript tests, and the packaged installation lifecycle.
 

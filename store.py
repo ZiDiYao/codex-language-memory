@@ -3,7 +3,7 @@ import hashlib
 import json
 import sqlite3
 import unicodedata
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Literal
@@ -11,6 +11,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError, field_validator, model_validator
 
 from learning import ALGORITHM, advance, memory_snapshot, recall_rating
+from study import STUDY_SCHEMA
 
 Kind = Literal["word", "expression", "grammar", "correction"]
 Status = Literal["new", "mastered"]
@@ -298,7 +299,7 @@ class Store:
         self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         self.path.touch(mode=0o600, exist_ok=True)
         with self.connection() as db:
-            db.executescript("BEGIN IMMEDIATE;\n" + SCHEMA)
+            db.executescript("BEGIN IMMEDIATE;\n" + SCHEMA + STUDY_SCHEMA)
             # Additive migration preserves source fields for deduplication and rollback.
             columns = {row["name"] for row in db.execute("PRAGMA table_info(knowledge)")}
             if "note" not in columns:
@@ -557,7 +558,7 @@ class Store:
             )]
 
     def review(self, *, language=None, kind=None, limit=5, include_variants=False, include_upcoming=False,
-               exclude_ids=None):
+               exclude_ids=None, _db=None):
         timestamp = now()
         clauses, params = self._filters(language=language, kind=kind, status="new", include_variants=include_variants)
         clauses.append("(note IS NULL OR normalize(coalesce(note, '')) <> '')")
@@ -565,8 +566,9 @@ class Store:
             clauses.append("knowledge.id NOT IN (" + ",".join("?" for _ in exclude_ids) + ")")
             params.extend(exclude_ids)
         where = " AND ".join(clauses)
-        with self.connection() as db:
-            db.execute("BEGIN")
+        with (nullcontext(_db) if _db is not None else self.connection()) as db:
+            if _db is None:
+                db.execute("BEGIN")
             counts = dict(db.execute(
                 f"""SELECT COUNT(*) AS eligible,
                     COUNT(CASE WHEN due_at <= ? THEN 1 END) AS due,
@@ -653,52 +655,55 @@ class Store:
             return {"status": "updated", "record": record(row)}
 
     def record_review(self, record_id: int, request_id: str, review: Review) -> dict:
-        fingerprint = hashlib.sha256(encode([record_id, review.model_dump()]).encode()).hexdigest()
         with self.connection(write=True) as db:
-            previous = db.execute("SELECT * FROM review_requests WHERE request_id = ?", (request_id,)).fetchone()
-            if previous:
-                if previous["fingerprint"] != fingerprint:
-                    return {"status": "failed", "error": "request_id_conflict"}
-                result = json.loads(previous["result"])
-                if not db.execute("SELECT 1 FROM knowledge WHERE id = ?", (record_id,)).fetchone():
-                    result["deleted"] = True
-                return {**result, "replayed": True}
+            return self._record_review(db, record_id, request_id, review)
+
+    def _record_review(self, db, record_id, request_id, review):
+        fingerprint = hashlib.sha256(encode([record_id, review.model_dump()]).encode()).hexdigest()
+        previous = db.execute("SELECT * FROM review_requests WHERE request_id = ?", (request_id,)).fetchone()
+        if previous:
+            if previous["fingerprint"] != fingerprint:
+                return {"status": "failed", "error": "request_id_conflict"}
+            result = json.loads(previous["result"])
             if not db.execute("SELECT 1 FROM knowledge WHERE id = ?", (record_id,)).fetchone():
-                return {"status": "not_found"}
-            timestamp = now()
-            state = db.execute("SELECT * FROM memory_states WHERE record_id = ?", (record_id,)).fetchone()
-            serialized = state["card"] if state else None
-            rated_reviews = state["rated_reviews"] if state else 0
-            rating = recall_rating(review.result, review.assisted, review.effort)
-            log = prediction = None
-            if rating is not None:
-                try:
-                    card, log, prediction = advance(record_id, serialized, rating, timestamp)
-                except ValueError as error:
-                    return {"status": "failed", "error": str(error)}
-                serialized = card.to_json()
-                rated_reviews += 1
-                db.execute(
-                    """INSERT INTO memory_states VALUES (?, ?, ?, ?, ?)
-                       ON CONFLICT(record_id) DO UPDATE SET card = excluded.card, due_at = excluded.due_at,
-                       rated_reviews = excluded.rated_reviews, algorithm = excluded.algorithm""",
-                    (record_id, serialized, card.due.isoformat(timespec="microseconds"), rated_reviews, encode(ALGORITHM)),
-                )
-            event = db.execute(
-                """INSERT INTO review_events (record_id, occurred_at, result, assisted, effort,
-                   prompt, answer, rating, predicted_recall, fsrs_log, algorithm)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (record_id, timestamp, review.result, review.assisted, review.effort, review.prompt,
-                 review.answer, int(rating) if rating else None, prediction,
-                 log.to_json() if log else None, encode(ALGORITHM) if log else None),
+                result["deleted"] = True
+            return {**result, "replayed": True}
+        if not db.execute("SELECT 1 FROM knowledge WHERE id = ?", (record_id,)).fetchone():
+            return {"status": "not_found"}
+        timestamp = now()
+        state = db.execute("SELECT * FROM memory_states WHERE record_id = ?", (record_id,)).fetchone()
+        serialized = state["card"] if state else None
+        rated_reviews = state["rated_reviews"] if state else 0
+        rating = recall_rating(review.result, review.assisted, review.effort)
+        log = prediction = None
+        if rating is not None:
+            try:
+                card, log, prediction = advance(record_id, serialized, rating, timestamp)
+            except ValueError as error:
+                return {"status": "failed", "error": str(error)}
+            serialized = card.to_json()
+            rated_reviews += 1
+            db.execute(
+                """INSERT INTO memory_states VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT(record_id) DO UPDATE SET card = excluded.card, due_at = excluded.due_at,
+                   rated_reviews = excluded.rated_reviews, algorithm = excluded.algorithm""",
+                (record_id, serialized, card.due.isoformat(timespec="microseconds"), rated_reviews, encode(ALGORITHM)),
             )
-            db.execute("UPDATE knowledge SET last_reviewed_at = ?, last_review_result = ? WHERE id = ?",
-                       (timestamp, review.result, record_id))
-            result = {"status": "reviewed", "record_id": record_id, "event_id": event.lastrowid,
-                      "scheduled": rating is not None, "rating": int(rating) if rating else None,
-                      "memory": memory_snapshot(serialized, timestamp, rated_reviews)}
-            db.execute("INSERT INTO review_requests VALUES (?, ?, ?)", (request_id, fingerprint, encode(result)))
-            return {**result, "replayed": False}
+        event = db.execute(
+            """INSERT INTO review_events (record_id, occurred_at, result, assisted, effort,
+               prompt, answer, rating, predicted_recall, fsrs_log, algorithm)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (record_id, timestamp, review.result, review.assisted, review.effort, review.prompt,
+             review.answer, int(rating) if rating else None, prediction,
+             log.to_json() if log else None, encode(ALGORITHM) if log else None),
+        )
+        db.execute("UPDATE knowledge SET last_reviewed_at = ?, last_review_result = ? WHERE id = ?",
+                   (timestamp, review.result, record_id))
+        result = {"status": "reviewed", "record_id": record_id, "event_id": event.lastrowid,
+                  "scheduled": rating is not None, "rating": int(rating) if rating else None,
+                  "memory": memory_snapshot(serialized, timestamp, rated_reviews)}
+        db.execute("INSERT INTO review_requests VALUES (?, ?, ?)", (request_id, fingerprint, encode(result)))
+        return {**result, "replayed": False}
 
     def history(self, record_id: int, *, limit=20, before_encounter_id=None, before_review_id=None):
         with self.connection() as db:

@@ -183,6 +183,7 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                     "review_queue", "update_point", "delete_point",
                     "get_settings", "update_settings", "open_memory_page", "list_languages", "export_points",
                     "record_review", "get_point_history", "get_learning_profile", "update_learning_preferences",
+                    "start_study", "get_study", "prepare_study_question", "submit_study_answer", "set_study_state",
                 })
                 self.assertTrue((await self.call(session, "get_recording"))["enabled"])
                 self.assertTrue((await self.call(session, "set_recording", {"enabled": True}))["enabled"])

@@ -1,6 +1,6 @@
 ---
 name: language-memory
-description: Remember and review language-learning gaps in Codex. Use for vocabulary meanings, usage or grammar questions, translations and corrections intended for learning, guided study of saved notes, short learning sessions, what to practice today, personalized learning or progress questions, and requests to open the learning page, change preferences, save, search, quiz, pause, delete, export or update learning records. Skip unrelated translation work and ordinary conversation.
+description: Remember and review language-learning gaps in Codex. Use for vocabulary meanings, usage or grammar questions, translations and corrections intended for learning, guided study of saved notes, short learning sessions, what to practice today, personalized learning or progress questions, and requests to open the learning page, change preferences, save, search, quiz, pause, delete, export or update learning records. Skip unrelated translation work, ordinary conversation, and plugin development requests.
 ---
 
 # Language memory
@@ -39,7 +39,7 @@ Use the `language_memory` MCP tools for persistent learning records. Work from t
 
 ## Guided study
 
-For requests such as “Help me study my saved English for five minutes”, “What should I practice today?” or “Continue learning with me”, read [the guided study workflow](references/guided-study.md). Use the existing profile, review queue and review-result tools to run a small adaptive round in this conversation.
+For requests such as “Help me study my saved English for five minutes”, “What should I practice today?” or “Continue learning with me”, read [the guided study workflow](references/guided-study.md). Use the profile and persistent study-session tools to run a small adaptive round. Read the actual stored records before claiming plugin-backed practice; current-chat vocabulary alone is not a retrieved learning history.
 
 ## Recall and review
 
