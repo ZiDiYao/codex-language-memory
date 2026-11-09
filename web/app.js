@@ -4,7 +4,7 @@ import { enter, reveal, conceal, openDialog, closeDialog, disclosure } from "./m
 
 import { EntryEditor } from "./entry-editor.js";
 import { RecordFeed } from "./record-feed.js";
-import { compactTitle, languageSelection } from "./history-model.js";
+import { languageSelection } from "./history-model.js";
 import { ExportDialog } from "./export-dialog.js";
 import { request, saveDownload } from "./transport.js";
 
@@ -280,7 +280,7 @@ function card(record, expanded = false) {
   summary.append(heading, preview, lastSeen);
   function renderSummary(point) {
     const fullTitle = point.note_title || t("untitledNote");
-    title.textContent = compactTitle(fullTitle);
+    title.textContent = fullTitle;
     title.title = fullTitle;
     title.lang = point.language;
     summary.setAttribute("aria-label", fullTitle);
