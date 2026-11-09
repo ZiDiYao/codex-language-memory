@@ -106,7 +106,6 @@ export class ExportDialog {
       cutoff = wholeDay ? this.dates.dayLabel(this.dates.marker)
         : new Intl.DateTimeFormat(this.getLocale(), {dateStyle:"medium", timeStyle:"short"}).format(end);
     }
-    this.pick("history").classList.toggle("has-export", Boolean(receipt));
     this.pick("history-title").textContent = receipt
       ? this.t("exportLastThrough", {day:cutoff})
       : this.t(this.historyState || "exportNoHistory");

@@ -620,10 +620,9 @@ summary[aria-expanded="true"] .entry-last-seen { display: none; }
   }
 }
 
-.export-history { padding: 12px 14px; margin: 6px 0 18px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); font-size: 12px; }
-.export-history.has-export { background: var(--surface); color: var(--text); border-left: 3px solid var(--muted); }
-.export-history strong { display: block; font-weight: 500; }
-.export-history small { display: block; margin-top: 5px; color: var(--muted); }
+.export-history { margin: 4px 0 12px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.export-history > span { display: block; }
+.export-history small { display: block; margin-top: 2px; color: var(--muted); }
 .export-date-range { margin-top: 20px; }
 .date-trigger { width: 100%; text-align: left; }
 .range-calendar { margin-top: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
