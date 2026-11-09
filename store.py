@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, Validation
 
 from learning import ALGORITHM, advance, memory_snapshot, recall_rating
 from study import STUDY_SCHEMA
+from word_records import generated_note, merge_sense, migrate_words, resolve_id
 
 Kind = Literal["word", "expression", "grammar", "correction"]
 Status = Literal["new", "mastered"]
@@ -266,17 +267,16 @@ def record(row: sqlite3.Row) -> dict:
     result = dict(row)
     result.pop("title_key")
     result["examples"] = json.loads(result["examples"]) if result["examples"] else []
+    result["additional_senses"] = json.loads(result.get("additional_senses") or "[]")
     result["content_ready"] = result["note"] is not None or bool(
         result["explanation"] and result["explanation"].strip() and example_count(row["examples"]) >= 2
     )
     result["revision"] = hashlib.sha256(encode({key: result.get(key) for key in (
-        "title", "sense_key", "meaning", "context", "corrected_sentence", "explanation", "examples", "status", "note",
+        "title", "sense_key", "meaning", "context", "corrected_sentence", "explanation", "examples", "status", "note", "additional_senses",
     )}).encode()).hexdigest()
     result["note_is_custom"] = result["note"] is not None
     if result["note"] is None:
-        parts = [result[key] for key in ("title", "meaning", "explanation", "context", "corrected_sentence")]
-        parts.extend("\n".join(filter(None, (item["text"], item.get("translation")))) for item in result["examples"])
-        result["note"] = "\n\n".join(part for part in parts if part)
+        result["note"] = generated_note(result)
     lines = [line.strip() for line in result["note"].splitlines() if line.strip()]
     result["note_title"] = lines[0][:350] if lines else ""
     result["note_preview"] = lines[1][:500] if len(lines) > 1 else ""
@@ -305,6 +305,7 @@ class Store:
             if "note" not in columns:
                 db.execute("ALTER TABLE knowledge ADD COLUMN note TEXT")
             db.execute("UPDATE knowledge SET status = 'new' WHERE status = 'learning'")
+            migrate_words(db)
 
     @contextmanager
     def connection(self, *, write=False):
@@ -405,10 +406,10 @@ class Store:
             return {"status": "failed", "error": "request_id_conflict"}
         results = json.loads(receipt["results"])
         for result in results:
-            if "id" in result and not db.execute(
-                "SELECT 1 FROM knowledge WHERE id = ?", (result["id"],)
-            ).fetchone():
-                result["deleted"] = True
+            if "id" in result:
+                result["id"] = resolve_id(db, result["id"])
+                if not db.execute("SELECT 1 FROM knowledge WHERE id = ?", (result["id"],)).fetchone():
+                    result["deleted"] = True
         return {"status": "processed", "replayed": True, "results": results}
 
     def _save_point(self, db, item, request_id, source, timestamp, seen, enabled_types):
@@ -426,30 +427,52 @@ class Store:
         if key in seen:
             return {"status": "failed", "error": "duplicate_in_batch"}
         seen.add(key)
-        existing = db.execute(
-            """SELECT id, encounter_count, note, examples FROM knowledge
-               WHERE kind = ? AND language = ? AND title_key = ? AND sense_key = ?""", key,
-        ).fetchone()
-        result = (self._merge_point(db, existing, point, timestamp) if existing
+        identity = "kind = ? AND language = ? AND title_key = ?"
+        identity_args = key[:3]
+        if point.kind != "word":
+            identity += " AND sense_key = ?"
+            identity_args = key
+        existing = db.execute(f"SELECT * FROM knowledge WHERE {identity}", identity_args).fetchone()
+        already_encountered = existing is not None and db.execute(
+            "SELECT 1 FROM encounters WHERE record_id = ? AND request_id = ?",
+            (existing["id"], request_id),
+        ).fetchone() is not None
+        result = (self._merge_point(db, existing, point, timestamp, not already_encountered) if existing
                   else self._insert_point(db, data, timestamp))
-        db.execute(
-            "INSERT INTO encounters (record_id, request_id, occurred_at, context, source) VALUES (?, ?, ?, ?, ?)",
-            (result["id"], request_id, timestamp, point.context, source),
-        )
+        self._save_encounter(db, result["id"], request_id, timestamp, point.context, source)
         return result
 
-    def _merge_point(self, db, existing, point, timestamp):
+    @staticmethod
+    def _save_encounter(db, identifier, request_id, timestamp, context, source):
+        previous = db.execute("SELECT context FROM encounters WHERE record_id = ? AND request_id = ?",
+                              (identifier, request_id)).fetchone()
+        if previous:
+            contexts = list(dict.fromkeys(filter(None, (previous["context"], context))))
+            db.execute("UPDATE encounters SET context = ? WHERE record_id = ? AND request_id = ?",
+                       ("\n\n".join(contexts) or None, identifier, request_id))
+            return
+        db.execute("INSERT INTO encounters (record_id, request_id, occurred_at, context, source) VALUES (?, ?, ?, ?, ?)",
+                   (identifier, request_id, timestamp, context, source))
+
+    def _merge_point(self, db, existing, point, timestamp, new_encounter=True):
         # Keep curated content. Refresh the latest supplied learning context.
+        extras = existing["additional_senses"]
+        same_sense = normalized(point.sense_key) == existing["sense_key"]
+        if point.kind == "word":
+            extras = encode(merge_sense(dict(existing), point.model_dump()))
         db.execute(
-            """UPDATE knowledge SET encounter_count = encounter_count + 1,
+            """UPDATE knowledge SET encounter_count = encounter_count + ?,
+               repeat_priority = repeat_priority + ?, additional_senses = ?,
                last_seen_at = ?, context = COALESCE(?, context),
                explanation = COALESCE(NULLIF(explanation, ''), ?), examples = ?,
                corrected_sentence = COALESCE(corrected_sentence, ?) WHERE id = ?""",
-            (timestamp, point.context, point.explanation, self._merge_examples(existing, point.examples),
-             point.corrected_sentence, existing["id"]),
+            (int(new_encounter), int(new_encounter), extras, timestamp,
+             point.context if same_sense else None, point.explanation if same_sense else None,
+             self._merge_examples(existing, point.examples) if same_sense else existing["examples"],
+             point.corrected_sentence if same_sense else None, existing["id"]),
         )
         return {"status": "merged", "id": existing["id"],
-                "encounter_count": existing["encounter_count"] + 1}
+                "encounter_count": existing["encounter_count"] + int(new_encounter)}
 
     @staticmethod
     def _merge_examples(existing, examples):
@@ -476,8 +499,10 @@ class Store:
         filters = []
         params = []
         if record_ids is not None:
-            filters.append("knowledge.id IN (" + ",".join("?" for _ in record_ids) + ")")
-            params.extend(record_ids)
+            placeholders = ",".join("?" for _ in record_ids)
+            filters.append(f"(knowledge.id IN ({placeholders}) OR knowledge.id IN "
+                           f"(SELECT record_id FROM merged_words WHERE old_id IN ({placeholders})))")
+            params.extend(record_ids * 2)
         for column, value in (("kind", kind), ("status", status)):
             if value is not None:
                 filters.append(f"{column} = ?")
@@ -486,7 +511,7 @@ class Store:
             filters.append("(language = ? OR (? AND language LIKE ?))")
             params.extend((language, include_variants, language + "-%"))
         if keyword is not None:
-            columns = ("title", "sense_key", "meaning", "context", "corrected_sentence", "explanation", "examples", "note")
+            columns = ("title", "sense_key", "meaning", "context", "corrected_sentence", "explanation", "examples", "note", "additional_senses")
             clauses = [f"instr(normalize(coalesce({column}, '')), ?) > 0" for column in columns]
             filters.append("(" + " OR ".join(clauses) + ")")
             params.extend([normalized(keyword)] * len(columns))
@@ -572,8 +597,10 @@ class Store:
         clauses, params = self._filters(language=language, kind=kind, status="new", include_variants=include_variants)
         clauses.append("(note IS NULL OR normalize(coalesce(note, '')) <> '')")
         if exclude_ids:
-            clauses.append("knowledge.id NOT IN (" + ",".join("?" for _ in exclude_ids) + ")")
-            params.extend(exclude_ids)
+            placeholders = ",".join("?" for _ in exclude_ids)
+            clauses.append(f"knowledge.id NOT IN ({placeholders}) AND knowledge.id NOT IN "
+                           f"(SELECT record_id FROM merged_words WHERE old_id IN ({placeholders}))")
+            params.extend(exclude_ids * 2)
         where = " AND ".join(clauses)
         with (nullcontext(_db) if _db is not None else self.connection()) as db:
             if _db is None:
@@ -591,8 +618,10 @@ class Store:
             rows = db.execute(
                 f"""SELECT knowledge.*, card, due_at, rated_reviews FROM knowledge
                     LEFT JOIN memory_states ON record_id = knowledge.id
-                    WHERE {where} AND (? OR due_at IS NULL OR due_at <= ?)
-                    ORDER BY CASE WHEN due_at <= ? THEN 0 WHEN due_at IS NULL THEN 1 ELSE 2 END,
+                    WHERE {where} AND (? OR repeat_priority > 0 OR due_at IS NULL OR due_at <= ?)
+                    ORDER BY CASE WHEN repeat_priority > 0 THEN 0
+                                  WHEN due_at <= ? THEN 1 WHEN due_at IS NULL THEN 2 ELSE 3 END,
+                             repeat_priority DESC,
                              due_at ASC, created_at ASC, id ASC LIMIT ?""",
                 (*params, include_upcoming, timestamp, timestamp, limit),
             ).fetchall()
@@ -602,7 +631,8 @@ class Store:
                 card = item.pop("card")
                 due = item.pop("due_at")
                 item["memory"] = memory_snapshot(card, timestamp, item.pop("rated_reviews") or 0)
-                item["review_reason"] = "unassessed" if due is None else "due" if due <= timestamp else "upcoming"
+                item["review_reason"] = ("repeated_question" if item["repeat_priority"] else
+                                         "unassessed" if due is None else "due" if due <= timestamp else "upcoming")
                 attempt = db.execute(
                     """SELECT occurred_at, result, assisted, prompt, answer FROM review_events
                        WHERE record_id = ? ORDER BY id DESC LIMIT 1""", (item["id"],),
@@ -630,6 +660,7 @@ class Store:
 
     def get_point(self, record_id: int) -> dict:
         with self.connection() as db:
+            record_id = resolve_id(db, record_id)
             row = db.execute("SELECT * FROM knowledge WHERE id = ?", (record_id,)).fetchone()
             return {"status": "found", "record": record(row)} if row else {"status": "not_found"}
 
@@ -645,6 +676,7 @@ class Store:
         data = content_fields(changes)
         assignments = ", ".join(f"{column} = ?" for column in data)
         with self.connection(write=True) as db:
+            record_id = resolve_id(db, record_id)
             if expected_revision is not None:
                 current = db.execute("SELECT * FROM knowledge WHERE id = ?", (record_id,)).fetchone()
                 if current is None:
@@ -669,11 +701,13 @@ class Store:
 
     def _record_review(self, db, record_id, request_id, review):
         fingerprint = hashlib.sha256(encode([record_id, review.model_dump()]).encode()).hexdigest()
+        record_id = resolve_id(db, record_id)
         previous = db.execute("SELECT * FROM review_requests WHERE request_id = ?", (request_id,)).fetchone()
         if previous:
             if previous["fingerprint"] != fingerprint:
                 return {"status": "failed", "error": "request_id_conflict"}
             result = json.loads(previous["result"])
+            result["record_id"] = resolve_id(db, result["record_id"])
             if not db.execute("SELECT 1 FROM knowledge WHERE id = ?", (record_id,)).fetchone():
                 result["deleted"] = True
             return {**result, "replayed": True}
@@ -708,6 +742,8 @@ class Store:
         )
         db.execute("UPDATE knowledge SET last_reviewed_at = ?, last_review_result = ? WHERE id = ?",
                    (timestamp, review.result, record_id))
+        if review.result == "correct" and not review.assisted:
+            db.execute("UPDATE knowledge SET repeat_priority = 0 WHERE id = ?", (record_id,))
         result = {"status": "reviewed", "record_id": record_id, "event_id": event.lastrowid,
                   "scheduled": rating is not None, "rating": int(rating) if rating else None,
                   "memory": memory_snapshot(serialized, timestamp, rated_reviews)}
@@ -717,6 +753,7 @@ class Store:
     def history(self, record_id: int, *, limit=20, before_encounter_id=None, before_review_id=None):
         with self.connection() as db:
             db.execute("BEGIN")
+            record_id = resolve_id(db, record_id)
             point = db.execute("SELECT * FROM knowledge WHERE id = ?", (record_id,)).fetchone()
             if not point:
                 return {"status": "not_found"}
@@ -824,5 +861,6 @@ class Store:
 
     def delete(self, record_id: int) -> dict:
         with self.connection(write=True) as db:
+            record_id = resolve_id(db, record_id)
             result = db.execute("DELETE FROM knowledge WHERE id = ?", (record_id,))
             return {"status": "deleted" if result.rowcount else "not_found", "id": record_id}

@@ -85,11 +85,11 @@ class StoreTests(unittest.TestCase):
         second_sense = dict(APPROACH, sense_key="move closer", meaning="靠近")
         other.save("other-sense", [second_sense])
         rows = other.query(keyword="APPROACH")["records"]
-        self.assertEqual(len(rows), 2)
-        self.assertEqual(rows[0]["encounter_count"], 1)
-        self.assertEqual(rows[1]["encounter_count"], 2)
-        self.assertEqual(rows[1]["context"], repeated["context"])
-        self.assertGreater(rows[1]["last_seen_at"], rows[1]["created_at"])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["encounter_count"], 3)
+        self.assertIn(second_sense["meaning"], rows[0]["note"])
+        self.assertEqual(rows[0]["context"], repeated["context"])
+        self.assertGreater(rows[0]["last_seen_at"], rows[0]["created_at"])
 
     def test_partial_batch_and_duplicate_inside_batch(self):
         self.store.recording(True)
@@ -148,9 +148,9 @@ class StoreTests(unittest.TestCase):
 
     def test_edit_conflict_and_delete_do_not_resurrect_on_retry(self):
         self.store.recording(True)
-        points = [APPROACH, dict(APPROACH, sense_key="move closer", meaning="靠近")]
+        points = [APPROACH, dict(APPROACH, title="strategy")]
         ids = [row["id"] for row in self.store.save("delete-test", points)["results"]]
-        self.assertEqual(self.store.update(ids[1], Patch(sense_key="Method"))["error"],
+        self.assertEqual(self.store.update(ids[1], Patch(title="Approach"))["error"],
                          "identity_conflict")
         self.assertEqual(self.store.delete(ids[0])["status"], "deleted")
         self.assertEqual(self.store.delete(ids[0])["status"], "not_found")

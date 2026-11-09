@@ -98,6 +98,20 @@ async def exercise(archive):
             saved = await call(session, "save_points", {"request_id": "beta-save-once", "items": points})
             record_id = saved["results"][0]["id"]
             assert (await call(session, "save_points", {"request_id": "beta-save-once", "items": points}))["replayed"]
+            movement = {**points[0], "sense_key": "move closer", "meaning": "To move toward something.",
+                        "explanation": "As a verb, approach can describe coming closer.",
+                        "examples": [{"text": "The train approached the station."},
+                                     {"text": "She approached the entrance slowly."}]}
+            repeat_args = {"request_id": "beta-repeated-word", "items": [points[0], movement]}
+            merged = await call(session, "save_points", repeat_args)
+            assert all(item["id"] == record_id and item["encounter_count"] == 2 for item in merged["results"])
+            assert (await call(session, "save_points", repeat_args))["replayed"]
+            repeated = (await call(session, "find_points", {"keyword": "approach"}))["records"]
+            assert len(repeated) == 1 and repeated[0]["repeat_priority"] == 1
+            assert movement["meaning"] in repeated[0]["note"] and points[0]["meaning"] in repeated[0]["note"]
+            priority_queue = await call(session, "review_queue", {"language": "en"})
+            assert priority_queue["records"][0]["review_reason"] == "repeated_question"
+            checks.append("Repeated words merge meanings, move to the top, count once per encounter and gain review priority without retry inflation")
             await call(session, "update_settings", {"patch": {"ui_language": "fr"}})
             await call(session, "update_learning_preferences", {"language": "en", "patch": {"explanation_language": "zh"}})
             review = {"record_id": record_id, "request_id": "beta-review-once", "review": {"result": "incorrect"}}
@@ -136,7 +150,7 @@ async def exercise(archive):
                 "format": "json", "record_ids": [point["id"]], "content": "sections", "fields": ["explanation"],
             }})
             assert json.loads(Path(selected["path"]).read_text())["records"] == [
-                {"title": point["title"], "explanation": point["explanation"]}]
+                {"title": point["title"], "explanation": point["explanation"] + "\n\n" + movement["explanation"]}]
             checks.append("Frozen MCP filters by date and multiple types and excludes unselected content from exports")
             for kind in ("pdf", "docx", "xlsx", "notion", "json"):
                 export = await call(session, "export_points", {"request": {"format": kind}})

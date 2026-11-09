@@ -117,6 +117,7 @@ SECTION_COLUMNS = [
 
 
 def project(records, selection):
+    from word_records import all_senses
     columns = COLUMNS[:3] if selection.metadata_enabled else COLUMNS[:1]
     if selection.content == "notes":
         columns = columns + [("note", "Note")]
@@ -126,6 +127,12 @@ def project(records, selection):
         columns = columns + COLUMNS[4:]
     projected = []
     for record in records:
+        if selection.content == "sections" and record.get("additional_senses"):
+            senses = all_senses(record)
+            record = {**record, **{
+                key: "\n\n".join(sense[key] for sense in senses if sense.get(key))
+                for key in ("meaning", "explanation", "context", "corrected_sentence")
+            }, "examples": [example for sense in senses for example in sense.get("examples") or []]}
         row = {key: record.get(key) for key, _ in columns}
         row["title"] = record["title"] if selection.content == "sections" else note_title(record)
         if "examples" in row:

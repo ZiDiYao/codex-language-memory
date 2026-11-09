@@ -38,3 +38,8 @@ records on scroll, note editing, mastery persistence after reload, export previe
 and JSON download. No browser console errors were observed. Native MCP transport
 was tested programmatically. The subsequent installed upgrade is documented in
 [Beta 29 verification](beta29-testing.md).
+
+
+Beta 30 adds `word_records.py` for word-sense consolidation and recovery-safe legacy
+migration. It keeps encounter-based review priority separate from the FSRS adapter.
+See [Beta 30 verification](beta30-testing.md). The frontend remains unchanged.

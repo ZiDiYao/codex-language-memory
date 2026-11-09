@@ -129,7 +129,7 @@ Only necessary learning context is stored. A translation does not imply every wo
 
 ## Storage and tools
 
-Each knowledge point has an ID, type, target language, title, stable sense key, meaning, explanation, examples, optional context/correction, creation and last-encounter timestamps, encounter count, mastery, and last review timestamp/result. Mastery is `new` (To Learn) or `mastered` (Mastered). Legacy `learning` records migrate to `new`. Review results never automatically change mastery. Merged encounters keep the latest context on the record and preserve each new context separately in history.
+Each knowledge point has an ID, type, target language, title, stable sense key, meaning, explanation, examples, optional context/correction, creation and last-encounter timestamps, encounter count, mastery, and last review timestamp/result. Mastery is `new` (To Learn) or `mastered` (Mastered). Legacy `learning` records migrate to `new`. Review results never automatically change mastery. Merged encounters preserve each new context in history; the primary meaning also keeps its latest context. Word records retain additional meanings in `additional_senses`.
 
 FSRS-6 (`fsrs==6.3.2`) updates each point's memory state after actual unassisted recall, using default parameters and 90% desired retention. The review queue prioritizes overdue points, then unassessed points. Skipped or assisted attempts are preserved as evidence without changing the schedule; asking a question does not count as a failed quiz. Codex reads observed histories and explicit, language-specific teaching preferences to personalize explanations. No personal parameter fitting or overall proficiency scoring is claimed. See [the learning model and primary references](docs/learning-model.md) for rating semantics, uncertainty, evaluation and migration details.
 
@@ -156,7 +156,7 @@ FSRS-6 (`fsrs==6.3.2`) updates each point's memory state after actual unassisted
 | `delete_point` | Delete by ID |
 | `export_points` | Export all matching records locally as PDF, XLSX, DOCX, Notion ZIP, or JSON |
 
-Deduplication uses type, language, normalized title, and `sense_key`. Codex searches for a likely repeat and reuses its identity; paraphrased identities can still create semantic duplicates. Different meanings use separate sense keys.
+Words are unique by target language and normalized title. Different meanings are retained inside that one record, using stable sense keys, and appear together in its generated editable note. Expressions, grammar and corrections still use type, language, title and sense key. Codex reuses an existing title for inflected forms; the backend does not guess linguistic equivalence between different spellings. A fresh question updates the record’s latest encounter, moves it to the top of unfiltered history, and increases `repeat_priority`. Multiple meanings in one batch count once; exact retries do not add encounters, priority or timestamps. User-edited notes remain unchanged by capture, with new meanings retained in the structured data.
 
 A new encounter gets a new `request_id`. Retries reuse the same ID and exact parameters, so they cannot increment the count again. Saves and receipts commit in one SQLite transaction. Deleting a record leaves a content-free request hash and receipt so retrying the old save cannot recreate it. `source=automatic/explicit` describes a save's origin; it is not a recording-mode preference.
 

@@ -78,6 +78,10 @@ def create_server(store: Store) -> FastMCP:
         a useful explanation with natural usage/collocations and two to five distinct examples
         (text, translation in the preferred explanation language when useful).
         Optional fields are context and corrected_sentence. Generate content before saving; never ask the user to fill a form.
+        A word has one record per language and normalized title. Different sense_key values
+        add meanings inside that record. Reuse an existing word's title, including when
+        the question uses an inflected form. A fresh encounter moves it to the top of history
+        and boosts review priority; multiple meanings in one batch count as one encounter.
         Set source=explicit only when the user requested this save.
         Do not call this for reading, explaining or practicing already saved notes during
         study/review; those actions are not new encounters. Use queries and record_review.
@@ -133,7 +137,7 @@ def create_server(store: Store) -> FastMCP:
         include_variants: bool = False, include_upcoming: bool = False,
         exclude_ids: Annotated[list[RecordId], Field(max_length=100)] | None = None,
     ) -> dict[str, Any]:
-        """Choose material for guided study: due FSRS reviews first, then unassessed points.
+        """Choose material for guided study: repeated questions, due FSRS reviews, then unassessed points.
         Excludes mastered and empty custom notes. Pass this round's completed/skipped IDs
         in exclude_ids to avoid repeating an assisted or skipped point with an unchanged schedule.
         Returns current notes, selection reasons, latest attempts and counts for the filtered
@@ -141,8 +145,11 @@ def create_server(store: Store) -> FastMCP:
         the entire scope. Schedule-only questions can use counts and next_due_at without
         loading upcoming records. Use last_attempt to address a specific difficulty,
         but the current note remains authoritative after user edits. Reading never records practice.
-        Future reviews are excluded unless include_upcoming=true for requested early practice.
+        Other future reviews are excluded unless include_upcoming=true for requested early practice.
         Memory estimates use population parameters and are not calibrated proficiency scores.
+        Repeated questions rank first and can be selected before their FSRS due time.
+        repeat_priority counts repeat encounters since the last independent correct answer;
+        it does not modify FSRS state. Mastered and empty notes stay excluded.
         Supply language to review one language. include_variants includes regional forms.
         """
         return store.review(language=language, kind=kind, limit=limit, include_variants=include_variants,
@@ -170,7 +177,7 @@ def create_server(store: Store) -> FastMCP:
         limit: Annotated[int, Field(ge=1, le=20)] = 3,
         include_variants: bool = True, include_upcoming: bool = False,
     ) -> dict[str, Any]:
-        """Start a persistent round from actual saved notes in FSRS queue order.
+        """Start a persistent round from saved notes in repeat-priority, then FSRS queue order.
         Read get_learning_profile first. Default to three points for a short round.
         A requested time budget is approximate. Retry with the same request_id and options.
         For 'continue', use get_study instead of starting another round. Returns only the
