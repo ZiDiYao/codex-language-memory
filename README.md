@@ -6,7 +6,7 @@ Recording is automatic for all languages and enabled by default on new installat
 
 ## Install the local Beta
 
-Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.26), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
+Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
 
 To upgrade, download the next Beta and run its **Install.command**. The installer validates the package, tests its runtime, backs up the database and switches versions while preserving learning records and settings. Repeating the same installation is safe. It also migrates the earlier source-checkout installation automatically.
 
@@ -14,7 +14,7 @@ To upgrade, download the next Beta and run its **Install.command**. The installe
 - **Roll Back.command**: activate the previous packaged version while keeping current data.
 - **Uninstall.command**: disconnect MCP and Skill; retain records, backups and release files for recovery.
 
-The repository is currently private, so GitHub downloads require repository access. This Beta is not Apple Developer ID signed or notarized; macOS may require its normal Privacy & Security / Open Anyway confirmation. The installer never disables Gatekeeper. Tested on macOS 26.5.1 arm64; other binary targets and clean-machine downloaded-app validation remain outstanding.
+The repository and release downloads are public. This Beta is not Apple Developer ID signed or notarized; macOS may require its normal Privacy & Security / Open Anyway confirmation. The installer never disables Gatekeeper. Tested on macOS 26.5.1 arm64; other binary targets and clean-machine downloaded-app validation remain outstanding.
 
 Code is installed under `~/Library/Application Support/Codex Language Memory`. Data stays at `~/.local/share/codex-language-memory/memory.sqlite3` unless this integration already has a custom absolute database path. An existing `CODEX_HOME` is respected. Other Codex settings, servers and skills are preserved. See [installation, upgrade and recovery details](docs/beta-release.md).
 
@@ -25,6 +25,8 @@ For source development, Python 3.10+ is supported (tested with 3.12):
 ```sh
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
+npm ci --ignore-scripts
+npm run build
 codex mcp add language_memory -- "$PWD/.venv/bin/python" "$PWD/server.py"
 mkdir -p "$HOME/.agents/skills"
 ln -s "$PWD/.agents/skills/language-memory" "$HOME/.agents/skills/language-memory"
@@ -50,6 +52,8 @@ Automatic capture depends on Codex selecting the skill and calling tools. It can
 MCP operations follow the client's approval policy. A rejected write is reported as unsuccessful. The skill only confirms a save after a successful tool result.
 
 ## Local page
+
+Beta 27 also registers **Language memory** as a native sidebar MCP App. On hosts supporting OpenAI's global UI entrypoint, open the plugin from the sidebar (and pin it if the host offers that option). It renders the same page, with the same markup, styles and controls. Data stays in the same local SQLite database; the app uses the MCP bridge instead of a localhost connection. No additional model or cloud service is used. The host controls discovery and pinning: local registration alone does not guarantee a sidebar icon in every Codex version. Restart or reload the plugin after upgrading. Desktop sidebar click-through verification is separate from protocol tests.
 
 Ask Codex to open the learning page. `open_memory_page` returns a local URL that Codex can open in its browser side panel when that capability is available. Otherwise, open the returned URL in a browser.
 
@@ -96,7 +100,7 @@ FSRS determines when a point is due. Codex uses its category, your last actual a
 
 The queue includes selection reasons, the most recent attempt and counts before the batch limit. It excludes empty notes and can exclude IDs already practiced or skipped in the current round, so an unchanged assisted/skipped schedule does not create a loop. When nothing is due, a schedule-only question gets the schedule; an explicit request to practice now can select upcoming points and is identified as early practice. It finishes the agreed round and respects “Stop” immediately.
 
-This uses the Skill and 21 MCP tools, with no additional AI service or chat UI. Study rounds live in the existing SQLite database. The current question, hint flag and progress survive process restarts and new chats. Each answer and progress change commit together; retries cannot add another attempt. Concurrent chats must use the current session version, and edited/deleted notes cannot silently receive an answer to an outdated question. Skill activation is model-driven, and the extension does not send proactive messages while you are away.
+This uses the Skill and MCP tools, with no additional AI service or chat UI. Study rounds live in the existing SQLite database. The current question, hint flag and progress survive process restarts and new chats. Each answer and progress change commit together; retries cannot add another attempt. Concurrent chats must use the current session version, and edited/deleted notes cannot silently receive an answer to an outdated question. Skill activation is model-driven, and the extension does not send proactive messages while you are away.
 
 ### Try the persistent round
 
@@ -134,6 +138,8 @@ FSRS-6 (`fsrs==6.3.2`) updates each point's memory state after actual unassisted
 | `get_recording`, `set_recording` | Read or change the persistent recording switch |
 | `get_settings`, `update_settings` | Read or patch `enabled`, `enabled_types`, and `ui_language` |
 | `open_memory_page` | Start or retrieve the local page |
+| `open_memory_app` | Open the same UI as a native MCP App; registers a global sidebar entry |
+| `memory_app_request` | App-only transport for validated page actions and exports; hidden from model tool selection |
 | `list_languages` | List language groups and record counts |
 | `save_points` | Batch save with per-item added, merged, skipped, or failed outcomes |
 | `find_points` | Search by keyword, type, language, mastery, or missing generated content; follow `next_cursor` for more |
@@ -162,11 +168,13 @@ Paused recording blocks new saves, including explicit ones. Queries, review, edi
 
 ```sh
 .venv/bin/python -m pip install -r requirements-dev.txt
+npm ci --ignore-scripts
+npm run build
 .venv/bin/python -m unittest discover -s tests -v
 node --test tests/*.mjs
 ```
 
-[Beta 15 guided-study results](docs/beta15-testing.md) cover a 25-step final conversation acceptance set, including targeted reruns for issues found during development. There are now 103 Python tests and seven Node tests. [Beta 26 results](docs/beta26-testing.md) additionally cover MCP process restart, atomic review/progress writes, concurrent retries, hint retention, pause/resume, edits and deletion.
+[Beta 15 guided-study results](docs/beta15-testing.md) cover a 25-step final conversation acceptance set, including targeted reruns for issues found during development. There are now 107 Python tests and ten Node tests. [Beta 26 results](docs/beta26-testing.md) additionally cover MCP process restart, atomic review/progress writes, concurrent retries, hint retention, pause/resume, edits and deletion. [Beta 27 results](docs/beta27-testing.md) cover the native sidebar integration and verification in Codex.
 
 [Beta 14 acceptance results](docs/beta14-testing.md) cover 35 real Codex turns, five replays of model-generated saves through the installed runtime, 86 Python tests, five JavaScript tests, and the packaged installation lifecycle.
 

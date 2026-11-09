@@ -56,6 +56,12 @@ def write_notices(package):
     if python_license is None:
         raise SystemExit("A full Python license file is required to distribute the runtime.")
     shutil.copyfile(python_license, notices / "PYTHON-LICENSE.txt")
+    # The native sidebar HTML bundles the MCP Apps SDK and its JS dependencies.
+    for license_file in (ROOT / "node_modules").rglob("*"):
+        if license_file.is_file() and license_file.name.lower().startswith(("license", "licence", "copying", "notice")):
+            destination = notices / "javascript" / license_file.relative_to(ROOT / "node_modules")
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(license_file, destination)
     (package / "BUILD-DEPENDENCIES.json").write_text(json.dumps(versions, indent=2, sort_keys=True))
 
 
@@ -69,6 +75,7 @@ def main():
     version_key(version)
     frozen = ROOT / "build" / "frozen"
     if not args.skip_freeze:
+        subprocess.run(["npm", "run", "build"], cwd=ROOT, check=True)
         subprocess.run([
             sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir",
             "--name", "language-memory", "--target-architecture", "arm64",

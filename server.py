@@ -13,6 +13,7 @@ from store import (CaptureMode, Kind, Language, LearnerPreferences, Limit, Patch
 from dashboard import Dashboard
 from study import StudySessions
 from exports import ExportError, ExportRequest, save_export
+from mcp_app import register_app
 
 
 def create_server(store: Store) -> FastMCP:
@@ -21,6 +22,7 @@ def create_server(store: Store) -> FastMCP:
     local_write = ToolAnnotations(destructiveHint=False, openWorldHint=False)
     dashboard = Dashboard(store)
     study = StudySessions(store)
+    register_app(server, store)
 
     @server.tool(annotations=read_only)
     def open_memory_page() -> dict[str, Any]:

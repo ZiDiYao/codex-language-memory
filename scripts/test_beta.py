@@ -78,7 +78,16 @@ async def exercise(archive):
         error_log = (root / "runtime-stderr.log").open("w+")
         async with stdio_client(parameters(), errlog=error_log) as streams, ClientSession(*streams) as session:
             await session.initialize()
-            assert len((await session.list_tools()).tools) == 21
+            assert len((await session.list_tools()).tools) == 23
+            sidebar = (await session.read_resource("ui://language-memory/sidebar-v1.html")).contents[0]
+            assert sidebar.mimeType == "text/html;profile=mcp-app"
+            assert '<div id="records"' in sidebar.text
+            assert sidebar.meta["openai/ui"]["preferredDisplayMode"] == "fullscreen"
+            assert (await call(session, "open_memory_app"))["ready"]
+            bridge = await call(session, "memory_app_request", {"route": "api", "payload": {
+                "action": "settings/read", "arguments": {}}})
+            assert bridge["status"] == 200 and bridge["data"]["enabled"]
+            checks.append("Frozen sidebar resource and app-only MCP transport work without Node or Python on PATH")
             points = [{"kind": "word", "language": "en", "title": "approach", "sense_key": "method",
                        "meaning": "A way of doing something.", "explanation": "A countable noun describing a method.",
                        "context": "We need a fresh approach.", "examples": [{"text": "Try a different approach."}, {"text": "This approach saves time."}]},
@@ -133,7 +142,7 @@ async def exercise(archive):
                 export = await call(session, "export_points", {"request": {"format": kind}})
                 assert export["count"] == 2 and export["format"] == kind, export
                 assert Path(export["path"]).is_file()
-            checks.append("Frozen MCP exposes 21 tools and saves multilingual data, reviews, preferences, page assets and all five exports")
+            checks.append("Frozen MCP exposes 23 tools and saves multilingual data, reviews, preferences, page assets and all five exports")
             with urlopen(Request(page["url"] + "api", data=json.dumps({
                 "action": "exports/history", "arguments": {},
             }).encode(), headers={"Content-Type": "application/json", "X-Language-Memory": "1"})) as response:

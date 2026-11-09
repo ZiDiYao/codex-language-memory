@@ -45,6 +45,7 @@ class PointDelete(StrictModel):
 ASSETS = {
     "": ("index.html", "text/html; charset=utf-8"),
     "app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "transport.js": ("transport.js", "text/javascript; charset=utf-8"),
     "motion.js": ("motion.js", "text/javascript; charset=utf-8"),
     "entry-editor.js": ("entry-editor.js", "text/javascript; charset=utf-8"),
     "history-model.js": ("history-model.js", "text/javascript; charset=utf-8"),

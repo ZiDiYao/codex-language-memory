@@ -14,3 +14,4 @@ exports/
 build/
 dist/
 *.spec
+web/mcp-app.html

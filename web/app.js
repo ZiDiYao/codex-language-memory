@@ -5,6 +5,7 @@ import { enter, reveal, conceal, openDialog, closeDialog, disclosure } from "./m
 import { EntryEditor } from "./entry-editor.js";
 import { languageSelection } from "./history-model.js";
 import { ExportDialog } from "./export-dialog.js";
+import { request, saveDownload } from "./transport.js";
 
 const $ = (selector) => document.querySelector(selector);
 const pageSize = 20;
@@ -205,18 +206,6 @@ function feedback(selector, key, error = false) {
   node.dataset.i18n = key;
   node.textContent = t(key);
   node.classList.toggle("error", error);
-}
-async function request(route, payload) {
-  try {
-    return await fetch(route, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Language-Memory": "1" },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(route === "export" ? 60000 : 15000),
-    });
-  } catch {
-    throw new Error("disconnected");
-  }
 }
 async function api(action, arguments_ = {}) {
   const response = await request("api", { action, arguments: arguments_ });
@@ -491,17 +480,7 @@ async function download(format, selection) {
       const data = await response.json();
       throw new Error(data.error);
     }
-    const blob = await response.blob();
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download =
-      response.headers
-        .get("Content-Disposition")
-        ?.match(/filename="([^"]+)"/)?.[1] || "language-memory";
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    await saveDownload(response);
     await closeDialog($("#export-dialog"));
     notice("exported", false, {
       count: response.headers.get("X-Record-Count"),

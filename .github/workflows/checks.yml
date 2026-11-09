@@ -16,6 +16,8 @@ jobs:
         with:
           node-version: '24'
       - run: python -m pip install -r requirements-dev.txt
+      - run: npm ci --ignore-scripts
+      - run: npm run build
       - run: python -m unittest discover -s tests -v
       - run: node --test tests/*.mjs
       - run: git diff --check

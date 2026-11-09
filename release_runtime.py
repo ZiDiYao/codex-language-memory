@@ -22,8 +22,11 @@ def healthcheck(database):
 
     store = Store(database)
     tools = asyncio.run(create_server(store).list_tools())
-    if len(tools) != 21:
+    if len(tools) != 23:
         raise InstallError("Unexpected MCP tool set")
+    from mcp_app import APP_FILE
+    if not APP_FILE.is_file():
+        raise InstallError("Missing native sidebar app")
     # Verify static assets and dynamically imported Office/PDF dependencies in the frozen build.
     if not (Path(__file__).parent / "web" / "app.js").is_file():
         raise InstallError("Missing dashboard assets")
