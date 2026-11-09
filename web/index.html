@@ -122,42 +122,30 @@
         <div class="setting">
           <h3 data-i18n="recordTypes"></h3>
           <div class="type-grid">
-            <label class="choice"
-              ><input
-                type="checkbox"
-                name="enabled-type"
-                value="word"
-                checked /><span
-                ><strong data-i18n="word"></strong
-                ><small data-i18n="wordHelp"></small></span
-            ></label>
-            <label class="choice"
-              ><input
-                type="checkbox"
-                name="enabled-type"
-                value="expression"
-                checked /><span
-                ><strong data-i18n="expression"></strong
-                ><small data-i18n="expressionHelp"></small></span
-            ></label>
-            <label class="choice"
-              ><input
-                type="checkbox"
-                name="enabled-type"
-                value="grammar"
-                checked /><span
-                ><strong data-i18n="grammar"></strong
-                ><small data-i18n="grammarHelp"></small></span
-            ></label>
-            <label class="choice"
-              ><input
-                type="checkbox"
-                name="enabled-type"
-                value="correction"
-                checked /><span
-                ><strong data-i18n="correction"></strong
-                ><small data-i18n="correctionHelp"></small></span
-            ></label>
+            <label class="choice">
+              <input type="checkbox" name="enabled-type" value="word" checked
+                aria-labelledby="capture-word-title" aria-describedby="capture-word-help"/>
+              <strong id="capture-word-title" data-i18n="word"></strong>
+              <small id="capture-word-help"><span data-i18n="wordHelp"></span><span data-i18n="wordHelpDetail"></span></small>
+            </label>
+            <label class="choice">
+              <input type="checkbox" name="enabled-type" value="expression" checked
+                aria-labelledby="capture-expression-title" aria-describedby="capture-expression-help"/>
+              <strong id="capture-expression-title" data-i18n="expression"></strong>
+              <small id="capture-expression-help"><span data-i18n="expressionHelp"></span><span data-i18n="expressionHelpDetail"></span></small>
+            </label>
+            <label class="choice">
+              <input type="checkbox" name="enabled-type" value="grammar" checked
+                aria-labelledby="capture-grammar-title" aria-describedby="capture-grammar-help"/>
+              <strong id="capture-grammar-title" data-i18n="grammar"></strong>
+              <small id="capture-grammar-help"><span data-i18n="grammarHelp"></span><span data-i18n="grammarHelpDetail"></span></small>
+            </label>
+            <label class="choice">
+              <input type="checkbox" name="enabled-type" value="correction" checked
+                aria-labelledby="capture-correction-title" aria-describedby="capture-correction-help"/>
+              <strong id="capture-correction-title" data-i18n="correction"></strong>
+              <small id="capture-correction-help"><span data-i18n="correctionHelp"></span><span data-i18n="correctionHelpDetail"></span></small>
+            </label>
           </div>
         </div>
       </fieldset>
