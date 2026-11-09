@@ -87,7 +87,7 @@ class PageTests(unittest.TestCase):
         with urlopen(self.url) as response:
             self.assertEqual(response.status, 200)
             self.assertIn("Language memory", response.read().decode())
-        for asset in ("app.js", "style.css"):
+        for asset in ("app.js", "record-feed.js", "style.css"):
             with urlopen(self.url + asset) as response:
                 self.assertEqual(response.status, 200)
         self.call("settings/update", {"enabled": False, "ui_language": "en"})

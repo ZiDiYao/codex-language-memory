@@ -3,6 +3,7 @@ import { Picker } from "./picker.js";
 import { enter, reveal, conceal, openDialog, closeDialog, disclosure } from "./motion.js";
 
 import { EntryEditor } from "./entry-editor.js";
+import { RecordFeed } from "./record-feed.js";
 import { languageSelection } from "./history-model.js";
 import { ExportDialog } from "./export-dialog.js";
 import { request, saveDownload } from "./transport.js";
@@ -12,11 +13,6 @@ const pageSize = 20;
 let locale = "en";
 let settings;
 let catalog = { languages: [], counts: {}, kinds: {}, by_language: {} };
-let cursor = null;
-let hasMore = true;
-let loading = false;
-let loadFailed = false;
-let queryVersion = 0;
 let ready = false;
 let versions;
 let syncing = false;
@@ -30,6 +26,14 @@ const editors = new Map();
 let selectedLanguage = "";
 let selectedKind = "";
 let switchingFilters = false;
+const historyFeed = new RecordFeed({
+  fetchPage: (args) => api("points/query", args),
+  canCommit: ({ preserve }) => !hasDirtyEditors() && !(preserve && historyIsInteracting()),
+  onStart: beginHistoryLoad,
+  onCommit: renderRecords,
+  onError: failHistoryLoad,
+  onFinish: finishHistoryLoad,
+});
 
 function t(key, params = {}) {
   return messages[locale][key].replace(/\{(\w+)\}/g, (_, name) => {
@@ -325,85 +329,87 @@ function updateLoadState(key, params = {}) {
   node.dataset.params = JSON.stringify(params);
   node.textContent = t(key, params);
 }
-function maybeLoadMore() {
-  if (
-    ready &&
-    !loading &&
-    !loadFailed &&
-    hasMore &&
-    $("#load-sentinel").getBoundingClientRect().top < window.innerHeight + 250
-  )
-    loadRecords();
+function hasDirtyEditors() {
+  return [...editors.values()].some((editor) => editor.dirty);
 }
-async function loadRecords(reset = false, preserve = false) {
-  if (!ready || (!reset && (loading || !hasMore || loadFailed))) return false;
-  if (reset && !preserve && !(await flushEditors())) return false;
-  if (preserve && (document.querySelector(".history-entry[data-animating]") || document.activeElement?.closest(".entry-editor") || [...editors.values()].some((editor) => editor.dirty))) return false;
-  const version = reset ? ++queryVersion : queryVersion;
-  const anchor = preserve ? [...$("#records").children].find((node) => node.getBoundingClientRect().top >= 0) : null;
-  const expanded = new Set(preserve ? [...document.querySelectorAll(".history-entry[open]")].map((node) => node.dataset.id) : []);
-  const anchorId = anchor?.dataset.id;
-  const anchorTop = anchor?.getBoundingClientRect().top;
-  const amount = preserve ? Math.max(pageSize, displayed.size) : pageSize;
-  if (reset) { cursor = null; hasMore = true; loadFailed = false; }
-  loading = true;
+function historyIsInteracting() {
+  return document.querySelector(".history-entry[data-animating]") ||
+    document.activeElement?.closest(".entry-editor");
+}
+function captureHistoryView(reset, preserve) {
+  const anchor = preserve
+    ? [...$("#records").children].find((node) => node.getBoundingClientRect().top >= 0)
+    : null;
+  return {
+    reset, preserve,
+    expanded: new Set(preserve
+      ? [...document.querySelectorAll(".history-entry[open]")].map((node) => node.dataset.id) : []),
+    anchorId: anchor?.dataset.id,
+    anchorTop: anchor?.getBoundingClientRect().top,
+  };
+}
+function clearRecords() {
+  displayed.clear();
+  editors.clear();
+  $("#records").replaceChildren();
+}
+function renderRecords(data, { reset, preserve, expanded, anchorId, anchorTop }) {
+  if (reset) clearRecords();
+  const added = [];
+  for (const record of data.records) {
+    if (displayed.has(record.id)) continue;
+    displayed.set(record.id, record);
+    const node = card(record, expanded.has(String(record.id)));
+    $("#records").append(node);
+    added.push(node);
+  }
+  if (!displayed.size) {
+    const empty = element("div", undefined, "empty");
+    empty.append(translated("strong", "emptyTitle"), translated("p", "emptyHelp"));
+    $("#records").append(empty);
+  }
+  if (!preserve) {
+    if (reset) enter($("#records"), 5);
+    else added.forEach((node) => enter(node, 4));
+  }
+  updateLoadState(data.has_more ? "scrollMore" : "allLoaded", { count: displayed.size });
+  if (anchorId) {
+    const restored = [...$("#records").children].find((node) => node.dataset.id === anchorId);
+    if (restored) window.scrollBy(0, restored.getBoundingClientRect().top - anchorTop);
+  }
+}
+function beginHistoryLoad({ reset, preserve }) {
   $("#retry-load").hidden = true;
   updateLoadState("loading");
   $("#records").setAttribute("aria-busy", "true");
   $("#records").classList.toggle("is-filtering", reset && !preserve);
-  try {
-    let data = { records: [], has_more: true, next_cursor: cursor };
-    do {
-      const args = { ...filters(), limit: Math.min(50, amount - data.records.length) };
-      if (data.next_cursor) args.cursor = data.next_cursor;
-      const batch = await api("points/query", args);
-      data = { ...batch, records: [...data.records, ...batch.records] };
-    } while (data.has_more && data.records.length < amount && version === queryVersion);
-    if (version !== queryVersion || [...editors.values()].some((editor) => editor.dirty) || (preserve && (document.querySelector(".history-entry[data-animating]") || document.activeElement?.closest(".entry-editor")))) return false;
-    if (reset) { displayed.clear(); editors.clear(); $("#records").replaceChildren(); }
-    const added = [];
-    for (const record of data.records) {
-      if (displayed.has(record.id)) continue;
-      displayed.set(record.id, record);
-      const node = card(record, expanded.has(String(record.id)));
-      $("#records").append(node);
-      added.push(node);
-    }
-    if (!displayed.size) {
-      const empty = element("div", undefined, "empty");
-      empty.append(translated("strong", "emptyTitle"), translated("p", "emptyHelp"));
-      $("#records").append(empty);
-    }
-    if (!preserve) {
-      if (reset) enter($("#records"), 5);
-      else added.forEach((node) => enter(node, 4));
-    }
-    cursor = data.next_cursor;
-    hasMore = data.has_more;
-    updateLoadState(hasMore ? "scrollMore" : "allLoaded", { count: displayed.size });
-    if (anchorId) {
-      const restored = [...$("#records").children].find((node) => node.dataset.id === anchorId);
-      if (restored) window.scrollBy(0, restored.getBoundingClientRect().top - anchorTop);
-    }
-    return true;
-  } catch (error) {
-    if (version === queryVersion) {
-      loadFailed = true;
-      if (error.message === "notFound" && ![...editors.values()].some((editor) => editor.dirty)) {
-        displayed.clear(); editors.clear(); $("#records").replaceChildren();
-      }
-      updateLoadState(errorKey(error));
-      $("#retry-load").hidden = false;
-    }
-    return false;
-  } finally {
-    if (version === queryVersion) {
-      loading = false;
-      $("#records").removeAttribute("aria-busy");
-      $("#records").classList.remove("is-filtering");
-      if (!loadFailed) requestAnimationFrame(maybeLoadMore);
-    }
+}
+function failHistoryLoad(error) {
+  if (error.message === "notFound" && !hasDirtyEditors()) clearRecords();
+  updateLoadState(errorKey(error));
+  $("#retry-load").hidden = false;
+}
+function finishHistoryLoad() {
+  $("#records").removeAttribute("aria-busy");
+  $("#records").classList.remove("is-filtering");
+  if (!historyFeed.failed) requestAnimationFrame(maybeLoadMore);
+}
+function maybeLoadMore() {
+  if (ready && !historyFeed.loading && !historyFeed.failed && historyFeed.hasMore &&
+      $("#load-sentinel").getBoundingClientRect().top < window.innerHeight + 250) {
+    loadRecords();
   }
+}
+async function loadRecords(reset = false, preserve = false) {
+  if (!ready) return false;
+  if (reset && !preserve && !(await flushEditors())) return false;
+  if (preserve && (hasDirtyEditors() || historyIsInteracting())) return false;
+  return historyFeed.load({
+    reset,
+    amount: preserve ? Math.max(pageSize, displayed.size) : pageSize,
+    filters: filters(),
+    view: captureHistoryView(reset, preserve),
+  });
 }
 async function loadSettings() {
   const revision = settingsRevision;
@@ -446,7 +452,7 @@ function saveSettings(patch) {
   });
 }
 async function synchronize() {
-  if (!ready || syncing || loading || document.visibilityState === "hidden")
+  if (!ready || syncing || historyFeed.loading || document.visibilityState === "hidden")
     return;
   syncing = true;
   try {
@@ -550,14 +556,13 @@ $("#search").addEventListener("input", () => {
   searchTimer = setTimeout(() => loadRecords(true), 250);
 });
 $("#retry-load").addEventListener("click", () => {
-  loadFailed = false;
   loadRecords(true);
 });
 new IntersectionObserver(maybeLoadMore, { rootMargin: "250px" }).observe(
   $("#load-sentinel"),
 );
 window.addEventListener("beforeunload", (event) => {
-  if ([...editors.values()].some((editor) => editor.dirty)) { event.preventDefault(); event.returnValue = ""; }
+  if (hasDirtyEditors()) { event.preventDefault(); event.returnValue = ""; }
 });
 document.addEventListener("visibilitychange", synchronize);
 window.addEventListener("focus", synchronize);

@@ -376,91 +376,100 @@ class Store:
         # Preserve fingerprints for automatic requests made by the original version.
         payload = items if source == "automatic" else {"source": source, "items": items}
         fingerprint = hashlib.sha256(encode(payload).encode("utf-8")).hexdigest()
+        # Validation results, encounters and the receipt commit together. Helpers
+        # must use this connection rather than opening their own transactions.
         with self.connection(write=True) as db:
-            receipt = db.execute(
-                "SELECT fingerprint, results FROM save_requests WHERE request_id = ?", (request_id,)
-            ).fetchone()
-            if receipt:
-                if receipt["fingerprint"] != fingerprint:
-                    return {"status": "failed", "error": "request_id_conflict"}
-                results = json.loads(receipt["results"])
-                for result in results:
-                    if "id" in result and not db.execute(
-                        "SELECT 1 FROM knowledge WHERE id = ?", (result["id"],)
-                    ).fetchone():
-                        result["deleted"] = True
-                return {"status": "processed", "replayed": True, "results": results}
+            replay = self._replay_save(db, request_id, fingerprint)
+            if replay is not None:
+                return replay
             settings = self._settings(db)
             if not settings["enabled"]:
                 return {"status": "paused", "results": []}
-
-            timestamp = now()
-            seen = set()
+            timestamp, seen = now(), set()
             results = []
             for index, item in enumerate(items):
-                try:
-                    point = KnowledgePoint.model_validate(item)
-                except ValidationError as exc:
-                    errors = [
-                        {"field": ".".join(map(str, err["loc"])), "message": err["msg"]}
-                        for err in exc.errors()
-                    ]
-                    results.append({"index": index, "status": "failed", "errors": errors})
-                    continue
-                if point.kind not in settings["enabled_types"]:
-                    results.append({"index": index, "status": "skipped", "reason": "type_disabled"})
-                    continue
-                data = content_fields(point.model_dump(exclude_none=True))
-                key = tuple(data[field] for field in ("kind", "language", "title_key", "sense_key"))
-                if key in seen:
-                    results.append({"index": index, "status": "failed", "error": "duplicate_in_batch"})
-                    continue
-                seen.add(key)
-                existing = db.execute(
-                    """SELECT id, encounter_count, note, examples FROM knowledge
-                       WHERE kind = ? AND language = ? AND title_key = ? AND sense_key = ?""",
-                    key,
-                ).fetchone()
-                if existing:
-                    # Keep curated content. Refresh the latest supplied learning context.
-                    examples = existing["examples"]
-                    if existing["note"] is None and example_count(examples) < 2:
-                        combined = json.loads(examples or "[]")
-                        originals = {normalized(item["text"]) for item in combined}
-                        for example in point.examples:
-                            if normalized(example.text) not in originals and len(combined) < 5:
-                                combined.append(example.model_dump(exclude_none=True))
-                                originals.add(normalized(example.text))
-                        examples = encode(combined)
-                    db.execute(
-                        """UPDATE knowledge SET encounter_count = encounter_count + 1,
-                           last_seen_at = ?, context = COALESCE(?, context),
-                           explanation = COALESCE(NULLIF(explanation, ''), ?),
-                           examples = ?,
-                           corrected_sentence = COALESCE(corrected_sentence, ?) WHERE id = ?""",
-                        (timestamp, point.context, point.explanation, examples, point.corrected_sentence, existing["id"]),
-                    )
-                    result = {"status": "merged", "id": existing["id"],
-                              "encounter_count": existing["encounter_count"] + 1}
-                else:
-                    data.update(created_at=timestamp, last_seen_at=timestamp)
-                    columns = ", ".join(data)
-                    placeholders = ", ".join("?" for _ in data)
-                    cursor = db.execute(
-                        f"INSERT INTO knowledge ({columns}) VALUES ({placeholders})",
-                        tuple(data.values()),
-                    )
-                    result = {"status": "added", "id": cursor.lastrowid, "encounter_count": 1}
-                db.execute(
-                    "INSERT INTO encounters (record_id, request_id, occurred_at, context, source) VALUES (?, ?, ?, ?, ?)",
-                    (result["id"], request_id, timestamp, point.context, source),
-                )
+                result = self._save_point(db, item, request_id, source, timestamp,
+                                          seen, settings["enabled_types"])
                 results.append({"index": index, **result})
-            db.execute(
-                "INSERT INTO save_requests VALUES (?, ?, ?)",
-                (request_id, fingerprint, encode(results)),
-            )
+            db.execute("INSERT INTO save_requests VALUES (?, ?, ?)",
+                       (request_id, fingerprint, encode(results)))
             return {"status": "processed", "replayed": False, "results": results}
+
+    def _replay_save(self, db, request_id, fingerprint):
+        receipt = db.execute(
+            "SELECT fingerprint, results FROM save_requests WHERE request_id = ?", (request_id,)
+        ).fetchone()
+        if receipt is None:
+            return None
+        if receipt["fingerprint"] != fingerprint:
+            return {"status": "failed", "error": "request_id_conflict"}
+        results = json.loads(receipt["results"])
+        for result in results:
+            if "id" in result and not db.execute(
+                "SELECT 1 FROM knowledge WHERE id = ?", (result["id"],)
+            ).fetchone():
+                result["deleted"] = True
+        return {"status": "processed", "replayed": True, "results": results}
+
+    def _save_point(self, db, item, request_id, source, timestamp, seen, enabled_types):
+        try:
+            point = KnowledgePoint.model_validate(item)
+        except ValidationError as error:
+            return {"status": "failed", "errors": [
+                {"field": ".".join(map(str, detail["loc"])), "message": detail["msg"]}
+                for detail in error.errors()
+            ]}
+        if point.kind not in enabled_types:
+            return {"status": "skipped", "reason": "type_disabled"}
+        data = content_fields(point.model_dump(exclude_none=True))
+        key = tuple(data[field] for field in ("kind", "language", "title_key", "sense_key"))
+        if key in seen:
+            return {"status": "failed", "error": "duplicate_in_batch"}
+        seen.add(key)
+        existing = db.execute(
+            """SELECT id, encounter_count, note, examples FROM knowledge
+               WHERE kind = ? AND language = ? AND title_key = ? AND sense_key = ?""", key,
+        ).fetchone()
+        result = (self._merge_point(db, existing, point, timestamp) if existing
+                  else self._insert_point(db, data, timestamp))
+        db.execute(
+            "INSERT INTO encounters (record_id, request_id, occurred_at, context, source) VALUES (?, ?, ?, ?, ?)",
+            (result["id"], request_id, timestamp, point.context, source),
+        )
+        return result
+
+    def _merge_point(self, db, existing, point, timestamp):
+        # Keep curated content. Refresh the latest supplied learning context.
+        db.execute(
+            """UPDATE knowledge SET encounter_count = encounter_count + 1,
+               last_seen_at = ?, context = COALESCE(?, context),
+               explanation = COALESCE(NULLIF(explanation, ''), ?), examples = ?,
+               corrected_sentence = COALESCE(corrected_sentence, ?) WHERE id = ?""",
+            (timestamp, point.context, point.explanation, self._merge_examples(existing, point.examples),
+             point.corrected_sentence, existing["id"]),
+        )
+        return {"status": "merged", "id": existing["id"],
+                "encounter_count": existing["encounter_count"] + 1}
+
+    @staticmethod
+    def _merge_examples(existing, examples):
+        if existing["note"] is not None or example_count(existing["examples"]) >= 2:
+            return existing["examples"]
+        combined = json.loads(existing["examples"] or "[]")
+        originals = {normalized(item["text"]) for item in combined}
+        for example in examples:
+            if normalized(example.text) not in originals and len(combined) < 5:
+                combined.append(example.model_dump(exclude_none=True))
+                originals.add(normalized(example.text))
+        return encode(combined)
+
+    @staticmethod
+    def _insert_point(db, data, timestamp):
+        data.update(created_at=timestamp, last_seen_at=timestamp)
+        columns = ", ".join(data)
+        placeholders = ", ".join("?" for _ in data)
+        cursor = db.execute(f"INSERT INTO knowledge ({columns}) VALUES ({placeholders})", tuple(data.values()))
+        return {"status": "added", "id": cursor.lastrowid, "encounter_count": 1}
 
     def _filters(self, *, keyword=None, kind=None, language=None, status=None,
                  include_variants=False, needs_enrichment=False, record_ids=None):

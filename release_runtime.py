@@ -50,6 +50,94 @@ def healthcheck(database):
         dashboard.close()
 
 
+def serve(database):
+    # The SDK's UTF-8 wrapper can close shared stdout on shutdown. Keep a
+    # duplicate for the frozen bootstrap's final flush, without logging to stdout.
+    output_descriptor = os.dup(sys.stdout.fileno())
+    try:
+        create_server(Store(database.resolve())).run(transport="stdio")
+    finally:
+        if sys.stdout.closed:
+            sys.stdout = sys.__stdout__ = os.fdopen(output_descriptor, "w", encoding="utf-8")
+        else:
+            os.close(output_descriptor)
+
+
+def check_runtime(database):
+    healthcheck(database.resolve())
+    return {"status": "healthy"}
+
+
+def migrate(database):
+    Store(database.resolve())
+    return {"status": "ready"}
+
+
+def install_package(package, locations):
+    if not package:
+        raise InstallError("An extracted release package is required.")
+    return install(package, locations)
+
+
+def disconnect(locations):
+    remove_extension(locations)
+    return uninstall(locations)
+
+
+def installation_status(locations):
+    return {**status(locations), "extension": extension_status(locations)}
+
+
+def refresh_extension(action, result, locations):
+    if action not in ("install", "rollback") or not extension_status(locations)["installed"]:
+        return
+    try:
+        result["extension"] = connect_extension(locations)
+    except (InstallError, OSError, subprocess.TimeoutExpired) as error:
+        result["extension_warning"] = str(error)
+        print("The Beta is installed through MCP, but its native extension could not be refreshed. "
+              "Run Connect Extension.command to retry.", file=sys.stderr)
+
+
+def print_ready(result):
+    label = "Already installed" if result["status"] == "already_installed" else "Ready"
+    print(f"{label}: Language Memory {result['version']}.")
+    print("Your learning records and settings are preserved.")
+    if result.get("database_backup"):
+        print("A database backup was created before updating.")
+    print("Restart Codex and start a new conversation.")
+    print('Try: "Open the language learning page."')
+
+
+def print_disconnected(result):
+    print("Language Memory disconnected. Your records, backups and release files were kept.")
+    print(result["next_step"])
+
+
+def print_status(result):
+    print(f"Language Memory: {result['version'] or 'not installed'}")
+    checks = [("runtime_available", "Runtime")]
+    if result["extension"]["enabled"]:
+        print("Native Codex extension: connected")
+    else:
+        checks += [("mcp_registered", "MCP connection"),
+                   ("mcp_enabled", "MCP enabled"), ("skill_registered", "Skill")]
+    for key, label in checks:
+        print(f"{label}: {'ready' if result[key] else 'not active'}")
+    print(f"Learning data: {result['database']}")
+
+
+def print_result(action, result, as_json):
+    if as_json:
+        print(json.dumps(result, indent=2))
+        return
+    reporters = {
+        "install": print_ready, "rollback": print_ready, "connect-extension": print_ready,
+        "uninstall": print_disconnected, "status": print_status,
+    }
+    reporters.get(action, lambda data: print(data["status"]))(result)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Install, update or run Codex Language Memory.")
     parser.add_argument("action", choices=("install", "serve", "healthcheck", "migrate", "status", "rollback", "uninstall", "connect-extension"))
@@ -60,71 +148,22 @@ def main():
     args = parser.parse_args()
     locations = Locations.default(args.sandbox_root)
     database = args.db or Path(os.getenv("LANGUAGE_MEMORY_DB", str(locations.database))).expanduser()
+    operations = {
+        "serve": lambda: serve(database),
+        "healthcheck": lambda: check_runtime(database),
+        "migrate": lambda: migrate(database),
+        "install": lambda: install_package(args.package, locations),
+        "rollback": lambda: rollback(locations),
+        "uninstall": lambda: disconnect(locations),
+        "connect-extension": lambda: connect_extension(locations),
+        "status": lambda: installation_status(locations),
+    }
     try:
-        if args.action == "serve":
-            # The SDK's UTF-8 wrapper can close shared stdout on shutdown. Keep a
-            # duplicate for the frozen bootstrap's final flush, without logging to stdout.
-            output_descriptor = os.dup(sys.stdout.fileno())
-            try:
-                create_server(Store(database.resolve())).run(transport="stdio")
-            finally:
-                if sys.stdout.closed:
-                    sys.stdout = sys.__stdout__ = os.fdopen(output_descriptor, "w", encoding="utf-8")
-                else:
-                    os.close(output_descriptor)
+        result = operations[args.action]()
+        if result is None:  # Stdio serve must never print operation summaries.
             return
-        if args.action == "healthcheck":
-            healthcheck(database.resolve())
-            result = {"status": "healthy"}
-        elif args.action == "migrate":
-            Store(database.resolve())
-            result = {"status": "ready"}
-        elif args.action == "install":
-            if not args.package:
-                raise InstallError("An extracted release package is required.")
-            result = install(args.package, locations)
-        elif args.action == "rollback":
-            result = rollback(locations)
-        elif args.action == "uninstall":
-            remove_extension(locations)
-            result = uninstall(locations)
-        elif args.action == "connect-extension":
-            result = connect_extension(locations)
-        else:
-            result = status(locations)
-            result["extension"] = extension_status(locations)
-        if args.action in ("install", "rollback") and extension_status(locations)["installed"]:
-            try:
-                result["extension"] = connect_extension(locations)
-            except (InstallError, OSError, subprocess.TimeoutExpired) as error:
-                result["extension_warning"] = str(error)
-                print("The Beta is installed through MCP, but its native extension could not be refreshed. "
-                      "Run Connect Extension.command to retry.", file=sys.stderr)
-        if args.json:
-            print(json.dumps(result, indent=2))
-        elif args.action in ("install", "rollback", "connect-extension"):
-            label = "Already installed" if result["status"] == "already_installed" else "Ready"
-            print(f"{label}: Language Memory {result['version']}.")
-            print("Your learning records and settings are preserved.")
-            if result.get("database_backup"):
-                print("A database backup was created before updating.")
-            print("Restart Codex and start a new conversation.")
-            print('Try: "Open the language learning page."')
-        elif args.action == "uninstall":
-            print("Language Memory disconnected. Your records, backups and release files were kept.")
-            print(result["next_step"])
-        elif args.action == "status":
-            print(f"Language Memory: {result['version'] or 'not installed'}")
-            if result["extension"]["enabled"]:
-                print("Native Codex extension: connected")
-            checks = (("runtime_available", "Runtime"),) if result["extension"]["enabled"] else (
-                ("runtime_available", "Runtime"), ("mcp_registered", "MCP connection"),
-                ("mcp_enabled", "MCP enabled"), ("skill_registered", "Skill"))
-            for key, label in checks:
-                print(f"{label}: {'ready' if result[key] else 'not active'}")
-            print(f"Learning data: {result['database']}")
-        else:
-            print(result["status"])
+        refresh_extension(args.action, result, locations)
+        print_result(args.action, result, args.json)
     except (InstallError, OSError, ValueError, sqlite3.Error, subprocess.TimeoutExpired) as error:
         print(f"Language Memory: {error}", file=sys.stderr)
         raise SystemExit(1) from None

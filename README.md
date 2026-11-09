@@ -174,7 +174,7 @@ npm run build
 node --test tests/*.mjs
 ```
 
-[Beta 15 guided-study results](docs/beta15-testing.md) cover a 25-step final conversation acceptance set, including targeted reruns for issues found during development. There are now 107 Python tests and ten Node tests. [Beta 26 results](docs/beta26-testing.md) additionally cover MCP process restart, atomic review/progress writes, concurrent retries, hint retention, pause/resume, edits and deletion. [Beta 27 results](docs/beta27-testing.md) cover the native sidebar integration and verification in Codex.
+[Beta 15 guided-study results](docs/beta15-testing.md) cover a 25-step final conversation acceptance set, including targeted reruns for issues found during development. There are now 119 Python tests and 17 Node tests. [Code structure and refactor checks](docs/code-structure.md) describe the shared action dispatcher, transactional save helpers and independently tested frontend loading flow. [Beta 26 results](docs/beta26-testing.md) additionally cover MCP process restart, atomic review/progress writes, concurrent retries, hint retention, pause/resume, edits and deletion. [Beta 27 results](docs/beta27-testing.md) cover the native sidebar integration and verification in Codex.
 
 [Beta 14 acceptance results](docs/beta14-testing.md) cover 35 real Codex turns, five replays of model-generated saves through the installed runtime, 86 Python tests, five JavaScript tests, and the packaged installation lifecycle.
 

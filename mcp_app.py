@@ -11,7 +11,7 @@ from typing import Any, Literal
 from mcp.types import Icon, ToolAnnotations
 from pydantic import ValidationError
 
-from dashboard import dispatch
+from dashboard_actions import dispatch
 from exports import ExportError, ExportRequest, build_export, export_scope
 
 APP_URI = "ui://language-memory/sidebar-v1.html"
@@ -35,45 +35,53 @@ class AppTransport:
         try:
             if len(json.dumps(payload).encode()) > 524288:
                 raise ValueError("Request too large")
-            if route == "api":
-                # Deletion stays available through the explicit conversational tool.
-                if payload.get("action") == "points/delete":
-                    raise ValueError("Unsupported app action")
-                data = dispatch(self.store, payload)
-            elif route == "export":
-                selection = ExportRequest.model_validate(payload)
-                exported = build_export(self.store, selection)
-                if len(exported.data) > 24 * 1024 * 1024:
-                    return {"status": 400, "data": {"error": "Export too large; select a shorter date range."}}
-                token = secrets.token_urlsafe(24)
-                with self.lock:
-                    # Keep only receipt metadata, not large files, awaiting acknowledgement.
-                    while len(self.pending_exports) >= 16:
-                        self.pending_exports.pop(next(iter(self.pending_exports)))
-                    self.pending_exports[token] = (selection, exported.receipt)
-                return {"status": 200, "file": {
-                    "blob": base64.b64encode(exported.data).decode(), "mime_type": exported.mime_type,
-                    "filename": exported.filename, "count": exported.count, "receipt": token,
-                }}
-            elif route == "export_complete":
-                if set(payload) != {"receipt"} or not isinstance(payload["receipt"], str):
-                    raise ValueError("Invalid receipt")
-                with self.lock:
-                    pending = self.pending_exports.get(payload["receipt"])
-                    if pending:
-                        selection, receipt = pending
-                        self.store.export_receipt(export_scope(selection), receipt)
-                        del self.pending_exports[payload["receipt"]]
-                data = {"status": "ok"}
-            else:
-                raise ValueError("Unknown route")
-            return {"status": 200, "data": data}
+            handlers = {
+                "api": self._api,
+                "export": self._export,
+                "export_complete": self._complete_export,
+            }
+            if not isinstance(payload, dict) or route not in handlers:
+                raise ValueError("Invalid request")
+            return handlers[route](payload)
         except ExportError as error:
             return {"status": 400, "data": {"error": str(error)}}
         except (ValueError, TypeError, KeyError, ValidationError):
             return {"status": 400, "data": {"error": "invalid_request"}}
         except sqlite3.Error:
             return {"status": 503, "data": {"error": "database_unavailable"}}
+
+    def _api(self, payload):
+        # Deletion stays available through the explicit conversational tool.
+        if payload.get("action") == "points/delete":
+            raise ValueError("Unsupported app action")
+        return {"status": 200, "data": dispatch(self.store, payload)}
+
+    def _export(self, payload):
+        selection = ExportRequest.model_validate(payload)
+        exported = build_export(self.store, selection)
+        if len(exported.data) > 24 * 1024 * 1024:
+            raise ExportError("Export too large; select a shorter date range.")
+        token = secrets.token_urlsafe(24)
+        with self.lock:
+            # Keep only receipt metadata, not large files, awaiting acknowledgement.
+            while len(self.pending_exports) >= 16:
+                self.pending_exports.pop(next(iter(self.pending_exports)))
+            self.pending_exports[token] = (selection, exported.receipt)
+        return {"status": 200, "file": {
+            "blob": base64.b64encode(exported.data).decode(), "mime_type": exported.mime_type,
+            "filename": exported.filename, "count": exported.count, "receipt": token,
+        }}
+
+    def _complete_export(self, payload):
+        if set(payload) != {"receipt"} or not isinstance(payload["receipt"], str):
+            raise ValueError("Invalid receipt")
+        with self.lock:
+            pending = self.pending_exports.get(payload["receipt"])
+            if pending:
+                selection, receipt = pending
+                self.store.export_receipt(export_scope(selection), receipt)
+                del self.pending_exports[payload["receipt"]]
+        return {"status": 200, "data": {"status": "ok"}}
 
 
 def register_app(server, store):

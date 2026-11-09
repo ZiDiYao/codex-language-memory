@@ -65,6 +65,8 @@ class AppTransportTests(unittest.TestCase):
 
     def test_bridge_rejects_unrecognized_actions_and_invalid_payloads(self):
         for route, payload in [
+            ("api", None), ("api", []), ("api", "invalid"),
+            ("api", {"action": [], "arguments": {}}),
             ("api", {"action": "shell", "arguments": {"command": "anything"}}),
             ("api", {"action": "points/delete", "arguments": {"record_id": self.record_id}}),
             ("api", {"action": "settings/update", "arguments": {"ui_language": "invalid"}}),
