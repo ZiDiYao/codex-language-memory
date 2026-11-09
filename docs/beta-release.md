@@ -18,9 +18,8 @@ previous packaged release. **Uninstall.command** removes this integration's MCP 
 and Skill link, retaining records, backups and release files. Reinstall to reconnect.
 No action restores an old database automatically or silently deletes learning data.
 
-The repository is currently private: downloading from its Releases page requires
-repository access. A downloaded ZIP can be distributed to authorized Beta testers
-without giving them GitHub credentials or embedding any credentials in the package.
+The repository and prerelease downloads are public. The package contains no
+GitHub credentials, personal learning database or account configuration.
 
 ## Signing boundary
 
@@ -93,7 +92,7 @@ npm run build
 .venv/bin/python -m unittest discover -s tests -v
 node --test tests/*.mjs
 .venv/bin/python scripts/build_beta.py
-.venv/bin/python scripts/test_beta.py dist/language-memory-0.2.0-beta.27-macos-arm64.zip
+.venv/bin/python scripts/test_beta.py dist/language-memory-0.2.0-beta.29-macos-arm64.zip
 ```
 
 Change `VERSION` for the next Beta. The builder copies that version into the packaged

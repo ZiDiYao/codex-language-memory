@@ -36,5 +36,5 @@ Browser checks used 47 temporary records, separate from personal learning data:
 English/French and type filtering, debounced `mi` search, loading the next 20
 records on scroll, note editing, mastery persistence after reload, export preview
 and JSON download. No browser console errors were observed. Native MCP transport
-was tested programmatically; this refactor was not installed over the personal
-Beta or published as a new packaged release.
+was tested programmatically. The subsequent installed upgrade is documented in
+[Beta 29 verification](beta29-testing.md).
