@@ -6,7 +6,7 @@ Recording is automatic for all languages and enabled by default on new installat
 
 ## Install the local Beta
 
-Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.15), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
+Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.16), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
 
 To upgrade, download the next Beta and run its **Install.command**. The installer validates the package, tests its runtime, backs up the database and switches versions while preserving learning records and settings. Repeating the same installation is safe. It also migrates the earlier source-checkout installation automatically.
 
@@ -75,6 +75,8 @@ The server binds only to loopback and uses a random URL token. The page shares t
 ```
 
 ## Export
+
+The export dialog selects groups by language, learning status, type and date range before choosing content and file format. It has no keyword search and does not inherit the history view's search term.
 
 The page and `export_points` tool support PDF, Excel (`.xlsx`), Word (`.docx`), a Notion import ZIP, and JSON for direct reading. Codex can also read records through `find_points` without generating a file. Tool exports are saved in an `exports` directory beside the database; browser exports download normally. No data is uploaded automatically.
 

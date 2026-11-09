@@ -79,7 +79,7 @@ export class ExportDialog {
     if (read("content") === "sections" && !fields.length) throw new Error("exportFieldsRequired");
     return {
       language: read("language") || null, status: read("status") || null,
-      keyword: this.pick("search").value.trim() || null, include_variants: true,
+      include_variants: true,
       kinds: this.kinds.size ? [...this.kinds] : null, date_field: read("date-field"),
       ...exportRange(read("period"), this.pick("from").value, this.pick("through").value),
       content: read("content"), fields, include_metadata: this.pick("metadata").checked,
@@ -95,7 +95,6 @@ export class ExportDialog {
     this.relabel();
     for (const [name, value] of Object.entries({language:current.language || "", status:"", "date-field":"created_at", period:"all", content:"notes"}))
       this.pickers[name].setValue(value);
-    this.pick("search").value = current.keyword || "";
     this.preview = null;
     this.showStep(false);
     this.reflect();
