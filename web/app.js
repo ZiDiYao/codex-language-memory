@@ -4,7 +4,7 @@ import { enter, reveal, conceal, openDialog, closeDialog, disclosure } from "./m
 
 import { EntryEditor } from "./entry-editor.js";
 import { RecordFeed } from "./record-feed.js";
-import { languageSelection } from "./history-model.js";
+import { compactTitle, languageSelection } from "./history-model.js";
 import { ExportDialog } from "./export-dialog.js";
 import { request, saveDownload } from "./transport.js";
 
@@ -279,9 +279,11 @@ function card(record, expanded = false) {
   heading.append(title, mastery, element("span", undefined, "entry-chevron"));
   summary.append(heading, preview, lastSeen);
   function renderSummary(point) {
-    title.textContent = point.note_title || t("untitledNote");
+    const fullTitle = point.note_title || t("untitledNote");
+    title.textContent = compactTitle(fullTitle);
+    title.title = fullTitle;
     title.lang = point.language;
-    summary.setAttribute("aria-label", title.textContent);
+    summary.setAttribute("aria-label", fullTitle);
     statusButtons.forEach((button) => {
       button.setAttribute("aria-pressed", String(button.dataset.status === point.status));
     });

@@ -564,7 +564,7 @@ input[role="switch"]:checked::after {
 .history-entry summary::-webkit-details-marker { display: none; }
 .history-entry summary:focus-visible { outline: 2px solid var(--muted); border-radius: 12px; }
 .entry-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto 10px; align-items: center; gap: 10px; }
-.entry-heading h3 { font-size: 16px; font-weight: 550; overflow-wrap: anywhere; }
+.entry-heading h3 { min-width: 0; font-size: 16px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .entry-status-group { position: relative; isolation: isolate; display: inline-grid; grid-template-columns: repeat(2, 1fr); gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
 .entry-status-group::before { content: ""; position: absolute; inset: 2px auto 2px 2px; width: calc((100% - 6px) / 2); border-radius: 5px; background: var(--hover); box-shadow: 0 1px 3px #0002; pointer-events: none; transform: translateX(0); transition: transform 260ms var(--ease); }
 .entry-status-group:has([data-status="mastered"][aria-pressed="true"])::before { transform: translateX(calc(100% + 2px)); }
