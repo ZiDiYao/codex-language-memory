@@ -6,7 +6,7 @@ Recording is automatic for all languages and enabled by default on new installat
 
 ## Install the local Beta
 
-Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.13), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
+Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.14), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
 
 To upgrade, download the next Beta and run its **Install.command**. The installer validates the package, tests its runtime, backs up the database and switches versions while preserving learning records and settings. Repeating the same installation is safe. It also migrates the earlier source-checkout installation automatically.
 
@@ -86,7 +86,7 @@ PDF export embeds a local TrueType font that covers the exported characters. mac
 
 ## Capture decisions
 
-Codex interprets the conversation and generates the contextual definition, explanation, and examples before saving. New captures require an explanation and two to five distinct example sentences. Codex adds common collocations or natural usage, a relevant pitfall when useful, and example translations in the preferred explanation language. Duplicate example originals are rejected. The backend validates and stores that content; it does not make a second AI call. For older incomplete records, Codex can retrieve `needs_enrichment=true` records and fill a missing explanation or append examples through `update_point` without adding an encounter or changing mastery. Existing examples and user-edited notes are preserved; the quality checks do not restrict freely edited notes. The page itself does not run a background AI worker.
+Codex interprets the conversation and generates the contextual definition, explanation, and examples before saving. New captures require an explanation and two to five distinct example sentences. Codex adds common collocations or natural usage, a relevant pitfall when useful, and example translations in the preferred explanation language. Duplicate example originals are rejected. Saved notes omit routine source links and originality footers unless attribution is requested. The backend validates and stores that content; it does not make a second AI call. For older incomplete records, Codex can retrieve `needs_enrichment=true` records and fill a missing explanation or append examples through `update_point` without adding an encounter or changing mastery. Existing examples and user-edited notes are preserved; the quality checks do not restrict freely edited notes. The page itself does not run a background AI worker.
 
 | Request | What to capture |
 | --- | --- |
@@ -136,6 +136,8 @@ Paused recording blocks new saves, including explicit ones. Queries, review, edi
 .venv/bin/python -m unittest discover -s tests -v
 node --test tests/*.mjs
 ```
+
+[Beta 14 acceptance results](docs/beta14-testing.md) cover 35 real Codex turns, five replays of model-generated saves through the installed runtime, 86 Python tests, five JavaScript tests, and the packaged installation lifecycle.
 
 The Python tests use isolated databases and cover persistence, query filters, language separation, sense deduplication, partial batches, rollback, concurrent idempotent retries, deletion without resurrection, legacy preference migration, settings validation, local HTTP protections, cursor pagination under concurrent inserts, legacy mastery migration, generated-content requirements, cross-process change detection, complete filtered exports, multilingual Office/Notion content, literal spreadsheet formulas, PDF text/font errors, and an MCP session restart with review/update/delete/export. Learning-model checks cover exact scheduling agreement with upstream FSRS across successful and failed recalls, assisted/skipped attempts, review retries and rollback, chronological prediction scoring, history pagination, language-scoped preferences, deletion cascades, legacy history gaps and clock reversal. These verify software behavior, not educational effectiveness. Node tests check translation completeness and matching placeholders for all six UI locales, language selection, and inclusive local date ranges across daylight-saving changes. Export tests verify date/type filtering, preview counts, and field exclusion in all five formats.
 
