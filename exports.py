@@ -81,6 +81,24 @@ class ExportFile:
     mime_type: str
     data: bytes
     count: int
+    receipt: dict
+
+
+def export_scope(selection):
+    scope = selection.model_dump(mode="json", exclude={"format", "start_at", "end_at", "include_metadata"})
+    kind = scope.pop("kind")
+    scope["kinds"] = sorted([kind] if kind else (scope["kinds"] or []))
+    for key in ("fields", "record_ids"):
+        scope[key] = sorted(scope[key] or [])
+    return json.dumps(scope, sort_keys=True, separators=(",", ":"))
+
+
+def export_history(store, selection):
+    return {"last_export": store.export_receipt(export_scope(selection))}
+
+
+def record_export(store, selection, result):
+    store.export_receipt(export_scope(selection), result.receipt)
 
 
 COLUMNS = [
@@ -338,6 +356,7 @@ def notion_archive(records, columns=COLUMNS, include_metadata=True):
 
 
 def build_export(store, request: ExportRequest) -> ExportFile:
+    as_of = datetime.now(timezone.utc)
     records = store.export_records(**request.filters())
     if not records:
         raise ExportError("exportEmpty")
@@ -352,8 +371,12 @@ def build_export(store, request: ExportRequest) -> ExportFile:
     extension, mime_type, render = formats[request.format]
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     source = "-captured" if request.content == "sections" else ""
+    through = min(request.end_at, as_of) if request.end_at else as_of
+    receipt = {"exported_at": as_of.isoformat(), "through_at": through.isoformat(),
+               "start_at": request.start_at.isoformat() if request.start_at else None,
+               "format": request.format, "count": len(records)}
     return ExportFile(f"language-memory-{stamp}{source}.{extension}", mime_type,
-                      render(records, columns, request.metadata_enabled), len(records))
+                      render(records, columns, request.metadata_enabled), len(records), receipt)
 
 
 def save_export(store, request):
@@ -364,4 +387,5 @@ def save_export(store, request):
     with path.open("xb") as stream:
         path.chmod(0o600)
         stream.write(result.data)
+    record_export(store, request, result)
     return {"path": str(path.resolve()), "format": request.format, "count": result.count, "mime_type": result.mime_type}

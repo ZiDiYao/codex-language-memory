@@ -82,7 +82,7 @@ const explanationLanguagePicker = new Picker($("#explanation-language"), {
 });
 const exportDialog = new ExportDialog($("#export-dialog"), {
   t, api, languageName, download, flushEditors, feedback, errorKey,
-  getFilters: filters, getCatalog: () => catalog,
+  getFilters: filters, getCatalog: () => catalog, getLocale: () => locale,
 });
 
 function renderLanguagePreferences() {

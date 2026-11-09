@@ -212,6 +212,11 @@ CREATE TABLE IF NOT EXISTS learner_preferences (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS export_receipts (
+    scope TEXT PRIMARY KEY,
+    data TEXT NOT NULL
+);
+
 -- A pre-upgrade page may still hold a connection with foreign keys disabled.
 CREATE TRIGGER IF NOT EXISTS learning_evidence_deleted AFTER DELETE ON knowledge
 BEGIN
@@ -319,6 +324,14 @@ class Store:
         with self.connection() as db:
             row = db.execute("SELECT content, preferences FROM change_versions WHERE id = 1").fetchone()
             return dict(row)
+
+    def export_receipt(self, scope, receipt=None):
+        with self.connection(write=receipt is not None) as db:
+            if receipt is not None:
+                db.execute("INSERT INTO export_receipts (scope, data) VALUES (?, ?) "
+                           "ON CONFLICT(scope) DO UPDATE SET data = excluded.data", (scope, encode(receipt)))
+            row = db.execute("SELECT data FROM export_receipts WHERE scope = ?", (scope,)).fetchone()
+            return json.loads(row[0]) if row else None
 
     def recording(self, enabled: bool | None = None) -> dict:
         with self.connection(write=enabled is not None) as db:

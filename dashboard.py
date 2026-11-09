@@ -13,7 +13,8 @@ from urllib.parse import urlsplit
 
 from pydantic import Field, ValidationError
 
-from exports import ExportError, ExportRequest, ExportSelection, build_export, preview_export
+from exports import (ExportError, ExportRequest, ExportSelection, build_export, preview_export,
+                     export_history, record_export)
 
 from store import (Kind, Language, Limit, Patch, RecordId, Revision, SettingsPatch,
                    Status, Store, StrictModel, Title)
@@ -49,6 +50,7 @@ ASSETS = {
     "history-model.js": ("history-model.js", "text/javascript; charset=utf-8"),
     "export-dialog.js": ("export-dialog.js", "text/javascript; charset=utf-8"),
     "export-model.js": ("export-model.js", "text/javascript; charset=utf-8"),
+    "date-range.js": ("date-range.js", "text/javascript; charset=utf-8"),
     "picker.js": ("picker.js", "text/javascript; charset=utf-8"),
     "i18n.js": ("i18n.js", "text/javascript; charset=utf-8"),
     "style.css": ("style.css", "text/css; charset=utf-8"),
@@ -125,8 +127,15 @@ class Dashboard:
                             raise ValueError("Invalid body size")
                         request = json.loads(self.rfile.read(length))
                         if route == "export":
-                            exported = build_export(store, ExportRequest.model_validate(request))
+                            selection = ExportRequest.model_validate(request)
+                            exported = build_export(store, selection)
                             self.respond(200, exported.data, exported.mime_type, exported.filename, exported.count)
+                            # Only remember a successfully written response. A browser may
+                            # still cancel saving it; the server cannot inspect its disk.
+                            try:
+                                record_export(store, selection, exported)
+                            except sqlite3.Error:
+                                pass  # The delivered file remains valid if history is unavailable.
                             return
                         result = dispatch(store, request)
                     except ExportError as error:
@@ -173,6 +182,8 @@ def dispatch(store, request):
         return store.languages()
     if action == "exports/preview":
         return preview_export(store, ExportSelection.model_validate(arguments))
+    if action == "exports/history":
+        return export_history(store, ExportSelection.model_validate(arguments))
     if action == "points/query":
         return store.query(**Query.model_validate(arguments).model_dump())
     if action == "points/read":

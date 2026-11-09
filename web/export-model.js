@@ -1,4 +1,31 @@
 /** Inclusive local calendar dates become an exclusive UTC end boundary. */
+export function localDate(date = new Date()) {
+  return `${String(date.getFullYear()).padStart(4, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+export function calendarDate(value) {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(0);
+  date.setFullYear(year, month - 1, day);
+  date.setHours(12, 0, 0, 0);
+  return date;
+}
+
+export function calendarDays(month) {
+  const first = calendarDate(month.slice(0, 7) + "-01");
+  first.setDate(first.getDate() - (first.getDay() + 6) % 7);
+  return Array.from({length: 42}, (_, offset) => {
+    const date = new Date(first);
+    date.setDate(first.getDate() + offset);
+    return localDate(date);
+  });
+}
+
+export function selectDate(from, date, endpoint) {
+  if (endpoint === "start" || !from) return {from: date, through: ""};
+  return date < from ? {from: date, through: from} : {from, through: date};
+}
+
 export function exportRange(period, from = "", through = "", now = new Date()) {
   if (period === "all") return {};
   function date(value) {

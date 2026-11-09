@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 import tomlkit
 from mcp import ClientSession, StdioServerParameters
@@ -59,7 +59,7 @@ async def exercise(archive):
         def snapshot():
             with sqlite3.connect(locations.database) as db:
                 return {name: db.execute(f"SELECT * FROM {name} ORDER BY 1").fetchall() for name in (
-                    "knowledge", "settings", "capture_preferences", "encounters", "review_events", "memory_states", "learner_preferences")}
+                    "knowledge", "settings", "capture_preferences", "encounters", "review_events", "memory_states", "learner_preferences", "export_receipts")}
 
         # The fixture uses the same executable with an earlier package version. It tests
         # release switching, not compatibility with an unreleased historical executable.
@@ -105,7 +105,7 @@ async def exercise(archive):
             page = await call(session, "open_memory_page")
             with urlopen(page["url"]) as response:
                 assert "Language memory" in response.read().decode()
-            for asset in ("entry-editor.js", "history-model.js", "export-dialog.js", "export-model.js"):
+            for asset in ("entry-editor.js", "history-model.js", "export-dialog.js", "export-model.js", "date-range.js"):
                 with urlopen(page["url"] + asset) as response:
                     assert response.status == 200 and response.read()
             point = (await call(session, "find_points"))["records"][0]
@@ -134,6 +134,12 @@ async def exercise(archive):
                 assert export["count"] == 2 and export["format"] == kind, export
                 assert Path(export["path"]).is_file()
             checks.append("Frozen MCP exposes 16 tools and saves multilingual data, reviews, preferences, page assets and all five exports")
+            with urlopen(Request(page["url"] + "api", data=json.dumps({
+                "action": "exports/history", "arguments": {},
+            }).encode(), headers={"Content-Type": "application/json", "X-Language-Memory": "1"})) as response:
+                receipt = json.load(response)["last_export"]
+                assert receipt["count"] == 2 and receipt["format"] == "json" and receipt["through_at"]
+            checks.append("Calendar assets and shared export history are available in the frozen page; receipts survive release switching")
             before = snapshot()
             updated = command(package, "Install.command")
             assert updated["status"] == "updated" and updated["version"] == metadata["version"]

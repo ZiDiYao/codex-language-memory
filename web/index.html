@@ -173,40 +173,20 @@
         </button>
       </div>
       <form id="export-filters">
-        <p class="help" data-i18n="exportFilterHelp"></p>
+        <div id="export-history" class="export-history" role="status"><strong id="export-history-title"></strong><small id="export-history-detail"></small></div>
         <div class="export-grid">
           <div><span class="field-label" data-i18n="notebook"></span><div id="export-language"></div></div>
           <div><span class="field-label" data-i18n="status"></span><div id="export-status"></div></div>
         </div>
         <span class="field-label" data-i18n="kind"></span>
         <div id="export-kinds" class="type-tabs"></div>
-        <div class="export-grid">
-          <div><span class="field-label" data-i18n="exportDateBasis"></span><div id="export-date-field"></div></div>
-          <div><span class="field-label" data-i18n="exportPeriod"></span><div id="export-period"></div></div>
-        </div>
-        <div id="export-dates" class="export-grid" hidden>
-          <label><span class="field-label" data-i18n="exportFrom"></span><input id="export-from" type="date"/></label>
-          <label><span class="field-label" data-i18n="exportThrough"></span><input id="export-through" type="date"/></label>
-        </div>
-        <p class="help" data-i18n="exportDateHelp"></p>
-        <div class="export-content"><span class="field-label" data-i18n="exportContent"></span><div id="export-content"></div></div>
-        <fieldset id="export-fields" class="type-grid" hidden>
-          <legend class="sr-only" data-i18n="exportContent"></legend>
-          <label class="choice"><input type="checkbox" name="export-field" value="meaning" checked/><span data-i18n="exportMeaning"></span></label>
-          <label class="choice"><input type="checkbox" name="export-field" value="explanation" checked/><span data-i18n="explanation"></span></label>
-          <label class="choice"><input type="checkbox" name="export-field" value="examples" checked/><span data-i18n="examples"></span></label>
-          <label class="choice"><input type="checkbox" name="export-field" value="translations" checked/><span data-i18n="exportTranslations"></span></label>
-          <label class="choice"><input type="checkbox" name="export-field" value="context"/><span data-i18n="context"></span></label>
-          <label class="choice"><input type="checkbox" name="export-field" value="corrected_sentence"/><span data-i18n="corrected"></span></label>
-        </fieldset>
-        <p id="export-source-help" class="help" data-i18n="exportCapturedHelp" hidden></p>
-        <label class="choice export-metadata"><input id="export-metadata" type="checkbox"/><span data-i18n="exportMetadata"></span></label>
+        <div class="export-date-range"><span class="field-label" data-i18n="exportRangeLabel"></span><div id="export-range"></div></div>
         <button id="export-next" class="export-next" type="submit" data-i18n="exportChooseFormat"></button>
       </form>
       <section id="export-formats" hidden>
       <button id="export-back" type="button" class="subtle" data-i18n="exportBack"></button>
       <h3 id="export-selection-title" tabindex="-1"></h3>
-      <p id="export-selection-content" class="help"></p>
+      <p id="export-selection-range" class="help"></p>
       <p id="export-selection-preview" class="help"></p>
       <div class="export-options">
         <button data-format="pdf">PDF <span>.pdf</span></button>

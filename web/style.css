@@ -554,13 +554,10 @@ summary[aria-expanded="true"] .entry-last-seen { display: none; }
 .entry-footer .help { flex: 1; margin: 0; }
 .export-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
 .export-grid input { width: 100%; min-width: 0; }
-.export-content { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
-.export-metadata { margin-top: 12px; font-size: 12px; color: var(--muted); }
 .export-next { width: 100%; margin-top: 16px; background: var(--text); color: var(--bg); }
 .export-next:hover:not(:disabled) { background: var(--text); opacity: .88; }
 #export-back { padding-left: 0; border-color: transparent; margin: 10px 0; color: var(--muted); }
 #export-selection-preview { overflow-wrap: anywhere; }
-#export-fields { font-size: 12px; }
 @media (max-width: 380px) { .export-grid { grid-template-columns: 1fr; } }
 [hidden] {
   display: none !important;
@@ -599,3 +596,28 @@ summary[aria-expanded="true"] .entry-last-seen { display: none; }
     scroll-behavior: auto !important;
   }
 }
+
+.export-history { padding: 12px 14px; margin: 6px 0 18px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); font-size: 12px; }
+.export-history.has-export { background: var(--surface); color: var(--text); border-left: 3px solid var(--muted); }
+.export-history strong { display: block; font-weight: 500; }
+.export-history small { display: block; margin-top: 5px; color: var(--muted); }
+.export-date-range { margin-top: 20px; }
+.date-trigger { width: 100%; text-align: left; }
+.range-calendar { margin-top: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.range-endpoints { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--muted); }
+.range-endpoints button { flex: 1; font-size: 12px; padding: 8px; background: transparent; }
+.range-endpoints button[aria-pressed="true"] { background: var(--hover); color: var(--text); }
+.calendar-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.calendar-heading strong { font-size: 13px; font-weight: 500; }
+.calendar-heading button { border: 0; background: transparent; padding: 3px 10px; font-size: 22px; }
+.calendar-weekdays, .calendar-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.calendar-weekdays { text-align: center; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.calendar-days button { position: relative; min-width: 0; border: 0; padding: 8px 0; border-radius: 6px; background: transparent; font-size: 12px; }
+.calendar-days .outside-month { color: var(--muted); opacity: .55; }
+.calendar-days .in-range { background: var(--hover); border-radius: 0; }
+.calendar-days button[aria-pressed="true"] { background: var(--text); color: var(--bg); opacity: 1; }
+.calendar-days button[aria-current="date"] { text-decoration: underline; text-underline-offset: 3px; }
+.calendar-days .last-export-day::after { content: ""; position: absolute; width: 4px; height: 4px; border-radius: 50%; background: currentColor; bottom: 2px; left: calc(50% - 2px); }
+.calendar-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+.calendar-legend::before { content: "•"; padding-right: 5px; }
+.calendar-clear { margin-left: auto; font-size: 11px; border: 0; background: transparent; padding: 5px 8px; }

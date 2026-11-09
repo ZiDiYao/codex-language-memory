@@ -6,7 +6,7 @@ Recording is automatic for all languages and enabled by default on new installat
 
 ## Install the local Beta
 
-Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.16), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
+Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases/tag/v0.2.0-beta.17), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
 
 To upgrade, download the next Beta and run its **Install.command**. The installer validates the package, tests its runtime, backs up the database and switches versions while preserving learning records and settings. Repeating the same installation is safe. It also migrates the earlier source-checkout installation automatically.
 
@@ -76,7 +76,9 @@ The server binds only to loopback and uses a random URL token. The page shares t
 
 ## Export
 
-The export dialog selects groups by language, learning status, type and date range before choosing content and file format. It has no keyword search and does not inherit the history view's search term.
+The export dialog selects groups by language, learning status, type and date added. A collapsible calendar selects an inclusive start/end range in two clicks, with month navigation and keyboard controls. The page always exports complete editable notes, then asks for the file format. It has no keyword search or content selector and does not inherit the history view's search term.
+
+The highlighted last-export cutoff is stored in SQLite for the same filters and marked on the calendar. It also shows the start date, record count and format, so a partial range is not presented as complete earlier coverage. Previews, empty selections and rendering failures do not advance it. Browser history is recorded after writing the download response; Codex file exports are recorded after writing the file. The browser may still cancel saving a delivered response. Earlier Beta exports were not tracked and are not reconstructed. A future end date is capped at the actual export snapshot time.
 
 The page and `export_points` tool support PDF, Excel (`.xlsx`), Word (`.docx`), a Notion import ZIP, and JSON for direct reading. Codex can also read records through `find_points` without generating a file. Tool exports are saved in an `exports` directory beside the database; browser exports download normally. No data is uploaded automatically.
 
@@ -149,7 +151,7 @@ Paused recording blocks new saves, including explicit ones. Queries, review, edi
 node --test tests/*.mjs
 ```
 
-[Beta 15 guided-study results](docs/beta15-testing.md) cover a 25-step final conversation acceptance set, including targeted reruns for issues found during development. There are now 91 Python tests and five Node tests.
+[Beta 15 guided-study results](docs/beta15-testing.md) cover a 25-step final conversation acceptance set, including targeted reruns for issues found during development. There are now 95 Python tests and seven Node tests.
 
 [Beta 14 acceptance results](docs/beta14-testing.md) cover 35 real Codex turns, five replays of model-generated saves through the installed runtime, 86 Python tests, five JavaScript tests, and the packaged installation lifecycle.
 
