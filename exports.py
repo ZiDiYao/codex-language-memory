@@ -16,7 +16,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from pydantic import AwareDatetime, Field, model_validator
 
-from store import Kind, Language, RecordIds, Status, StrictModel, Title
+from store import Kind, Language, RecordIds, SceneName, Status, StrictModel, Title
 
 ExportFormat = Literal["pdf", "xlsx", "docx", "notion", "json"]
 
@@ -27,6 +27,7 @@ ExportField = Literal["meaning", "explanation", "examples", "translations", "con
 class ExportSelection(StrictModel):
     keyword: Title | None = None
     kind: Kind | None = None
+    scene: SceneName | None = None
     language: Language | None = None
     status: Status | None = None
     include_variants: bool = True
@@ -86,6 +87,9 @@ class ExportFile:
 
 def export_scope(selection):
     scope = selection.model_dump(mode="json", exclude={"format", "start_at", "end_at", "include_metadata"})
+    # Preserve pre-scene receipts for exports without a scene filter.
+    if scope.get("scene") is None:
+        scope.pop("scene", None)
     kind = scope.pop("kind")
     scope["kinds"] = sorted([kind] if kind else (scope["kinds"] or []))
     for key in ("fields", "record_ids"):

@@ -6,13 +6,15 @@ from typing import Annotated, Callable
 from pydantic import Field
 
 from exports import ExportSelection, export_history, preview_export
-from store import (Kind, Language, Patch, RecordId, Revision, SettingsPatch,
+import speech
+from store import (Kind, Language, Patch, RecordId, Revision, SceneName, SettingsPatch,
                    Status, Store, StrictModel, Title)
 
 
 class Query(StrictModel):
     keyword: Title | None = None
     kind: Kind | None = None
+    scene: SceneName | None = None
     language: Language | None = None
     status: Status | None = None
     limit: Annotated[int, Field(ge=1)] = 20
@@ -32,6 +34,12 @@ class PointReference(StrictModel):
     record_id: RecordId
 
 
+class SceneScope(StrictModel):
+    language: Language | None = None
+    kind: Kind | None = None
+    include_variants: bool = False
+
+
 @dataclass(frozen=True)
 class Action:
     arguments: type[StrictModel]
@@ -44,10 +52,13 @@ class Action:
 # Keep the allowlist, argument schema and operation together. No arbitrary Store
 # method names or paths from a client are ever executed.
 ACTIONS = {
+    "speech/play": Action(PointReference, lambda store, point: speech.play(store, point.record_id)),
+    "speech/status": Action(StrictModel, lambda store, _: speech.status()),
     "changes/read": Action(StrictModel, lambda store, _: store.versions()),
     "settings/read": Action(StrictModel, lambda store, _: store.settings()),
     "settings/update": Action(SettingsPatch, lambda store, patch: store.settings(patch)),
     "languages/list": Action(StrictModel, lambda store, _: store.languages()),
+    "scenes/list": Action(SceneScope, lambda store, scope: store.scenes(**scope.model_dump())),
     "exports/preview": Action(ExportSelection, preview_export),
     "exports/history": Action(ExportSelection, export_history),
     "points/query": Action(Query, lambda store, query: store.query(**query.model_dump())),

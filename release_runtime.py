@@ -22,7 +22,7 @@ def healthcheck(database):
 
     store = Store(database)
     tools = asyncio.run(create_server(store).list_tools())
-    if len(tools) != 23:
+    if len(tools) != 24 or not {"list_scenes", "find_points", "save_points"}.issubset({tool.name for tool in tools}):
         raise InstallError("Unexpected MCP tool set")
     from mcp_app import APP_FILE
     if not APP_FILE.is_file():
@@ -35,9 +35,12 @@ def healthcheck(database):
         saved = sample.save("runtime-healthcheck", [{
             "kind": "word", "language": "en", "title": "approach", "sense_key": "method",
             "meaning": "A way of doing something.", "explanation": "A countable noun describing a method.",
+            "scenes": ["Work & projects", "Problem solving"],
             "examples": [{"text": "Try a new approach."}, {"text": "This approach saves time."}],
         }])
         sample.record_review(saved["results"][0]["id"], "runtime-review-check", Review(result="correct"))
+        if sample.scenes(language="en")["total"] != 1 or len(sample.query(scene="Problem solving", kind="word")["records"]) != 1:
+            raise InstallError("Scene classification health check failed")
         for format_name in ("pdf", "docx", "xlsx", "notion", "json"):
             result = build_export(sample, ExportRequest(format=format_name))
             if result.count != 1 or not result.data:

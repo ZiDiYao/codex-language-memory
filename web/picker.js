@@ -89,9 +89,9 @@ export class Picker {
     const focusedIndex = [...this.list.children].indexOf(document.activeElement);
     this.button.setAttribute("aria-label", this.label);
     this.list.setAttribute("aria-label", this.label);
-    this.button.textContent =
-      this.options.find((option) => option.value === this.value)?.label ||
-      this.label;
+    const selectedLabel = document.createElement("span");
+    selectedLabel.textContent = this.options.find((option) => option.value === this.value)?.label || this.label;
+    this.button.replaceChildren(selectedLabel);
     this.list.replaceChildren(
       ...this.options.map((option) => {
         const button = document.createElement("button");

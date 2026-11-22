@@ -2,7 +2,7 @@
 const running = new WeakMap();
 const preference = matchMedia("(prefers-reduced-motion: reduce)");
 
-export async function animate(node, frames, duration = 180, onFrame) {
+export async function animate(node, frames, duration = 180, onFrame, delay = 0) {
   running.get(node)?.cancel();
   if (preference.matches || !node.animate) {
     running.delete(node);
@@ -11,6 +11,8 @@ export async function animate(node, frames, duration = 180, onFrame) {
   }
   const animation = node.animate(frames, {
     duration,
+    delay,
+    fill: "backwards",
     easing: "cubic-bezier(.2,.8,.2,1)",
   });
   running.set(node, animation);
@@ -41,6 +43,14 @@ export function enter(node, distance = 6, duration = 180) {
     { opacity: 0, transform: `translateY(${distance}px)` },
     { opacity: 1, transform: "translateY(0)" },
   ], duration);
+}
+
+/** Animate only genuinely new results; existing cards keep their place and focus. */
+export function enterResults(nodes) {
+  return Promise.all(nodes.map((node, index) => animate(node, [
+    { opacity: 0, transform: "translateY(6px)" },
+    { opacity: 1, transform: "translateY(0)" },
+  ], 240, undefined, Math.min(index, 4) * 24)));
 }
 
 export async function reveal(node) {

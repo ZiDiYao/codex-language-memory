@@ -1,4 +1,5 @@
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -115,6 +116,20 @@ class PageTests(unittest.TestCase):
             self.call("settings/update", {"enabled": None})
         self.assertEqual(error.exception.code, 400)
         self.assertTrue(self.store.recording()["enabled"])
+
+    def test_browser_module_dependencies_are_served(self):
+        pending, seen = ["app.js"], set()
+        while pending:
+            asset = pending.pop()
+            if asset in seen:
+                continue
+            seen.add(asset)
+            with urlopen(self.url + asset) as response:
+                self.assertEqual(response.status, 200, asset)
+                self.assertIn("javascript", response.headers["Content-Type"])
+                source = response.read().decode()
+            pending.extend(re.findall(r'(?:from\s*|import\s*)[\"\']\./([^\"\']+)', source))
+        self.assertIn("scene-model.js", seen)
 
     def test_pagination_has_more(self):
         for number in range(22):

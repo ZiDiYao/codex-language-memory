@@ -53,11 +53,16 @@ MCP operations follow the client's approval policy. A rejected write is reported
 
 ## Local page
 
+Beta 35 gives newly appearing search results a short fade and gentle upward motion. Switching filters reuses unchanged cards, so identical results stay still and keep their expanded state. Only new results animate; background synchronization stays quiet and the system's reduced-motion preference is respected. Results from a previous query cannot flash back while a new query is being typed.
+
+Beta 34 adds a small speaker button beside each record title. Click to hear the word or expression; click the same button again to stop, or another record to switch. Pronunciation uses the Mac's installed system voices through its audio output, including headphones. English uses Samantha (US), with Daniel for en-GB records. Chinese, Japanese, Korean, French and Spanish use their corresponding system voices. No API key is required. Unsupported or unavailable voices show an error. Listening never changes learning encounters, mastery or review state.
+
 Beta 27 also registers **Language memory** as a native sidebar MCP App. On hosts supporting OpenAI's global UI entrypoint, open the plugin from the sidebar (and pin it if the host offers that option). It renders the same page, with the same markup, styles and controls. Data stays in the same local SQLite database; the app uses the MCP bridge instead of a localhost connection. No additional model or cloud service is used. The host controls discovery and pinning: local registration alone does not guarantee a sidebar icon in every Codex version. Restart or reload the plugin after upgrading. Desktop sidebar click-through verification is separate from protocol tests.
 
 Ask Codex to open the learning page. `open_memory_page` returns a local URL that Codex can open in its browser side panel when that capability is available. Otherwise, open the returned URL in a browser.
 
-- Select a language from the dropdown to see its recent learning history. Use **All**, **Word**, **Expression**, or **Grammar** to filter that history in place. **All** also includes correction records. There are no separate category or document pages.
+- Select a language and an optional **Scene** to see its recent learning history. Use **All**, **Word**, **Expression**, or **Grammar** to narrow the same view. **All** also includes correction records. Scenes overlap: a single record can belong to several, and each can mix words and expressions. The page stays a single compact list.
+- Codex classifies new learning points from their meaning and context, reusing existing scene names or adding suitable new ones. For example, rinse and washing-related rub belong to **Cleaning & hygiene**, turn on/off a device to **Device controls**, and sneeze/cough/fart to **Body reactions**. These are examples rather than a fixed taxonomy. Conservative local defaults also cover a few common cases for older clients and legacy data. The page does not run a background AI service. Ask Codex to organize older notes semantically, or edit their scenes directly in an expanded record; these edits do not add encounters or change review progress.
 - Expand a record into one freely editable note. Its initial text contains the captured title, meaning, explanation, context and examples. Change, add, reorder or remove any text; there are no required sections. The first nonempty line becomes the card title. Edits auto-save quietly after a short pause or on leaving the note. There is no permanent save notice. Failed saves show inline recovery controls; concurrent changes preserve the draft and show a conflict message. Editing does not add encounters or reviews.
 - Choose **To Learn** or **Mastered** in the two-option control in a card header. The current state is highlighted; choosing a state does not open or close the note. The user decides whether they know it; no score or quiz is required. The page has no Delete button; deletion remains available through Codex when requested.
 - Open **Settings** in the top-right corner to change recording, captured types, or interface language. English is the initial interface language. Settings save immediately.
@@ -141,8 +146,9 @@ FSRS-6 (`fsrs==6.3.2`) updates each point's memory state after actual unassisted
 | `open_memory_app` | Open the same UI as a native MCP App; registers a global sidebar entry |
 | `memory_app_request` | App-only transport for validated page actions and exports; hidden from model tool selection |
 | `list_languages` | List language groups and record counts |
+| `list_scenes` | List overlapping scenes and distinct record counts, optionally scoped by language and type |
 | `save_points` | Batch save with per-item added, merged, skipped, or failed outcomes |
-| `find_points` | Search by keyword, type, language, mastery, or missing generated content; follow `next_cursor` for more |
+| `find_points` | Search by scene, keyword, type, language, mastery, or missing generated content; follow `next_cursor` for more |
 | `review_queue` | Due FSRS points, then unassessed; current notes, latest attempts, scope counts, round exclusions and optional early practice |
 | `start_study`, `get_study` | Start or resume a persistent round from saved records |
 | `prepare_study_question` | Save the current question and irreversible hint flag before display |
@@ -165,6 +171,8 @@ Each quiz attempt also requires a fresh `request_id` through `record_review`. Re
 Paused recording blocks new saves, including explicit ones. Queries, review, edits, and deletion remain available. Type restrictions also apply to explicit saves. Upgrade compatibility ignores retired `capture_mode`, `target_language`, and `target_languages` preferences while preserving existing data, the recording switch, type selection, and UI language.
 
 ## Tests and verified boundaries
+
+[Beta 33 verification](docs/beta33-testing.md) covers overlapping scenes, combined scene/type/language filters, simple inline editing, export scope, legacy compatibility and the packaged upgrade.
 
 ```sh
 .venv/bin/python -m pip install -r requirements-dev.txt

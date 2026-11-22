@@ -78,7 +78,8 @@ async def exercise(archive):
         error_log = (root / "runtime-stderr.log").open("w+")
         async with stdio_client(parameters(), errlog=error_log) as streams, ClientSession(*streams) as session:
             await session.initialize()
-            assert len((await session.list_tools()).tools) == 23
+            tools = (await session.list_tools()).tools
+            assert len(tools) == 24 and "list_scenes" in {tool.name for tool in tools}
             sidebar = (await session.read_resource("ui://language-memory/sidebar-v1.html")).contents[0]
             assert sidebar.mimeType == "text/html;profile=mcp-app"
             assert '<div id="records"' in sidebar.text
@@ -87,16 +88,33 @@ async def exercise(archive):
             bridge = await call(session, "memory_app_request", {"route": "api", "payload": {
                 "action": "settings/read", "arguments": {}}})
             assert bridge["status"] == 200 and bridge["data"]["enabled"]
+            speech_state = await call(session, "memory_app_request", {"route": "api", "payload": {
+                "action": "speech/status", "arguments": {}}})
+            assert speech_state["status"] == 200 and not speech_state["data"]["playing"]
             checks.append("Frozen sidebar resource and app-only MCP transport work without Node or Python on PATH")
             points = [{"kind": "word", "language": "en", "title": "approach", "sense_key": "method",
                        "meaning": "A way of doing something.", "explanation": "A countable noun describing a method.",
-                       "context": "We need a fresh approach.", "examples": [{"text": "Try a different approach."}, {"text": "This approach saves time."}]},
+                       "context": "We need a fresh approach.", "scenes": ["Work & projects", "Problem solving"],
+                       "examples": [{"text": "Try a different approach."}, {"text": "This approach saves time."}]},
                       {"kind": "expression", "language": "ja", "title": "ありがとうございます", "sense_key": "polite thanks",
                        "meaning": "Thank you, politely.", "explanation": "Use this to express polite gratitude.",
+                       "scenes": ["Work & projects", "Social interactions"],
                        "examples": [{"text": "ありがとうございます。", "translation": "Thank you."},
                                     {"text": "お手伝いいただき、ありがとうございます。", "translation": "Thank you for your help."}]}]
             saved = await call(session, "save_points", {"request_id": "beta-save-once", "items": points})
             record_id = saved["results"][0]["id"]
+            scenes = await call(session, "list_scenes")
+            assert next(scene for scene in scenes["scenes"] if scene["name"] == "Work & projects")["count"] == 2
+            in_scene = await call(session, "find_points", {"scene": "Work & projects", "kind": "word", "language": "en"})
+            assert [item["id"] for item in in_scene["records"]] == [record_id]
+            scene_bridge = await call(session, "memory_app_request", {"route": "api", "payload": {
+                "action": "scenes/list", "arguments": {"language": "ja", "kind": "expression"}}})
+            assert scene_bridge["status"] == 200 and scene_bridge["data"]["total"] == 1
+            for index, name in enumerate(("\ufdfa" * 5, "Work, meetings")):
+                invalid = await call(session, "save_points", {"request_id": f"beta-scene-invalid-{index}",
+                    "items": [{**points[0], "title": "invalid scene name", "scenes": [name]}]})
+                assert invalid["results"][0]["status"] == "failed"
+            checks.append("Frozen scene catalog, overlapping memberships and combined scene/type/language filters work through MCP and the app bridge")
             assert (await call(session, "save_points", {"request_id": "beta-save-once", "items": points}))["replayed"]
             movement = {**points[0], "sense_key": "move closer", "meaning": "To move toward something.",
                         "explanation": "As a verb, approach can describe coming closer.",
@@ -128,7 +146,7 @@ async def exercise(archive):
             page = await call(session, "open_memory_page")
             with urlopen(page["url"]) as response:
                 assert "Language memory" in response.read().decode()
-            for asset in ("entry-editor.js", "history-model.js", "export-dialog.js", "export-model.js", "date-range.js"):
+            for asset in ("entry-editor.js", "history-model.js", "scene-model.js", "export-dialog.js", "export-model.js", "date-range.js"):
                 with urlopen(page["url"] + asset) as response:
                     assert response.status == 200 and response.read()
             point = (await call(session, "find_points"))["records"][0]
@@ -156,7 +174,7 @@ async def exercise(archive):
                 export = await call(session, "export_points", {"request": {"format": kind}})
                 assert export["count"] == 2 and export["format"] == kind, export
                 assert Path(export["path"]).is_file()
-            checks.append("Frozen MCP exposes 23 tools and saves multilingual data, reviews, preferences, page assets and all five exports")
+            checks.append("Frozen MCP exposes 24 tools and saves multilingual data, reviews, preferences, page assets and all five exports")
             with urlopen(Request(page["url"] + "api", data=json.dumps({
                 "action": "exports/history", "arguments": {},
             }).encode(), headers={"Content-Type": "application/json", "X-Language-Memory": "1"})) as response:
@@ -195,6 +213,7 @@ async def exercise(archive):
         async with stdio_client(parameters(), errlog=error_log) as streams, ClientSession(*streams) as session:
             await session.initialize()
             assert (await call(session, "get_settings"))["ui_language"] == "fr"
+            assert (await call(session, "find_points", {"scene": "Problem solving", "language": "en"}))["records"][0]["id"] == record_id
             resumed = (await call(session, "get_study", {"language": "en"}))["session"]
             assert resumed["current"]["prompt"] == "Explain the current note."
             assert resumed["current"]["assisted"] is True

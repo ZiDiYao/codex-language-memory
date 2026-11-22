@@ -8,7 +8,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from store import (CaptureMode, Kind, Language, LearnerPreferences, Limit, Patch, RecordId, RequestId, Review,
+from store import (CaptureMode, Kind, Language, LearnerPreferences, Limit, Patch, RecordId, RequestId, Review, SceneName,
                    Revision, SettingsPatch, Status, Store, Title, Text)
 from dashboard import Dashboard
 from study import StudySessions
@@ -56,6 +56,16 @@ def create_server(store: Store) -> FastMCP:
         return store.languages()
 
     @server.tool(annotations=read_only)
+    def list_scenes(language: Language | None = None, kind: Kind | None = None,
+                    include_variants: bool = False) -> dict[str, Any]:
+        """List overlapping real-world scene labels and distinct point counts.
+        Scenes can contain words, expressions, grammar and corrections together.
+        Filter language/kind when requested. Reuse an existing scene name when
+        classifying a matching point; create a short new label for a new context.
+        """
+        return store.scenes(language=language, kind=kind, include_variants=include_variants)
+
+    @server.tool(annotations=read_only)
     def get_recording() -> dict[str, Any]:
         """Read the persistent recording switch. Enabled by default."""
         return store.recording()
@@ -78,6 +88,10 @@ def create_server(store: Store) -> FastMCP:
         a useful explanation with natural usage/collocations and two to five distinct examples
         (text, translation in the preferred explanation language when useful).
         Optional fields are context and corrected_sentence. Generate content before saving; never ask the user to fill a form.
+        Include scenes as a list of short real-world situation labels (up to 12,
+        80 characters each). Classify from the actual meaning/context, reuse
+        matching list_scenes names, and allow a point in several scenes. Labels
+        are open-ended, separate from kind/language. [] leaves a point ungrouped.
         A word has one record per language and normalized title. Different sense_key values
         add meanings inside that record. Reuse an existing word's title, including when
         the question uses an inflected form. A fresh encounter moves it to the top of history
@@ -94,6 +108,7 @@ def create_server(store: Store) -> FastMCP:
     def find_points(
         keyword: Title | None = None,
         kind: Kind | None = None,
+        scene: SceneName | None = None,
         language: Language | None = None,
         status: Status | None = None,
         limit: Limit = 10,
@@ -105,11 +120,12 @@ def create_server(store: Store) -> FastMCP:
         """Find points by keyword and filters. Title exact/prefix matches rank first;
         without a keyword, list most recently seen first.
         Set language to isolate a learning language and include_variants=true to include regional forms.
+        Set scene to a list_scenes name; scene, kind, language and keyword filters combine.
         Use needs_enrichment=true for noncustom records missing an explanation or two distinct examples.
         Pass next_cursor to continue reading; omit offset when using a cursor.
         """
         return store.query(
-            keyword=keyword, kind=kind, language=language, status=status,
+            keyword=keyword, kind=kind, scene=scene, language=language, status=status,
             limit=limit, offset=offset, include_variants=include_variants,
             cursor=cursor, needs_enrichment=needs_enrichment,
         )
@@ -117,7 +133,7 @@ def create_server(store: Store) -> FastMCP:
     @server.tool(annotations=local_write)
     def export_points(request: ExportRequest) -> dict[str, Any]:
         """Export all matching points as PDF, XLSX, DOCX, a Notion import ZIP, or JSON.
-        Filter by kind or kinds, language, status, keyword, and timezone-aware start_at
+        Filter by kind or kinds, scene, language, status, keyword, and timezone-aware start_at
         (inclusive) / end_at (exclusive), using date_field created_at or last_seen_at.
         content=notes exports current editable notes; terms exports current titles only.
         content=sections requires fields (meaning, explanation, examples, translations,
@@ -133,7 +149,7 @@ def create_server(store: Store) -> FastMCP:
 
     @server.tool(annotations=read_only)
     def review_queue(
-        language: Language | None = None, kind: Kind | None = None, limit: Limit = 5,
+        language: Language | None = None, kind: Kind | None = None, scene: SceneName | None = None, limit: Limit = 5,
         include_variants: bool = False, include_upcoming: bool = False,
         exclude_ids: Annotated[list[RecordId], Field(max_length=100)] | None = None,
     ) -> dict[str, Any]:
@@ -152,7 +168,7 @@ def create_server(store: Store) -> FastMCP:
         it does not modify FSRS state. Mastered and empty notes stay excluded.
         Supply language to review one language. include_variants includes regional forms.
         """
-        return store.review(language=language, kind=kind, limit=limit, include_variants=include_variants,
+        return store.review(language=language, kind=kind, scene=scene, limit=limit, include_variants=include_variants,
                             include_upcoming=include_upcoming, exclude_ids=exclude_ids)
 
     @server.tool(annotations=local_write)
@@ -269,6 +285,8 @@ def create_server(store: Store) -> FastMCP:
     @server.tool(annotations=ToolAnnotations(openWorldHint=False))
     def update_point(record_id: RecordId, patch: Patch, expected_revision: Revision | None = None) -> dict[str, Any]:
         """Edit supplied fields only. Use null to clear optional content.
+        patch.scenes replaces the point's scene labels; [] explicitly removes all
+        scenes. User scene edits are preserved across later automatic captures.
         The returned note is the current editable study content. Set patch.note to replace
         it verbatim, including an empty string; null restores the generated source content.
         If note_is_custom is true, edit note rather than the historical structured fields.
