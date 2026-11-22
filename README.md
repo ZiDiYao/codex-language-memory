@@ -39,8 +39,11 @@ The source instructions are an alternative to the Beta installer. Inspect an exi
 The repository also contains a separate PostgreSQL-backed HTTP service for hosted
 learning records, overlapping scenes and account-scoped operations. It exposes
 Streamable HTTP MCP and a REST API, validates access tokens from an external OAuth
-provider, and includes a nonroot Docker image, Compose setup and explicit Alembic
-migrations. Existing local learning data is not uploaded or migrated automatically.
+provider, and includes nonroot Docker images, Compose setup and explicit database
+migrations. Choose the new [Node.js implementation](docs/node-backend.md) or the
+retained [Python implementation](docs/remote-backend.md). Both use the same
+PostgreSQL schema and account identities. Existing local learning data is not
+uploaded or migrated automatically.
 
 This first cloud milestone does not include the desktop UI, document exports or
 pronunciation. It is not a published plugin or a complete OAuth authorization

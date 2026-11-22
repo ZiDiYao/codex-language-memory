@@ -1,5 +1,9 @@
 # Experimental remote backend
 
+This page documents the retained Python implementation in `cloud/`. The separate
+[Node.js implementation](node-backend.md) uses the same PostgreSQL schema and HTTP
+contract and can be deployed without installing Python.
+
 The cloud service is separate from the desktop Beta. It stores learning records
 in PostgreSQL and exposes authenticated REST and Streamable HTTP MCP endpoints.
 An account is identified by the verified JWT issuer and subject; a client cannot

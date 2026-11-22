@@ -1,0 +1,1676 @@
+{
+  "fsrs": [
+    {
+      "name": "new-1",
+      "serialized": null,
+      "timestamp": "2026-01-01T10:20:30.012345+00:00",
+      "rating": 1,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 1,
+          "step": 0,
+          "stability": 0.212,
+          "difficulty": 6.4133,
+          "due": "2026-01-01T10:21:30.012345+00:00",
+          "last_review": "2026-01-01T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 1,
+          "review_datetime": "2026-01-01T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": null,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 0.212,
+          "difficulty": 6.4133,
+          "due_at": "2026-01-01T10:21:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "new-2",
+      "serialized": null,
+      "timestamp": "2026-01-01T10:20:30.012345+00:00",
+      "rating": 2,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 1,
+          "step": 0,
+          "stability": 1.2931,
+          "difficulty": 5.112170705601056,
+          "due": "2026-01-01T10:26:00.012345+00:00",
+          "last_review": "2026-01-01T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 2,
+          "review_datetime": "2026-01-01T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": null,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 1.2931,
+          "difficulty": 5.112170705601056,
+          "due_at": "2026-01-01T10:26:00.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "new-3",
+      "serialized": null,
+      "timestamp": "2026-01-01T10:20:30.012345+00:00",
+      "rating": 3,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 1,
+          "step": 1,
+          "stability": 2.3065,
+          "difficulty": 2.118103970459016,
+          "due": "2026-01-01T10:30:30.012345+00:00",
+          "last_review": "2026-01-01T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 3,
+          "review_datetime": "2026-01-01T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": null,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 2.3065,
+          "difficulty": 2.118103970459016,
+          "due_at": "2026-01-01T10:30:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "new-4",
+      "serialized": null,
+      "timestamp": "2026-01-01T10:20:30.012345+00:00",
+      "rating": 4,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 8.2956,
+          "difficulty": 1.0,
+          "due": "2026-01-09T10:20:30.012345+00:00",
+          "last_review": "2026-01-01T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 4,
+          "review_datetime": "2026-01-01T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": null,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 8.2956,
+          "difficulty": 1.0,
+          "due_at": "2026-01-09T10:20:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "learning-step-0-1",
+      "serialized": "{\"card_id\": 17, \"state\": 1, \"step\": 0, \"stability\": 0.212, \"difficulty\": 6.4133, \"due\": \"2026-01-01T10:21:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-01T10:20:45.012345+00:00",
+      "rating": 1,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 1,
+          "step": 0,
+          "stability": 0.08335671711031604,
+          "difficulty": 8.806304468856837,
+          "due": "2026-01-01T10:21:45.012345+00:00",
+          "last_review": "2026-01-01T10:20:45.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 1,
+          "review_datetime": "2026-01-01T10:20:45.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 1.0,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 0.08335671711031604,
+          "difficulty": 8.806304468856837,
+          "due_at": "2026-01-01T10:21:45.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "learning-step-0-2",
+      "serialized": "{\"card_id\": 17, \"state\": 1, \"step\": 0, \"stability\": 0.212, \"difficulty\": 6.4133, \"due\": \"2026-01-01T10:21:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-01T10:20:45.012345+00:00",
+      "rating": 2,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 1,
+          "step": 0,
+          "stability": 0.212,
+          "difficulty": 7.604209769076838,
+          "due": "2026-01-01T10:26:15.012345+00:00",
+          "last_review": "2026-01-01T10:20:45.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 2,
+          "review_datetime": "2026-01-01T10:20:45.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 1.0,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 0.212,
+          "difficulty": 7.604209769076838,
+          "due_at": "2026-01-01T10:26:15.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "learning-step-0-3",
+      "serialized": "{\"card_id\": 17, \"state\": 1, \"step\": 0, \"stability\": 0.212, \"difficulty\": 6.4133, \"due\": \"2026-01-01T10:21:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-01T10:20:45.012345+00:00",
+      "rating": 3,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 1,
+          "step": 1,
+          "stability": 0.24668918777567272,
+          "difficulty": 6.402115069296838,
+          "due": "2026-01-01T10:30:45.012345+00:00",
+          "last_review": "2026-01-01T10:20:45.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 3,
+          "review_datetime": "2026-01-01T10:20:45.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 1.0,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 0.24668918777567272,
+          "difficulty": 6.402115069296838,
+          "due_at": "2026-01-01T10:30:45.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "learning-step-0-4",
+      "serialized": "{\"card_id\": 17, \"state\": 1, \"step\": 0, \"stability\": 0.212, \"difficulty\": 6.4133, \"due\": \"2026-01-01T10:21:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-01T10:20:45.012345+00:00",
+      "rating": 4,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 0.42437996387663374,
+          "difficulty": 5.200020369516838,
+          "due": "2026-01-02T10:20:45.012345+00:00",
+          "last_review": "2026-01-01T10:20:45.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 4,
+          "review_datetime": "2026-01-01T10:20:45.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 1.0,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 0.42437996387663374,
+          "difficulty": 5.200020369516838,
+          "due_at": "2026-01-02T10:20:45.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "learning-step-1-1",
+      "serialized": "{\"card_id\": 17, \"state\": 1, \"step\": 1, \"stability\": 2.3065, \"difficulty\": 2.118103970459016, \"due\": \"2026-01-01T10:30:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-01T10:30:30.012345+00:00",
+      "rating": 1,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 1,
+          "step": 0,
+          "stability": 0.7750839828558984,
+          "difficulty": 7.394502741279718,
+          "due": "2026-01-01T10:31:30.012345+00:00",
+          "last_review": "2026-01-01T10:30:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 1,
+          "review_datetime": "2026-01-01T10:30:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 1.0,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 0.7750839828558984,
+          "difficulty": 7.394502741279718,
+          "due_at": "2026-01-01T10:31:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "learning-step-1-2",
+      "serialized": "{\"card_id\": 17, \"state\": 1, \"step\": 1, \"stability\": 2.3065, \"difficulty\": 2.118103970459016, \"due\": \"2026-01-01T10:30:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-01T10:30:30.012345+00:00",
+      "rating": 2,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 1,
+          "step": 1,
+          "stability": 2.3065,
+          "difficulty": 4.752858488532557,
+          "due": "2026-01-01T10:40:30.012345+00:00",
+          "last_review": "2026-01-01T10:30:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 2,
+          "review_datetime": "2026-01-01T10:30:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 1.0,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 2.3065,
+          "difficulty": 4.752858488532557,
+          "due_at": "2026-01-01T10:40:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "learning-step-1-3",
+      "serialized": "{\"card_id\": 17, \"state\": 1, \"step\": 1, \"stability\": 2.3065, \"difficulty\": 2.118103970459016, \"due\": \"2026-01-01T10:30:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-01T10:30:30.012345+00:00",
+      "rating": 3,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 2.3065,
+          "difficulty": 2.111214235785395,
+          "due": "2026-01-03T10:30:30.012345+00:00",
+          "last_review": "2026-01-01T10:30:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 3,
+          "review_datetime": "2026-01-01T10:30:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 1.0,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 2.3065,
+          "difficulty": 2.111214235785395,
+          "due_at": "2026-01-03T10:30:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "learning-step-1-4",
+      "serialized": "{\"card_id\": 17, \"state\": 1, \"step\": 1, \"stability\": 2.3065, \"difficulty\": 2.118103970459016, \"due\": \"2026-01-01T10:30:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-01T10:30:30.012345+00:00",
+      "rating": 4,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 3.946054067969477,
+          "difficulty": 1.0,
+          "due": "2026-01-05T10:30:30.012345+00:00",
+          "last_review": "2026-01-01T10:30:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 4,
+          "review_datetime": "2026-01-01T10:30:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 1.0,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 3.946054067969477,
+          "difficulty": 1.0,
+          "due_at": "2026-01-05T10:30:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "learning-long-1",
+      "serialized": "{\"card_id\": 17, \"state\": 1, \"step\": 1, \"stability\": 2.3065, \"difficulty\": 2.118103970459016, \"due\": \"2026-01-01T10:30:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-06T10:20:30.012345+00:00",
+      "rating": 1,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 1,
+          "step": 0,
+          "stability": 0.6825982499532058,
+          "difficulty": 7.394502741279718,
+          "due": "2026-01-06T10:21:30.012345+00:00",
+          "last_review": "2026-01-06T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 1,
+          "review_datetime": "2026-01-06T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 0.8388614268145294,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 0.6825982499532058,
+          "difficulty": 7.394502741279718,
+          "due_at": "2026-01-06T10:21:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "learning-long-2",
+      "serialized": "{\"card_id\": 17, \"state\": 1, \"step\": 1, \"stability\": 2.3065, \"difficulty\": 2.118103970459016, \"due\": \"2026-01-01T10:30:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-06T10:20:30.012345+00:00",
+      "rating": 2,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 1,
+          "step": 1,
+          "stability": 11.84551603137166,
+          "difficulty": 4.752858488532557,
+          "due": "2026-01-06T10:30:30.012345+00:00",
+          "last_review": "2026-01-06T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 2,
+          "review_datetime": "2026-01-06T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 0.8388614268145294,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 11.84551603137166,
+          "difficulty": 4.752858488532557,
+          "due_at": "2026-01-06T10:30:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "learning-long-3",
+      "serialized": "{\"card_id\": 17, \"state\": 1, \"step\": 1, \"stability\": 2.3065, \"difficulty\": 2.118103970459016, \"due\": \"2026-01-01T10:30:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-06T10:20:30.012345+00:00",
+      "rating": 3,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 18.167850235070937,
+          "difficulty": 2.111214235785395,
+          "due": "2026-01-24T10:20:30.012345+00:00",
+          "last_review": "2026-01-06T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 3,
+          "review_datetime": "2026-01-06T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 0.8388614268145294,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 18.167850235070937,
+          "difficulty": 2.111214235785395,
+          "due_at": "2026-01-24T10:20:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "learning-long-4",
+      "serialized": "{\"card_id\": 17, \"state\": 1, \"step\": 1, \"stability\": 2.3065, \"difficulty\": 2.118103970459016, \"due\": \"2026-01-01T10:30:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-06T10:20:30.012345+00:00",
+      "rating": 4,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 32.01322285526435,
+          "difficulty": 1.0,
+          "due": "2026-02-07T10:20:30.012345+00:00",
+          "last_review": "2026-01-06T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 4,
+          "review_datetime": "2026-01-06T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 0.8388614268145294,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 32.01322285526435,
+          "difficulty": 1.0,
+          "due_at": "2026-02-07T10:20:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "review-short-1",
+      "serialized": "{\"card_id\": 17, \"state\": 2, \"step\": null, \"stability\": 8.2956, \"difficulty\": 1.0, \"due\": \"2026-01-09T10:20:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-01T11:20:30.012345+00:00",
+      "rating": 1,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 3,
+          "step": 0,
+          "stability": 2.5625081682260777,
+          "difficulty": 7.0269895692968385,
+          "due": "2026-01-01T11:30:30.012345+00:00",
+          "last_review": "2026-01-01T11:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 1,
+          "review_datetime": "2026-01-01T11:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 1.0,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 2.5625081682260777,
+          "difficulty": 7.0269895692968385,
+          "due_at": "2026-01-01T11:30:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "review-short-2",
+      "serialized": "{\"card_id\": 17, \"state\": 2, \"step\": null, \"stability\": 8.2956, \"difficulty\": 1.0, \"due\": \"2026-01-09T10:20:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-01T11:20:30.012345+00:00",
+      "rating": 2,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 8.2956,
+          "difficulty": 4.010608969296839,
+          "due": "2026-01-09T11:20:30.012345+00:00",
+          "last_review": "2026-01-01T11:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 2,
+          "review_datetime": "2026-01-01T11:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 1.0,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 8.2956,
+          "difficulty": 4.010608969296839,
+          "due_at": "2026-01-09T11:20:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "review-short-3",
+      "serialized": "{\"card_id\": 17, \"state\": 2, \"step\": null, \"stability\": 8.2956, \"difficulty\": 1.0, \"due\": \"2026-01-09T10:20:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-01T11:20:30.012345+00:00",
+      "rating": 3,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 8.2956,
+          "difficulty": 1.0,
+          "due": "2026-01-09T11:20:30.012345+00:00",
+          "last_review": "2026-01-01T11:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 3,
+          "review_datetime": "2026-01-01T11:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 1.0,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 8.2956,
+          "difficulty": 1.0,
+          "due_at": "2026-01-09T11:20:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "review-short-4",
+      "serialized": "{\"card_id\": 17, \"state\": 2, \"step\": null, \"stability\": 8.2956, \"difficulty\": 1.0, \"due\": \"2026-01-09T10:20:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-01T11:20:30.012345+00:00",
+      "rating": 4,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 13.046064691177454,
+          "difficulty": 1.0,
+          "due": "2026-01-14T11:20:30.012345+00:00",
+          "last_review": "2026-01-01T11:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 4,
+          "review_datetime": "2026-01-01T11:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 1.0,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 13.046064691177454,
+          "difficulty": 1.0,
+          "due_at": "2026-01-14T11:20:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "review-long-1",
+      "serialized": "{\"card_id\": 17, \"state\": 2, \"step\": null, \"stability\": 8.2956, \"difficulty\": 1.0, \"due\": \"2026-01-09T10:20:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-11T10:20:30.012345+00:00",
+      "rating": 1,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 3,
+          "step": 0,
+          "stability": 1.4253096209625484,
+          "difficulty": 7.0269895692968385,
+          "due": "2026-01-11T10:30:30.012345+00:00",
+          "last_review": "2026-01-11T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 1,
+          "review_datetime": "2026-01-11T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 0.8866572196242765,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 1.4253096209625484,
+          "difficulty": 7.0269895692968385,
+          "due_at": "2026-01-11T10:30:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "review-long-2",
+      "serialized": "{\"card_id\": 17, \"state\": 2, \"step\": null, \"stability\": 8.2956, \"difficulty\": 1.0, \"due\": \"2026-01-09T10:20:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-11T10:20:30.012345+00:00",
+      "rating": 2,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 29.826527344927904,
+          "difficulty": 4.010608969296839,
+          "due": "2026-02-10T10:20:30.012345+00:00",
+          "last_review": "2026-01-11T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 2,
+          "review_datetime": "2026-01-11T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 0.8866572196242765,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 29.826527344927904,
+          "difficulty": 4.010608969296839,
+          "due_at": "2026-02-10T10:20:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "review-long-3",
+      "serialized": "{\"card_id\": 17, \"state\": 2, \"step\": null, \"stability\": 8.2956, \"difficulty\": 1.0, \"due\": \"2026-01-09T10:20:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-11T10:20:30.012345+00:00",
+      "rating": 3,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 44.09694244251397,
+          "difficulty": 1.0,
+          "due": "2026-02-24T10:20:30.012345+00:00",
+          "last_review": "2026-01-11T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 3,
+          "review_datetime": "2026-01-11T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 0.8866572196242765,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 44.09694244251397,
+          "difficulty": 1.0,
+          "due_at": "2026-02-24T10:20:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "review-long-4",
+      "serialized": "{\"card_id\": 17, \"state\": 2, \"step\": null, \"stability\": 8.2956, \"difficulty\": 1.0, \"due\": \"2026-01-09T10:20:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-11T10:20:30.012345+00:00",
+      "rating": 4,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 75.34793426058442,
+          "difficulty": 1.0,
+          "due": "2026-03-27T10:20:30.012345+00:00",
+          "last_review": "2026-01-11T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 4,
+          "review_datetime": "2026-01-11T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 0.8866572196242765,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 75.34793426058442,
+          "difficulty": 1.0,
+          "due_at": "2026-03-27T10:20:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "relearning-short-1",
+      "serialized": "{\"card_id\": 17, \"state\": 3, \"step\": 0, \"stability\": 1.4253096209625484, \"difficulty\": 7.0269895692968385, \"due\": \"2026-01-11T10:30:30.012345+00:00\", \"last_review\": \"2026-01-11T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-11T10:25:30.012345+00:00",
+      "rating": 1,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 3,
+          "step": 0,
+          "stability": 0.494378563356253,
+          "difficulty": 9.008020057195637,
+          "due": "2026-01-11T10:35:30.012345+00:00",
+          "last_review": "2026-01-11T10:25:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 1,
+          "review_datetime": "2026-01-11T10:25:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 1.0,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 0.494378563356253,
+          "difficulty": 9.008020057195637,
+          "due_at": "2026-01-11T10:35:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "relearning-short-2",
+      "serialized": "{\"card_id\": 17, \"state\": 3, \"step\": 0, \"stability\": 1.4253096209625484, \"difficulty\": 7.0269895692968385, \"due\": \"2026-01-11T10:30:30.012345+00:00\", \"last_review\": \"2026-01-11T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-11T10:25:30.012345+00:00",
+      "rating": 2,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 3,
+          "step": 0,
+          "stability": 1.4253096209625484,
+          "difficulty": 8.011605503110008,
+          "due": "2026-01-11T10:40:30.012345+00:00",
+          "last_review": "2026-01-11T10:25:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 2,
+          "review_datetime": "2026-01-11T10:25:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 1.0,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 1.4253096209625484,
+          "difficulty": 8.011605503110008,
+          "due_at": "2026-01-11T10:40:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "relearning-short-3",
+      "serialized": "{\"card_id\": 17, \"state\": 3, \"step\": 0, \"stability\": 1.4253096209625484, \"difficulty\": 7.0269895692968385, \"due\": \"2026-01-11T10:30:30.012345+00:00\", \"last_review\": \"2026-01-11T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-11T10:25:30.012345+00:00",
+      "rating": 3,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 1.4630836059277192,
+          "difficulty": 7.0151909490243805,
+          "due": "2026-01-12T10:25:30.012345+00:00",
+          "last_review": "2026-01-11T10:25:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 3,
+          "review_datetime": "2026-01-11T10:25:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 1.0,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 1.4630836059277192,
+          "difficulty": 7.0151909490243805,
+          "due_at": "2026-01-12T10:25:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "relearning-short-4",
+      "serialized": "{\"card_id\": 17, \"state\": 3, \"step\": 0, \"stability\": 1.4253096209625484, \"difficulty\": 7.0269895692968385, \"due\": \"2026-01-11T10:30:30.012345+00:00\", \"last_review\": \"2026-01-11T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-11T10:25:30.012345+00:00",
+      "rating": 4,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 2.51694601385092,
+          "difficulty": 6.018776394938751,
+          "due": "2026-01-14T10:25:30.012345+00:00",
+          "last_review": "2026-01-11T10:25:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 4,
+          "review_datetime": "2026-01-11T10:25:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 1.0,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 2.51694601385092,
+          "difficulty": 6.018776394938751,
+          "due_at": "2026-01-14T10:25:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "relearning-long-1",
+      "serialized": "{\"card_id\": 17, \"state\": 3, \"step\": 0, \"stability\": 1.4253096209625484, \"difficulty\": 7.0269895692968385, \"due\": \"2026-01-11T10:30:30.012345+00:00\", \"last_review\": \"2026-01-11T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-15T10:20:30.012345+00:00",
+      "rating": 1,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 3,
+          "step": 0,
+          "stability": 0.46782330528386257,
+          "difficulty": 9.008020057195637,
+          "due": "2026-01-15T10:30:30.012345+00:00",
+          "last_review": "2026-01-15T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 1,
+          "review_datetime": "2026-01-15T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 0.8155714668762052,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 0.46782330528386257,
+          "difficulty": 9.008020057195637,
+          "due_at": "2026-01-15T10:30:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "relearning-long-2",
+      "serialized": "{\"card_id\": 17, \"state\": 3, \"step\": 0, \"stability\": 1.4253096209625484, \"difficulty\": 7.0269895692968385, \"due\": \"2026-01-11T10:30:30.012345+00:00\", \"last_review\": \"2026-01-11T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-15T10:20:30.012345+00:00",
+      "rating": 2,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 3,
+          "step": 0,
+          "stability": 4.726317993418169,
+          "difficulty": 8.011605503110008,
+          "due": "2026-01-15T10:35:30.012345+00:00",
+          "last_review": "2026-01-15T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 2,
+          "review_datetime": "2026-01-15T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 0.8155714668762052,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 4.726317993418169,
+          "difficulty": 8.011605503110008,
+          "due_at": "2026-01-15T10:35:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "relearning-long-3",
+      "serialized": "{\"card_id\": 17, \"state\": 3, \"step\": 0, \"stability\": 1.4253096209625484, \"difficulty\": 7.0269895692968385, \"due\": \"2026-01-11T10:30:30.012345+00:00\", \"last_review\": \"2026-01-11T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-15T10:20:30.012345+00:00",
+      "rating": 3,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 6.9141828708056146,
+          "difficulty": 7.0151909490243805,
+          "due": "2026-01-22T10:20:30.012345+00:00",
+          "last_review": "2026-01-15T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 3,
+          "review_datetime": "2026-01-15T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 0.8155714668762052,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 6.9141828708056146,
+          "difficulty": 7.0151909490243805,
+          "due_at": "2026-01-22T10:20:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "relearning-long-4",
+      "serialized": "{\"card_id\": 17, \"state\": 3, \"step\": 0, \"stability\": 1.4253096209625484, \"difficulty\": 7.0269895692968385, \"due\": \"2026-01-11T10:30:30.012345+00:00\", \"last_review\": \"2026-01-11T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-15T10:20:30.012345+00:00",
+      "rating": 4,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 11.705420330593629,
+          "difficulty": 6.018776394938751,
+          "due": "2026-01-27T10:20:30.012345+00:00",
+          "last_review": "2026-01-15T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 4,
+          "review_datetime": "2026-01-15T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 0.8155714668762052,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 11.705420330593629,
+          "difficulty": 6.018776394938751,
+          "due_at": "2026-01-27T10:20:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "legacy-missing-last-1",
+      "serialized": "{\"card_id\": 17, \"state\": 2, \"step\": null, \"stability\": 2.3, \"difficulty\": 5, \"due\": \"2026-01-01T10:20:30.012345+00:00\", \"last_review\": null}",
+      "timestamp": "2026-01-11T10:20:30.012345+00:00",
+      "rating": 1,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 3,
+          "step": 0,
+          "stability": 2.1889743984690067,
+          "difficulty": 8.341762369296838,
+          "due": "2026-01-11T10:30:30.012345+00:00",
+          "last_review": "2026-01-11T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 1,
+          "review_datetime": "2026-01-11T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": null,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 2.1889743984690067,
+          "difficulty": 8.341762369296838,
+          "due_at": "2026-01-11T10:30:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "legacy-missing-last-2",
+      "serialized": "{\"card_id\": 17, \"state\": 2, \"step\": null, \"stability\": 2.3, \"difficulty\": 5, \"due\": \"2026-01-01T10:20:30.012345+00:00\", \"last_review\": null}",
+      "timestamp": "2026-01-11T10:20:30.012345+00:00",
+      "rating": 2,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 59.452177093463526,
+          "difficulty": 6.665995369296838,
+          "due": "2026-03-11T10:20:30.012345+00:00",
+          "last_review": "2026-01-11T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 2,
+          "review_datetime": "2026-01-11T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": null,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 59.452177093463526,
+          "difficulty": 6.665995369296838,
+          "due_at": "2026-03-11T10:20:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "legacy-missing-last-3",
+      "serialized": "{\"card_id\": 17, \"state\": 2, \"step\": null, \"stability\": 2.3, \"difficulty\": 5, \"due\": \"2026-01-01T10:20:30.012345+00:00\", \"last_review\": null}",
+      "timestamp": "2026-01-11T10:20:30.012345+00:00",
+      "rating": 3,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 97.3318874184628,
+          "difficulty": 4.9902283692968386,
+          "due": "2026-04-18T10:20:30.012345+00:00",
+          "last_review": "2026-01-11T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 3,
+          "review_datetime": "2026-01-11T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": null,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 97.3318874184628,
+          "difficulty": 4.9902283692968386,
+          "due_at": "2026-04-18T10:20:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "legacy-missing-last-4",
+      "serialized": "{\"card_id\": 17, \"state\": 2, \"step\": null, \"stability\": 2.3, \"difficulty\": 5, \"due\": \"2026-01-01T10:20:30.012345+00:00\", \"last_review\": null}",
+      "timestamp": "2026-01-11T10:20:30.012345+00:00",
+      "rating": 4,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 180.28522194603897,
+          "difficulty": 3.3144613692968385,
+          "due": "2026-07-10T10:20:30.012345+00:00",
+          "last_review": "2026-01-11T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 4,
+          "review_datetime": "2026-01-11T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": null,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 180.28522194603897,
+          "difficulty": 3.3144613692968385,
+          "due_at": "2026-07-10T10:20:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "out-of-range-step-1",
+      "serialized": "{\"card_id\": 17, \"state\": 1, \"step\": 8, \"stability\": 0.212, \"difficulty\": 6.4133, \"due\": \"2026-01-01T10:21:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-06T10:20:30.012345+00:00",
+      "rating": 1,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 1,
+          "step": 0,
+          "stability": 0.13005520738508233,
+          "difficulty": 8.806304468856837,
+          "due": "2026-01-06T10:21:30.012345+00:00",
+          "last_review": "2026-01-06T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 1,
+          "review_datetime": "2026-01-06T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 0.6121157997905046,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 0.13005520738508233,
+          "difficulty": 8.806304468856837,
+          "due_at": "2026-01-06T10:21:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "out-of-range-step-2",
+      "serialized": "{\"card_id\": 17, \"state\": 1, \"step\": 8, \"stability\": 0.212, \"difficulty\": 6.4133, \"due\": \"2026-01-01T10:21:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-06T10:20:30.012345+00:00",
+      "rating": 2,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 1.9931582864630646,
+          "difficulty": 7.604209769076838,
+          "due": "2026-01-08T10:20:30.012345+00:00",
+          "last_review": "2026-01-06T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 2,
+          "review_datetime": "2026-01-06T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 0.6121157997905046,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 1.9931582864630646,
+          "difficulty": 7.604209769076838,
+          "due_at": "2026-01-08T10:20:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "out-of-range-step-3",
+      "serialized": "{\"card_id\": 17, \"state\": 1, \"step\": 8, \"stability\": 0.212, \"difficulty\": 6.4133, \"due\": \"2026-01-01T10:21:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-06T10:20:30.012345+00:00",
+      "rating": 3,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 3.1736865421733698,
+          "difficulty": 6.402115069296838,
+          "due": "2026-01-09T10:20:30.012345+00:00",
+          "last_review": "2026-01-06T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 3,
+          "review_datetime": "2026-01-06T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 0.6121157997905046,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 3.1736865421733698,
+          "difficulty": 6.402115069296838,
+          "due_at": "2026-01-09T10:20:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    },
+    {
+      "name": "out-of-range-step-4",
+      "serialized": "{\"card_id\": 17, \"state\": 1, \"step\": 8, \"stability\": 0.212, \"difficulty\": 6.4133, \"due\": \"2026-01-01T10:21:30.012345+00:00\", \"last_review\": \"2026-01-01T10:20:30.012345+00:00\"}",
+      "timestamp": "2026-01-06T10:20:30.012345+00:00",
+      "rating": 4,
+      "expected": {
+        "card": {
+          "card_id": 17,
+          "state": 2,
+          "step": null,
+          "stability": 5.758942724836505,
+          "difficulty": 5.200020369516838,
+          "due": "2026-01-12T10:20:30.012345+00:00",
+          "last_review": "2026-01-06T10:20:30.012345+00:00"
+        },
+        "log": {
+          "card_id": 17,
+          "rating": 4,
+          "review_datetime": "2026-01-06T10:20:30.012345+00:00",
+          "review_duration": null
+        },
+        "prediction": 0.6121157997905046,
+        "memory": {
+          "assessed": true,
+          "rated_reviews": 3,
+          "estimated_recall": 1.0,
+          "stability_days": 5.758942724836505,
+          "difficulty": 5.200020369516838,
+          "due_at": "2026-01-12T10:20:30.012345+00:00",
+          "estimate_calibrated": false
+        }
+      }
+    }
+  ],
+  "records": [
+    {
+      "raw": {
+        "id": 31,
+        "kind": "word",
+        "language": "en",
+        "title": "credential",
+        "title_key": "credential",
+        "sense_key": "qualification",
+        "meaning": "\u8d44\u683c\u8bc1\u660e",
+        "context": null,
+        "corrected_sentence": null,
+        "explanation": "A qualification or proof of identity.",
+        "examples": "[{\"text\":\"She has strong credentials.\",\"translation\":\"\u5979\u6709\u5f88\u597d\u7684\u8d44\u5386\u3002\"},{\"text\":\"Check his credentials.\"}]",
+        "additional_senses": "[{\"context\":null,\"corrected_sentence\":null,\"examples\":[{\"text\":\"Enter your credentials.\"},{\"text\":\"Keep your credentials private.\"}],\"explanation\":\"Use credentials to sign in.\",\"meaning\":\"\u767b\u5f55\u51ed\u636e\",\"sense_key\":\"login\"}]",
+        "note": null,
+        "scenes": "[\"Work\",\"Device controls\"]",
+        "status": "new",
+        "encounter_count": 2,
+        "repeat_priority": 1,
+        "last_review_result": null,
+        "created_at": "2026-01-01T10:20:30.012345+00:00",
+        "last_seen_at": "2026-01-01T10:20:30.012345+00:00",
+        "last_reviewed_at": null
+      },
+      "expected": {
+        "id": 31,
+        "kind": "word",
+        "language": "en",
+        "title": "credential",
+        "sense_key": "qualification",
+        "meaning": "\u8d44\u683c\u8bc1\u660e",
+        "context": null,
+        "corrected_sentence": null,
+        "explanation": "A qualification or proof of identity.",
+        "examples": [
+          {
+            "text": "She has strong credentials.",
+            "translation": "\u5979\u6709\u5f88\u597d\u7684\u8d44\u5386\u3002"
+          },
+          {
+            "text": "Check his credentials."
+          }
+        ],
+        "additional_senses": [
+          {
+            "context": null,
+            "corrected_sentence": null,
+            "examples": [
+              {
+                "text": "Enter your credentials."
+              },
+              {
+                "text": "Keep your credentials private."
+              }
+            ],
+            "explanation": "Use credentials to sign in.",
+            "meaning": "\u767b\u5f55\u51ed\u636e",
+            "sense_key": "login"
+          }
+        ],
+        "note": "credential\n\n\u8d44\u683c\u8bc1\u660e\n\nA qualification or proof of identity.\n\nShe has strong credentials.\n\u5979\u6709\u5f88\u597d\u7684\u8d44\u5386\u3002\n\nCheck his credentials.\n\n\u767b\u5f55\u51ed\u636e\n\nUse credentials to sign in.\n\nEnter your credentials.\n\nKeep your credentials private.",
+        "scenes": [
+          "Work",
+          "Device controls"
+        ],
+        "status": "new",
+        "encounter_count": 2,
+        "repeat_priority": 1,
+        "last_review_result": null,
+        "created_at": "2026-01-01T10:20:30.012345+00:00",
+        "last_seen_at": "2026-01-01T10:20:30.012345+00:00",
+        "last_reviewed_at": null,
+        "content_ready": true,
+        "revision": "586075be97b5e54c19fcc08b0db2461d92618fbf5b24814f0a997fdddc4c105f",
+        "note_is_custom": false,
+        "note_title": "credential",
+        "note_preview": "\u8d44\u683c\u8bc1\u660e"
+      }
+    },
+    {
+      "raw": {
+        "id": 31,
+        "kind": "word",
+        "language": "en",
+        "title": "credential",
+        "title_key": "credential",
+        "sense_key": "qualification",
+        "meaning": "\u8d44\u683c\u8bc1\u660e",
+        "context": null,
+        "corrected_sentence": null,
+        "explanation": "A qualification or proof of identity.",
+        "examples": "[{\"text\":\"She has strong credentials.\",\"translation\":\"\u5979\u6709\u5f88\u597d\u7684\u8d44\u5386\u3002\"},{\"text\":\"Check his credentials.\"}]",
+        "additional_senses": "[{\"context\":null,\"corrected_sentence\":null,\"examples\":[{\"text\":\"Enter your credentials.\"},{\"text\":\"Keep your credentials private.\"}],\"explanation\":\"Use credentials to sign in.\",\"meaning\":\"\u767b\u5f55\u51ed\u636e\",\"sense_key\":\"login\"}]",
+        "note": "",
+        "scenes": "[\"Work\",\"Device controls\"]",
+        "status": "new",
+        "encounter_count": 2,
+        "repeat_priority": 1,
+        "last_review_result": null,
+        "created_at": "2026-01-01T10:20:30.012345+00:00",
+        "last_seen_at": "2026-01-01T10:20:30.012345+00:00",
+        "last_reviewed_at": null
+      },
+      "expected": {
+        "id": 31,
+        "kind": "word",
+        "language": "en",
+        "title": "credential",
+        "sense_key": "qualification",
+        "meaning": "\u8d44\u683c\u8bc1\u660e",
+        "context": null,
+        "corrected_sentence": null,
+        "explanation": "A qualification or proof of identity.",
+        "examples": [
+          {
+            "text": "She has strong credentials.",
+            "translation": "\u5979\u6709\u5f88\u597d\u7684\u8d44\u5386\u3002"
+          },
+          {
+            "text": "Check his credentials."
+          }
+        ],
+        "additional_senses": [
+          {
+            "context": null,
+            "corrected_sentence": null,
+            "examples": [
+              {
+                "text": "Enter your credentials."
+              },
+              {
+                "text": "Keep your credentials private."
+              }
+            ],
+            "explanation": "Use credentials to sign in.",
+            "meaning": "\u767b\u5f55\u51ed\u636e",
+            "sense_key": "login"
+          }
+        ],
+        "note": "",
+        "scenes": [
+          "Work",
+          "Device controls"
+        ],
+        "status": "new",
+        "encounter_count": 2,
+        "repeat_priority": 1,
+        "last_review_result": null,
+        "created_at": "2026-01-01T10:20:30.012345+00:00",
+        "last_seen_at": "2026-01-01T10:20:30.012345+00:00",
+        "last_reviewed_at": null,
+        "content_ready": true,
+        "revision": "371e108b48e66162a7789c8a2d6581541cefdd4965c74db9275e641faf2e0ace",
+        "note_is_custom": true,
+        "note_title": "",
+        "note_preview": ""
+      }
+    },
+    {
+      "raw": {
+        "id": 31,
+        "kind": "word",
+        "language": "en",
+        "title": "credential",
+        "title_key": "credential",
+        "sense_key": "qualification",
+        "meaning": "\u8d44\u683c\u8bc1\u660e",
+        "context": null,
+        "corrected_sentence": null,
+        "explanation": "A qualification or proof of identity.",
+        "examples": "[{\"text\":\"She has strong credentials.\",\"translation\":\"\u5979\u6709\u5f88\u597d\u7684\u8d44\u5386\u3002\"},{\"text\":\"Check his credentials.\"}]",
+        "additional_senses": "[{\"context\":null,\"corrected_sentence\":null,\"examples\":[{\"text\":\"Enter your credentials.\"},{\"text\":\"Keep your credentials private.\"}],\"explanation\":\"Use credentials to sign in.\",\"meaning\":\"\u767b\u5f55\u51ed\u636e\",\"sense_key\":\"login\"}]",
+        "note": "Custom first line\n\nMy custom second line",
+        "scenes": "[\"Work\",\"Device controls\"]",
+        "status": "new",
+        "encounter_count": 2,
+        "repeat_priority": 1,
+        "last_review_result": null,
+        "created_at": "2026-01-01T10:20:30.012345+00:00",
+        "last_seen_at": "2026-01-01T10:20:30.012345+00:00",
+        "last_reviewed_at": null
+      },
+      "expected": {
+        "id": 31,
+        "kind": "word",
+        "language": "en",
+        "title": "credential",
+        "sense_key": "qualification",
+        "meaning": "\u8d44\u683c\u8bc1\u660e",
+        "context": null,
+        "corrected_sentence": null,
+        "explanation": "A qualification or proof of identity.",
+        "examples": [
+          {
+            "text": "She has strong credentials.",
+            "translation": "\u5979\u6709\u5f88\u597d\u7684\u8d44\u5386\u3002"
+          },
+          {
+            "text": "Check his credentials."
+          }
+        ],
+        "additional_senses": [
+          {
+            "context": null,
+            "corrected_sentence": null,
+            "examples": [
+              {
+                "text": "Enter your credentials."
+              },
+              {
+                "text": "Keep your credentials private."
+              }
+            ],
+            "explanation": "Use credentials to sign in.",
+            "meaning": "\u767b\u5f55\u51ed\u636e",
+            "sense_key": "login"
+          }
+        ],
+        "note": "Custom first line\n\nMy custom second line",
+        "scenes": [
+          "Work",
+          "Device controls"
+        ],
+        "status": "new",
+        "encounter_count": 2,
+        "repeat_priority": 1,
+        "last_review_result": null,
+        "created_at": "2026-01-01T10:20:30.012345+00:00",
+        "last_seen_at": "2026-01-01T10:20:30.012345+00:00",
+        "last_reviewed_at": null,
+        "content_ready": true,
+        "revision": "3f3b0822f7561a5bd90c4abd43ea64cfdaaca13c7da63f2a9394eee4ef0f542b",
+        "note_is_custom": true,
+        "note_title": "Custom first line",
+        "note_preview": "My custom second line"
+      }
+    },
+    {
+      "raw": {
+        "id": 31,
+        "kind": "word",
+        "language": "en",
+        "title": "credential",
+        "title_key": "credential",
+        "sense_key": "qualification",
+        "meaning": "\u8d44\u683c\u8bc1\u660e",
+        "context": null,
+        "corrected_sentence": null,
+        "explanation": "A qualification or proof of identity.",
+        "examples": "[{\"text\":\"She has strong credentials.\",\"translation\":\"\u5979\u6709\u5f88\u597d\u7684\u8d44\u5386\u3002\"},{\"text\":\"Check his credentials.\"}]",
+        "additional_senses": "[{\"context\":null,\"corrected_sentence\":null,\"examples\":[{\"text\":\"Enter your credentials.\"},{\"text\":\"Keep your credentials private.\"}],\"explanation\":\"Use credentials to sign in.\",\"meaning\":\"\u767b\u5f55\u51ed\u636e\",\"sense_key\":\"login\"}]",
+        "note": "\ufeffThis mark is not stripped in Python\n\u4e0b\u4e00\u884c",
+        "scenes": "[\"Work\",\"Device controls\"]",
+        "status": "new",
+        "encounter_count": 2,
+        "repeat_priority": 1,
+        "last_review_result": null,
+        "created_at": "2026-01-01T10:20:30.012345+00:00",
+        "last_seen_at": "2026-01-01T10:20:30.012345+00:00",
+        "last_reviewed_at": null
+      },
+      "expected": {
+        "id": 31,
+        "kind": "word",
+        "language": "en",
+        "title": "credential",
+        "sense_key": "qualification",
+        "meaning": "\u8d44\u683c\u8bc1\u660e",
+        "context": null,
+        "corrected_sentence": null,
+        "explanation": "A qualification or proof of identity.",
+        "examples": [
+          {
+            "text": "She has strong credentials.",
+            "translation": "\u5979\u6709\u5f88\u597d\u7684\u8d44\u5386\u3002"
+          },
+          {
+            "text": "Check his credentials."
+          }
+        ],
+        "additional_senses": [
+          {
+            "context": null,
+            "corrected_sentence": null,
+            "examples": [
+              {
+                "text": "Enter your credentials."
+              },
+              {
+                "text": "Keep your credentials private."
+              }
+            ],
+            "explanation": "Use credentials to sign in.",
+            "meaning": "\u767b\u5f55\u51ed\u636e",
+            "sense_key": "login"
+          }
+        ],
+        "note": "\ufeffThis mark is not stripped in Python\n\u4e0b\u4e00\u884c",
+        "scenes": [
+          "Work",
+          "Device controls"
+        ],
+        "status": "new",
+        "encounter_count": 2,
+        "repeat_priority": 1,
+        "last_review_result": null,
+        "created_at": "2026-01-01T10:20:30.012345+00:00",
+        "last_seen_at": "2026-01-01T10:20:30.012345+00:00",
+        "last_reviewed_at": null,
+        "content_ready": true,
+        "revision": "699cfc63966385ce969c3cff93cfcf5b347f55051e92ad646484e16df6daad27",
+        "note_is_custom": true,
+        "note_title": "\ufeffThis mark is not stripped in Python",
+        "note_preview": "\u4e0b\u4e00\u884c"
+      }
+    }
+  ],
+  "normalization": [
+    {
+      "input": "Stra\u00dfe",
+      "expected": "strasse"
+    },
+    {
+      "input": "\u03a3\u03c2\u03c3",
+      "expected": "\u03c3\u03c3\u03c3"
+    },
+    {
+      "input": "\u0130STANBUL",
+      "expected": "i\u0307stanbul"
+    },
+    {
+      "input": "\uff21\uff34\u3000\uff28\uff2f\uff2d\uff25",
+      "expected": "at home"
+    },
+    {
+      "input": "\u001c Hello\u001fWORLD \ufeff",
+      "expected": "hello world \ufeff"
+    },
+    {
+      "input": "\ufb03",
+      "expected": "ffi"
+    },
+    {
+      "input": "\u01f0",
+      "expected": "j\u030c"
+    },
+    {
+      "input": "\ud801\udc00\ud801\udc28",
+      "expected": "\ud801\udc28\ud801\udc28"
+    }
+  ]
+}
