@@ -2,6 +2,7 @@ import { Picker } from "./picker.js";
 import { enter, openDialog } from "./motion.js";
 import { DateRange } from "./date-range.js";
 import { localDate, exportRange } from "./export-model.js";
+import { sceneLabel, sceneSelection } from "./scene-model.js";
 
 /** Keep export choices separate from the history view until a file is requested. */
 export class ExportDialog {
@@ -9,18 +10,24 @@ export class ExportDialog {
     this.root = root;
     Object.assign(this, helpers);
     this.kinds = new Set();
+    this.sceneCatalog = [];
+    this.sceneVersion = 0;
     this.generation = 0;
     this.pick = (id) => root.querySelector(`#export-${id}`);
     this.pickers = {};
-    for (const name of ["language", "status"]) {
+    for (const name of ["language", "status", "scene"]) {
       this.pickers[name] = new Picker(this.pick(name), {
-        label: name, onChange: () => { this.generation++; this.loadHistory(); },
+        label: name, onChange: () => {
+          this.generation++;
+          if (name === "language") this.refreshSceneScope();
+          else this.loadHistory();
+        },
       });
     }
     this.dates = new DateRange(this.pick("range"), {
       t: this.t, getLocale: this.getLocale, onChange: () => {
         this.generation++;
-        this.pick("next").disabled = Boolean(this.dates.from && !this.dates.through);
+        this.updateNextState();
       },
     });
     this.pick("filters").addEventListener("submit", (event) => { event.preventDefault(); this.next(); });
@@ -39,6 +46,7 @@ export class ExportDialog {
     language.setLabel(this.t("notebook"));
     language.setOptions([{value:"", label:this.t("allLanguages")}, ...this.getCatalog().languages.map(value => ({value,label:this.languageName(value)}))]);
     options("status", "status", [["", "allStatuses"], ["new", "new"], ["mastered", "mastered"]]);
+    this.renderScenes();
     this.renderKinds();
     this.dates.render();
     this.renderHistory();
@@ -61,16 +69,83 @@ export class ExportDialog {
         else this.kinds.add(kind);
         this.generation++;
         this.renderKinds();
-        this.loadHistory();
+        this.refreshSceneScope();
         host.querySelectorAll("button")[["", "word", "expression", "grammar"].indexOf(kind)].focus();
       });
       return button;
     }));
   }
 
+  renderScenes() {
+    const picker = this.pickers.scene;
+    const choices = this.sceneCatalog.map(({ name, count }) => ({ value: name, label: sceneLabel(name, this.t), count }));
+    // Retain an inherited scene while its scoped choices are still loading.
+    if (picker.value && !choices.some(({ value }) => value === picker.value))
+      choices.unshift({ value: picker.value, label: sceneLabel(picker.value, this.t) });
+    picker.setLabel(this.t("scene"));
+    picker.setOptions([{ value: "", label: this.t("allScenes") }, ...choices]);
+    picker.button.disabled = !!this.sceneLoading;
+  }
+
+  updateNextState() {
+    this.pick("next").disabled = !!this.sceneLoading || Boolean(this.dates.from && !this.dates.through);
+  }
+
+  loadScenes() {
+    const version = ++this.sceneVersion;
+    const language = this.pickers.language.value || null;
+    const kinds = this.kinds.size ? [...this.kinds] : [null];
+    this.sceneLoading = true;
+    this.sceneLoadError = null;
+    this.historyVersion = (this.historyVersion || 0) + 1;
+    this.history = null;
+    this.historyState = "exportHistoryLoading";
+    this.renderHistory();
+    this.renderScenes();
+    this.updateNextState();
+    const pending = (async () => {
+      try {
+        const catalogs = await Promise.all(kinds.map((kind) => this.api("scenes/list", {
+          language, kind, include_variants: true,
+        })));
+        if (version !== this.sceneVersion) return false;
+        const counts = new Map();
+        for (const { scenes } of catalogs) for (const { name, count } of scenes)
+          counts.set(name, (counts.get(name) || 0) + count);
+        this.sceneCatalog = [...counts].map(([name, count]) => ({ name, count }));
+        this.sceneCatalog.sort((a, b) => a.name.localeCompare(b.name));
+        this.pickers.scene.setValue(sceneSelection(this.sceneCatalog, this.pickers.scene.value));
+        return true;
+      } catch (error) {
+        if (version !== this.sceneVersion) return false;
+        this.sceneLoadError = error;
+        throw error;
+      } finally {
+        if (version === this.sceneVersion) {
+          this.sceneLoading = false;
+          this.renderScenes();
+          this.updateNextState();
+        }
+      }
+    })();
+    this.sceneRequest = pending;
+    return pending;
+  }
+
+  async refreshSceneScope() {
+    const generation = this.generation;
+    try {
+      if (await this.loadScenes()) await this.loadHistory();
+    } catch (error) {
+      if (generation === this.generation && this.root.open)
+        this.feedback(".export-feedback", this.errorKey(error), true);
+    }
+  }
+
   scope() {
     return {
       language: this.pickers.language.value || null, status: this.pickers.status.value || null,
+      scene: this.pickers.scene.value || null,
       include_variants: true, kinds: this.kinds.size ? [...this.kinds] : null,
       date_field: "created_at", content: "notes", include_metadata: false,
     };
@@ -125,15 +200,16 @@ export class ExportDialog {
     this.pick("filters").reset();
     this.kinds = new Set(current.kind ? [current.kind] : []);
     this.relabel();
-    for (const [name, value] of Object.entries({language:current.language || "", status:""}))
+    for (const [name, value] of Object.entries({language:current.language || "", status:"", scene:current.scene || ""}))
       this.pickers[name].setValue(value);
+    this.renderScenes();
     this.preview = null;
     this.dates.reset();
     this.dates.close();
     this.pick("next").disabled = false;
     this.showStep(false);
     openDialog(this.root);
-    this.loadHistory();
+    await this.refreshSceneScope();
   }
 
   showStep(formats) {
@@ -146,7 +222,8 @@ export class ExportDialog {
 
   renderPreview() {
     this.pick("selection-title").textContent = this.t("exportSelection", {count:this.preview.count});
-    this.pick("selection-range").textContent = this.dates.summary();
+    this.pick("selection-range").textContent = [this.dates.summary(),
+      this.prepared.scene && sceneLabel(this.prepared.scene, this.t)].filter(Boolean).join(" · ");
     this.pick("selection-preview").textContent = this.preview.titles.join(" · ") + (this.preview.count > this.preview.titles.length ? " …" : "");
   }
 
@@ -155,6 +232,9 @@ export class ExportDialog {
     this.pick("next").disabled = true;
     this.root.querySelector(".export-feedback").textContent = "";
     try {
+      if (this.sceneLoadError) await this.loadScenes();
+      else if (this.sceneRequest) await this.sceneRequest;
+      if (generation !== this.generation || !this.root.open) return;
       this.prepared = this.selection();
       const preview = await this.api("exports/preview", this.prepared);
       if (generation !== this.generation || !this.root.open) return;
@@ -162,7 +242,10 @@ export class ExportDialog {
       this.preview = preview;
       this.renderPreview();
       this.showStep(true);
-    } catch (error) { this.feedback(".export-feedback", this.errorKey(error), true); }
-    finally { this.pick("next").disabled = Boolean(this.dates.from && !this.dates.through); }
+    } catch (error) {
+      if (generation === this.generation && this.root.open)
+        this.feedback(".export-feedback", this.errorKey(error), true);
+    }
+    finally { if (generation === this.generation) this.updateNextState(); }
   }
 }

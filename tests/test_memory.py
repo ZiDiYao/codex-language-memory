@@ -181,7 +181,7 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual({tool.name for tool in tools.tools}, {
                     "get_recording", "set_recording", "save_points", "find_points",
                     "review_queue", "update_point", "delete_point",
-                    "get_settings", "update_settings", "open_memory_page", "list_languages", "export_points",
+                    "get_settings", "update_settings", "open_memory_page", "list_languages", "list_scenes", "export_points",
                     "record_review", "get_point_history", "get_learning_profile", "update_learning_preferences",
                     "start_study", "get_study", "prepare_study_question", "submit_study_answer", "set_study_state",
                     "open_memory_app", "memory_app_request",

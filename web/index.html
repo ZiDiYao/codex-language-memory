@@ -71,8 +71,9 @@
       <section id="records-panel">
         <div class="history-filters">
           <nav id="kinds" class="type-tabs" aria-label="Type"></nav>
-          <div class="history-language">
-            <div id="language"></div>
+          <div class="history-selectors">
+            <div id="language" class="history-language"></div>
+            <div id="scene" class="history-scene"></div>
           </div>
         </div>
         <form id="search-form" class="search-line" role="search">
@@ -166,6 +167,8 @@
           <div><span class="field-label" data-i18n="notebook"></span><div id="export-language"></div></div>
           <div><span class="field-label" data-i18n="status"></span><div id="export-status"></div></div>
         </div>
+        <span class="field-label" data-i18n="scene"></span>
+        <div id="export-scene"></div>
         <span class="field-label" data-i18n="kind"></span>
         <div id="export-kinds" class="type-tabs"></div>
         <div class="export-date-range"><span class="field-label" data-i18n="exportRangeLabel"></span><div id="export-range"></div></div>

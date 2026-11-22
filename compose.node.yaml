@@ -1,0 +1,19 @@
+# Optional override: docker compose -f compose.yaml -f compose.node.yaml ...
+# The original compose.yaml continues to run the Python implementation.
+services:
+  backend:
+    build:
+      context: ./backend-node
+      dockerfile: Dockerfile
+    image: language-memory-cloud-node:dev
+    environment:
+      DATABASE_URL: postgresql://language_memory:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/language_memory
+
+  migrate:
+    build:
+      context: ./backend-node
+      dockerfile: Dockerfile
+    image: language-memory-cloud-node:dev
+    command: ["node", "src/migration.js"]
+    environment:
+      DATABASE_URL: postgresql://language_memory:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/language_memory

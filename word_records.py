@@ -2,6 +2,8 @@
 
 import json
 
+from scenes import unique_scenes
+
 
 CONTENT_FIELDS = ("sense_key", "meaning", "explanation", "context", "corrected_sentence", "examples")
 
@@ -94,6 +96,18 @@ def _merge_legacy_word(db, primary, duplicate):
         left = note if note is not None else generated_note(primary)
         right = duplicate["note"] if duplicate["note"] is not None else generated_note(duplicate)
         note = left if left == right else "\n\n".join(filter(None, (left, right)))
+    # Preserve scene membership in restored/imported legacy databases too.
+    # A manual primary selection wins conflicts; otherwise a manual duplicate
+    # replaces automatic labels. Both-manual conflicts retain the primary and
+    # keep the duplicate's complete original in merged_words for recovery.
+    scenes, scenes_custom = primary["scenes"], primary["scenes_custom"]
+    if not scenes_custom:
+        if duplicate["scenes_custom"]:
+            scenes, scenes_custom = duplicate["scenes"], 1
+        elif scenes is not None or duplicate["scenes"] is not None:
+            scenes = encode(unique_scenes([
+                *json.loads(scenes or "[]"), *json.loads(duplicate["scenes"] or "[]"),
+            ]))
     overlap = _merge_encounters(db, identifier, old_id)
     latest = max((primary, duplicate), key=lambda p: p["last_reviewed_at"] or "")
     if state and (not primary_state or json.loads(state["card"])["last_review"] > json.loads(primary_state["card"])["last_review"]):
@@ -110,12 +124,12 @@ def _merge_legacy_word(db, primary, duplicate):
             AND (other.review_event_id IS NOT NULL OR other.ordinal < pending.ordinal))""", (identifier,))
     db.execute("""UPDATE knowledge SET additional_senses = ?, note = ?, encounter_count = ?,
         created_at = ?, last_seen_at = ?, last_reviewed_at = ?, last_review_result = ?, status = ?,
-        repeat_priority = ? WHERE id = ?""",
+        repeat_priority = ?, scenes = ?, scenes_custom = ? WHERE id = ?""",
         (extras, note, primary["encounter_count"] + duplicate["encounter_count"] - overlap,
          min(primary["created_at"], duplicate["created_at"]), max(primary["last_seen_at"], duplicate["last_seen_at"]),
          latest["last_reviewed_at"], latest["last_review_result"],
          "mastered" if primary["status"] == duplicate["status"] == "mastered" else "new",
-         max(primary["repeat_priority"], duplicate["repeat_priority"]), identifier))
+         max(primary["repeat_priority"], duplicate["repeat_priority"]), scenes, scenes_custom, identifier))
     db.execute("DELETE FROM knowledge WHERE id = ?", (old_id,))
 
 

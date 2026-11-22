@@ -1,0 +1,23 @@
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app
+COPY requirements.txt requirements-cloud.txt ./
+RUN python -m pip install --no-cache-dir -r requirements-cloud.txt \
+    && groupadd --gid 10001 memory \
+    && useradd --uid 10001 --gid memory --no-create-home --shell /usr/sbin/nologin memory
+
+# Only cloud code and its shared validation/learning modules enter this image.
+# Local databases, desktop assets, installer and speech code are excluded.
+COPY --chown=memory:memory cloud ./cloud
+COPY --chown=memory:memory alembic ./alembic
+COPY --chown=memory:memory alembic.ini store.py scenes.py learning.py study.py word_records.py ./
+
+USER memory
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import os, urllib.request; port = int(os.environ.get('PORT', '8080')); urllib.request.urlopen(f'http://127.0.0.1:{port}/readyz', timeout=3).close()"
+CMD ["python", "-m", "cloud.main"]

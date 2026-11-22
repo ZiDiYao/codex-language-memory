@@ -1,10 +1,11 @@
 import { messages } from "./i18n.js";
 import { Picker } from "./picker.js";
-import { enter, reveal, conceal, openDialog, closeDialog, disclosure } from "./motion.js";
+import { enter, enterResults, reveal, conceal, openDialog, closeDialog, disclosure } from "./motion.js";
 
 import { EntryEditor } from "./entry-editor.js";
 import { RecordFeed } from "./record-feed.js";
 import { languageSelection } from "./history-model.js";
+import { sceneSelection, sceneLabel } from "./scene-model.js";
 import { ExportDialog } from "./export-dialog.js";
 import { request, saveDownload } from "./transport.js";
 
@@ -23,12 +24,55 @@ let settingsWriteError;
 let noticeTimer;
 const displayed = new Map();
 const editors = new Map();
+let speechButton;
+let speechTimer;
+let speechStarting = false;
+function resetSpeechButton() {
+  if (speechButton) {
+    speechButton.setAttribute("aria-pressed", "false");
+    speechButton.classList.remove("is-speaking");
+  }
+  speechButton = null;
+  clearTimeout(speechTimer);
+}
+async function listen(button, recordId) {
+  if (speechStarting) return;
+  speechStarting = true;
+  button.disabled = true;
+  try {
+    const result = await api("speech/play", { record_id: recordId });
+    resetSpeechButton();
+    if (result.playing) {
+      speechButton = button;
+      button.setAttribute("aria-pressed", "true");
+      button.classList.add("is-speaking");
+      const poll = async () => {
+        if (speechButton !== button) return;
+        try {
+          const state = await api("speech/status");
+          if (speechButton !== button) return;
+          if (!state.playing || state.record_id !== recordId) {
+            resetSpeechButton();
+            if (state.error) notice(state.error, true);
+          } else speechTimer = setTimeout(poll, 450);
+        } catch { resetSpeechButton(); }
+      };
+      speechTimer = setTimeout(poll, 450);
+    }
+  } catch (error) { showError(error); }
+  finally { button.disabled = false; speechStarting = false; }
+}
 let selectedLanguage = "";
 let selectedKind = "";
+let committedFiltersKey = null;
+let selectedScene = "";
+let sceneCatalog = [];
+let sceneCatalogVersion = 0;
 let switchingFilters = false;
 const historyFeed = new RecordFeed({
   fetchPage: (args) => api("points/query", args),
-  canCommit: ({ preserve }) => !hasDirtyEditors() && !(preserve && historyIsInteracting()),
+  canCommit: ({ preserve, filtersKey }) => filtersKey === JSON.stringify(filters()) &&
+    !hasDirtyEditors() && !(preserve && historyIsInteracting()),
   onStart: beginHistoryLoad,
   onCommit: renderRecords,
   onError: failHistoryLoad,
@@ -66,6 +110,10 @@ function languageName(code) {
 const languagePicker = new Picker($("#language"), {
   label: "Learning language",
   onChange: (value) => changeFilter("language", value),
+});
+const scenePicker = new Picker($("#scene"), {
+  label: "Scene",
+  onChange: (value) => changeFilter("scene", value),
 });
 const localePicker = new Picker($("#ui-language"), {
   label: "Interface language",
@@ -125,23 +173,60 @@ function renderKinds() {
   }));
   if (restoreFocus) nav.querySelector('[aria-pressed="true"]')?.focus({ preventScroll: true });
 }
+function renderScenes() {
+  scenePicker.setLabel(t("scene"));
+  scenePicker.setOptions([{ value: "", label: t("allScenes") }, ...sceneCatalog.map(({ name, count }) => ({
+    value: name, label: sceneLabel(name, t), count,
+  }))]);
+  scenePicker.setValue(selectedScene);
+  scenePicker.button.title = selectedScene ? sceneLabel(selectedScene, t) : t("allScenes");
+  scenePicker.button.disabled = !sceneCatalog.length;
+}
+async function loadScenes(preserve = false) {
+  const version = ++sceneCatalogVersion;
+  const scope = { include_variants: true };
+  if (selectedLanguage) scope.language = selectedLanguage;
+  if (selectedKind) scope.kind = selectedKind;
+  const result = await api("scenes/list", scope);
+  if (version !== sceneCatalogVersion || (scope.language || "") !== selectedLanguage ||
+      (scope.kind || "") !== selectedKind) return false;
+  if (preserve && (hasDirtyEditors() || historyIsInteracting() || switchingFilters)) return false;
+  sceneCatalog = result.scenes;
+  selectedScene = sceneSelection(sceneCatalog, selectedScene);
+  renderScenes();
+  return true;
+}
 async function changeFilter(name, value) {
   if (switchingFilters) {
     languagePicker.setValue(selectedLanguage);
+    scenePicker.setValue(selectedScene);
     return;
   }
-  if (value === (name === "language" ? selectedLanguage : selectedKind)) return;
+  if (value === ({ language: selectedLanguage, kind: selectedKind, scene: selectedScene })[name]) return;
+  const previous = { language: selectedLanguage, kind: selectedKind, scene: selectedScene };
   switchingFilters = true;
   try {
     if (!(await flushEditors())) {
       languagePicker.setValue(selectedLanguage);
+      scenePicker.setValue(selectedScene);
       return;
     }
     if (name === "language") selectedLanguage = value;
-    else selectedKind = value;
+    else if (name === "kind") selectedKind = value;
+    else selectedScene = value;
     renderCatalog();
     renderKinds();
+    renderScenes();
+    if (name !== "scene") await loadScenes();
     await loadRecords(true);
+  } catch (error) {
+    selectedLanguage = previous.language;
+    selectedKind = previous.kind;
+    selectedScene = previous.scene;
+    renderCatalog();
+    renderKinds();
+    renderScenes();
+    showError(error);
   } finally { switchingFilters = false; }
 }
 async function flushEditors() {
@@ -179,6 +264,7 @@ function applyLocale() {
   localePicker.setValue(locale);
   renderCatalog();
   renderKinds();
+  renderScenes();
   renderLanguagePreferences();
   refreshEditorLocales();
   exportDialog.relabel();
@@ -240,6 +326,7 @@ function filters() {
     keyword: $("#search").value.trim(),
     language: selectedLanguage,
     kind: selectedKind,
+    scene: selectedScene,
   })) {
     if (value) result[key] = value;
   }
@@ -264,6 +351,17 @@ function card(record, expanded = false) {
   const body = element("div", undefined, "entry-body");
   const heading = element("div", undefined, "entry-heading");
   const title = element("h3");
+  const listenButton = element("button", undefined, "icon-button entry-listen");
+  listenButton.type = "button";
+  listenButton.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM15 8c2 2 2 6 0 8M18 5c4 4 4 10 0 14"/></svg>';
+  listenButton.setAttribute("aria-label", t("listen"));
+  listenButton.setAttribute("aria-pressed", "false");
+  listenButton.title = t("listen");
+  listenButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    listen(listenButton, record.id);
+  });
   const mastery = element("div", undefined, "entry-status-group");
   mastery.setAttribute("role", "group");
   mastery.setAttribute("aria-label", t("status"));
@@ -276,7 +374,7 @@ function card(record, expanded = false) {
   mastery.append(...statusButtons);
   const preview = element("p", undefined, "entry-preview");
   const lastSeen = translated("small", "lastSeen", { date: record.last_seen_at }, "entry-last-seen");
-  heading.append(title, mastery, element("span", undefined, "entry-chevron"));
+  heading.append(title, listenButton, mastery, element("span", undefined, "entry-chevron"));
   summary.append(heading, preview, lastSeen);
   function renderSummary(point) {
     const fullTitle = point.note_title || t("untitledNote");
@@ -344,6 +442,7 @@ function captureHistoryView(reset, preserve) {
     : null;
   return {
     reset, preserve,
+    filtersKey: JSON.stringify(filters()),
     expanded: new Set(preserve
       ? [...document.querySelectorAll(".history-entry[open]")].map((node) => node.dataset.id) : []),
     anchorId: anchor?.dataset.id,
@@ -355,25 +454,42 @@ function clearRecords() {
   editors.clear();
   $("#records").replaceChildren();
 }
-function renderRecords(data, { reset, preserve, expanded, anchorId, anchorTop }) {
-  if (reset) clearRecords();
-  const added = [];
-  for (const record of data.records) {
-    if (displayed.has(record.id)) continue;
-    displayed.set(record.id, record);
-    const node = card(record, expanded.has(String(record.id)));
-    $("#records").append(node);
-    added.push(node);
+function renderRecords(data, { reset, preserve, expanded, anchorId, anchorTop, filtersKey }) {
+  const host = $("#records");
+  if (reset) {
+    const incoming = new Map(data.records.map((record) => [record.id, record]));
+    for (const [id, previous] of displayed) {
+      const next = incoming.get(id);
+      if (next && JSON.stringify(previous) === JSON.stringify(next)) continue;
+      editors.get(id)?.card.remove();
+      editors.delete(id);
+      displayed.delete(id);
+    }
   }
-  if (!displayed.size) {
+  const added = [];
+  if (data.records.length) host.querySelector(".empty")?.remove();
+  let previousNode = null;
+  for (const record of data.records) {
+    let node = editors.get(record.id)?.card;
+    if (!node) {
+      displayed.set(record.id, record);
+      node = card(record, expanded.has(String(record.id)));
+      added.push(node);
+    }
+    if (reset) {
+      const nextSlot = previousNode ? previousNode.nextSibling : host.firstChild;
+      if (node !== nextSlot) host.insertBefore(node, nextSlot);
+      previousNode = node;
+    } else if (!node.isConnected) host.append(node);
+  }
+  if (!displayed.size && !host.querySelector(".empty")) {
     const empty = element("div", undefined, "empty");
     empty.append(translated("strong", "emptyTitle"), translated("p", "emptyHelp"));
-    $("#records").append(empty);
+    host.append(empty);
+    added.push(empty);
   }
-  if (!preserve) {
-    if (reset) enter($("#records"), 5);
-    else added.forEach((node) => enter(node, 4));
-  }
+  if (!preserve) enterResults(added);
+  committedFiltersKey = filtersKey;
   updateLoadState(data.has_more ? "scrollMore" : "allLoaded", { count: displayed.size });
   if (anchorId) {
     const restored = [...$("#records").children].find((node) => node.dataset.id === anchorId);
@@ -382,9 +498,8 @@ function renderRecords(data, { reset, preserve, expanded, anchorId, anchorTop })
 }
 function beginHistoryLoad({ reset, preserve }) {
   $("#retry-load").hidden = true;
-  updateLoadState("loading");
+  if (!reset || !$("#records").children.length) updateLoadState("loading");
   $("#records").setAttribute("aria-busy", "true");
-  $("#records").classList.toggle("is-filtering", reset && !preserve);
 }
 function failHistoryLoad(error) {
   if (error.message === "notFound" && !hasDirtyEditors()) clearRecords();
@@ -393,11 +508,11 @@ function failHistoryLoad(error) {
 }
 function finishHistoryLoad() {
   $("#records").removeAttribute("aria-busy");
-  $("#records").classList.remove("is-filtering");
   if (!historyFeed.failed) requestAnimationFrame(maybeLoadMore);
 }
 function maybeLoadMore() {
-  if (ready && !historyFeed.loading && !historyFeed.failed && historyFeed.hasMore &&
+  if (ready && JSON.stringify(filters()) === committedFiltersKey &&
+      !historyFeed.loading && !historyFeed.failed && historyFeed.hasMore &&
       $("#load-sentinel").getBoundingClientRect().top < window.innerHeight + 250) {
     loadRecords();
   }
@@ -461,8 +576,12 @@ async function synchronize() {
     refreshEditorLocales();
     const latest = await api("changes/read");
     if (latest.content !== versions.content) {
-      catalog = await api("languages/list");
+      if (hasDirtyEditors() || historyIsInteracting() || switchingFilters) return;
+      const latestCatalog = await api("languages/list");
+      if (hasDirtyEditors() || historyIsInteracting() || switchingFilters) return;
+      catalog = latestCatalog;
       renderCatalog();
+      if (!(await loadScenes(true))) return;
       if (await loadRecords(true, true)) versions.content = latest.content;
     }
     if (latest.preferences !== versions.preferences && !pendingSettingWrites) {
@@ -582,6 +701,7 @@ async function initialize() {
     applyLocale();
     localePicker.button.disabled = false;
     ready = true;
+    await loadScenes();
     await loadRecords(true);
     if (!settings.first_language) openDialog($("#settings-dialog"));
   } catch (error) {

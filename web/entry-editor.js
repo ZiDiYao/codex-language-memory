@@ -1,4 +1,6 @@
 /** Inline editing with automatic saves and protection for concurrent changes. */
+import { parseScenes } from "./scene-model.js";
+
 export class EntryEditor {
   constructor(record, helpers) {
     this.record = record;
@@ -9,7 +11,7 @@ export class EntryEditor {
     this.node = this.render();
   }
 
-  get dirty() { return !!this.running || Object.keys(this.pending).length > 0; }
+  get dirty() { return !!this.running || !!this.invalidSceneDraft || !!this.sceneComposing || Object.keys(this.pending).length > 0; }
 
   text(tag, value, className = "") {
     const node = document.createElement(tag);
@@ -52,27 +54,66 @@ export class EntryEditor {
 
   queue(patch) {
     Object.assign(this.pending, patch);
-    if (this.error !== "editConflict") this.error = null;
+    if (this.error !== "editConflict") this.error = this.invalidSceneDraft ? "invalidScenes" : null;
     this.reflect(this.error || "saving");
     clearTimeout(this.timer);
     if (!this.error && !this.composing) this.timer = setTimeout(() => this.flush(), 650);
+  }
+
+  scenes(values) {
+    const label = this.text("label", "", "entry-scenes");
+    label.append(this.text("span", this.t("scenes")));
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "entry-scenes-input";
+    input.value = (values || []).join(", ");
+    input.placeholder = this.t("scenesPlaceholder");
+    input.maxLength = 1000;
+    input.dir = "auto";
+    input.setAttribute("aria-label", this.t("scenes"));
+    input.title = this.t("scenesHelp");
+    const update = () => {
+      if (this.sceneComposing) return;
+      try {
+        const scenes = parseScenes(input.value);
+        this.invalidSceneDraft = false;
+        input.removeAttribute("aria-invalid");
+        this.queue({ scenes });
+      } catch {
+        clearTimeout(this.timer);
+        this.invalidSceneDraft = true;
+        input.setAttribute("aria-invalid", "true");
+        if (this.error !== "editConflict") this.error = "invalidScenes";
+        this.reflect(this.error);
+      }
+    };
+    input.addEventListener("compositionstart", () => {
+      this.sceneComposing = true;
+      clearTimeout(this.timer);
+    });
+    input.addEventListener("compositionend", () => { this.sceneComposing = false; update(); });
+    input.addEventListener("input", update);
+    input.addEventListener("blur", () => this.flush());
+    label.append(input);
+    return label;
   }
 
   reflect(key) {
     this.footer.hidden = !this.error;
     this.feedback.textContent = this.error ? this.t(key) : "";
     this.feedback.classList.toggle("error", !!this.error);
-    this.retry.hidden = !this.error || this.error === "editConflict";
+    this.retry.hidden = !this.error || ["editConflict", "invalidScenes"].includes(this.error);
     this.reload.hidden = !this.error;
   }
 
   async flush() {
     clearTimeout(this.timer);
-    if (this.composing) return false;
+    if (this.composing || this.sceneComposing || this.invalidSceneDraft) return false;
     if (this.running) return this.running;
     if (this.error === "editConflict") return false;
     this.running = (async () => {
       while (Object.keys(this.pending).length) {
+        if (this.invalidSceneDraft || this.sceneComposing) return false;
         const patch = this.pending;
         this.pending = {};
         try {
@@ -80,9 +121,9 @@ export class EntryEditor {
             record_id: this.record.id, patch, expected_revision: this.record.revision,
           });
           this.record = result.record;
-          this.error = null;
+          this.error = this.invalidSceneDraft ? "invalidScenes" : null;
           this.onChange(this.record);
-          this.reflect("saved");
+          this.reflect(this.error || "saved");
         } catch (error) {
           this.pending = { ...patch, ...this.pending };
           this.error = error.message;
@@ -90,7 +131,7 @@ export class EntryEditor {
           return false;
         }
       }
-      return true;
+      return !this.invalidSceneDraft && !this.sceneComposing;
     })();
     try { return await this.running; }
     finally { this.running = null; }
@@ -102,6 +143,7 @@ export class EntryEditor {
       clearTimeout(this.timer);
       this.record = result.record;
       this.pending = {};
+      this.invalidSceneDraft = false;
       this.error = null;
       const old = this.node;
       this.node = this.render();
@@ -130,7 +172,7 @@ export class EntryEditor {
     article.dataset.id = record.id;
     const meta = this.text("div", `${this.t(record.kind)} · ${this.languageName(record.language)}`, "entry-meta");
     meta.append(this.text("span", this.t("lastSeen", { date: record.last_seen_at })));
-    article.append(meta, this.note(record.note));
+    article.append(meta, this.note(record.note), this.scenes(record.scenes));
     this.footer = this.text("div", "", "entry-footer");
     this.footer.hidden = true;
     this.feedback = this.text("span", "", "help");

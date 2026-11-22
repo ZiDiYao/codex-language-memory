@@ -1,0 +1,69 @@
+name: language-memory-cloud
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: language_memory
+      POSTGRES_DB: language_memory
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env to a random hexadecimal password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U language_memory -d language_memory"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.cloud
+    image: language-memory-cloud:dev
+    environment:
+      DATABASE_URL: postgresql+psycopg://language_memory:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/language_memory
+      PUBLIC_URL: ${PUBLIC_URL:?Set the externally reachable HTTPS service root}
+      AUTH_ISSUER: ${AUTH_ISSUER:?Set the exact external OIDC issuer}
+      AUTH_AUDIENCE: ${AUTH_AUDIENCE:?Set the JWT audience for this API}
+      AUTH_JWKS_URL: ${AUTH_JWKS_URL:?Set the external issuer HTTPS JWKS endpoint}
+      AUTH_REQUIRED_SCOPES: ${AUTH_REQUIRED_SCOPES:-memory:read memory:write}
+      CLOUD_ALLOW_INSECURE_LOCAL: "false"
+      HOST: 0.0.0.0
+      PORT: "8080"
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+  migrate:
+    profiles: ["tools"]
+    build:
+      context: .
+      dockerfile: Dockerfile.cloud
+    image: language-memory-cloud:dev
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://language_memory:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/language_memory
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  postgres-data:

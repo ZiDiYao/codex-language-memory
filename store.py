@@ -8,9 +8,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints, ValidationError, field_validator, model_validator
 
 from learning import ALGORITHM, advance, memory_snapshot, recall_rating
+from scenes import infer_scenes, unique_scenes
 from study import STUDY_SCHEMA
 from word_records import generated_note, merge_sense, migrate_words, resolve_id
 
@@ -30,6 +31,14 @@ Limit = Annotated[int, Field(ge=1, le=50)]
 RecordId = Annotated[int, Field(gt=0)]
 RecordIds = Annotated[list[RecordId], Field(min_length=1, max_length=500)]
 Revision = Annotated[str, StringConstraints(pattern=r"^[a-f0-9]{64}$")]
+def clean_scene_name(value):
+    return " ".join(unicodedata.normalize("NFKC", value).split()) if isinstance(value, str) else value
+
+
+SceneName = Annotated[str, StringConstraints(
+    strip_whitespace=True, min_length=1, max_length=80, pattern=r"^[^,;]+$",
+), BeforeValidator(clean_scene_name)]
+Scenes = Annotated[list[SceneName], Field(max_length=12)]
 
 
 class StrictModel(BaseModel):
@@ -47,6 +56,12 @@ class Content(StrictModel):
     corrected_sentence: Text | None = None
     explanation: Text | None = None
     examples: Annotated[list[Example], Field(max_length=5)] | None = None
+    scenes: Scenes | None = None
+
+    @field_validator("scenes")
+    @classmethod
+    def normalize_scenes(cls, values):
+        return unique_scenes(values) if values is not None else None
 
 
 class KnowledgePoint(Content):
@@ -157,6 +172,8 @@ CREATE TABLE IF NOT EXISTS knowledge (
     last_reviewed_at TEXT,
     last_review_result TEXT,
     note TEXT,
+    scenes TEXT,
+    scenes_custom INTEGER NOT NULL DEFAULT 0,
     UNIQUE (kind, language, title_key, sense_key)
 );
 
@@ -266,13 +283,15 @@ def example_count(value: str | None) -> int:
 def record(row: sqlite3.Row) -> dict:
     result = dict(row)
     result.pop("title_key")
+    result.pop("scenes_custom", None)
+    result["scenes"] = json.loads(result.get("scenes") or "[]")
     result["examples"] = json.loads(result["examples"]) if result["examples"] else []
     result["additional_senses"] = json.loads(result.get("additional_senses") or "[]")
     result["content_ready"] = result["note"] is not None or bool(
         result["explanation"] and result["explanation"].strip() and example_count(row["examples"]) >= 2
     )
     result["revision"] = hashlib.sha256(encode({key: result.get(key) for key in (
-        "title", "sense_key", "meaning", "context", "corrected_sentence", "explanation", "examples", "status", "note", "additional_senses",
+        "title", "sense_key", "meaning", "context", "corrected_sentence", "explanation", "examples", "status", "note", "additional_senses", "scenes",
     )}).encode()).hexdigest()
     result["note_is_custom"] = result["note"] is not None
     if result["note"] is None:
@@ -290,6 +309,8 @@ def content_fields(value: dict) -> dict:
         value["sense_key"] = normalized(value["sense_key"])
     if value.get("examples") is not None:
         value["examples"] = encode(value["examples"])
+    if value.get("scenes") is not None:
+        value["scenes"] = encode(value["scenes"])
     return value
 
 
@@ -304,8 +325,15 @@ class Store:
             columns = {row["name"] for row in db.execute("PRAGMA table_info(knowledge)")}
             if "note" not in columns:
                 db.execute("ALTER TABLE knowledge ADD COLUMN note TEXT")
+            if "scenes" not in columns:
+                db.execute("ALTER TABLE knowledge ADD COLUMN scenes TEXT")
+            if "scenes_custom" not in columns:
+                db.execute("ALTER TABLE knowledge ADD COLUMN scenes_custom INTEGER NOT NULL DEFAULT 0")
             db.execute("UPDATE knowledge SET status = 'new' WHERE status = 'learning'")
             migrate_words(db)
+            for row in db.execute("SELECT * FROM knowledge WHERE scenes IS NULL").fetchall():
+                labels = self._canonical_scenes(db, infer_scenes(dict(row)))
+                db.execute("UPDATE knowledge SET scenes = ? WHERE id = ?", (encode(labels), row["id"]))
 
     @contextmanager
     def connection(self, *, write=False):
@@ -433,6 +461,13 @@ class Store:
             identity += " AND sense_key = ?"
             identity_args = key
         existing = db.execute(f"SELECT * FROM knowledge WHERE {identity}", identity_args).fetchone()
+        if existing is None:
+            labels = point.scenes if point.scenes is not None else infer_scenes(point.model_dump())
+            data["scenes"] = encode(self._canonical_scenes(db, labels))
+        elif point.scenes is not None and not existing["scenes_custom"]:
+            combined = unique_scenes([*json.loads(existing["scenes"] or "[]"), *point.scenes])
+            if len(combined) > 12:
+                return {"status": "failed", "error": "scene_limit_exceeded"}
         already_encountered = existing is not None and db.execute(
             "SELECT 1 FROM encounters WHERE record_id = ? AND request_id = ?",
             (existing["id"], request_id),
@@ -460,16 +495,19 @@ class Store:
         same_sense = normalized(point.sense_key) == existing["sense_key"]
         if point.kind == "word":
             extras = encode(merge_sense(dict(existing), point.model_dump()))
+        scenes = json.loads(existing["scenes"] or "[]")
+        if point.scenes is not None and not existing["scenes_custom"]:
+            scenes = self._canonical_scenes(db, [*scenes, *point.scenes])
         db.execute(
             """UPDATE knowledge SET encounter_count = encounter_count + ?,
                repeat_priority = repeat_priority + ?, additional_senses = ?,
                last_seen_at = ?, context = COALESCE(?, context),
                explanation = COALESCE(NULLIF(explanation, ''), ?), examples = ?,
-               corrected_sentence = COALESCE(corrected_sentence, ?) WHERE id = ?""",
+               corrected_sentence = COALESCE(corrected_sentence, ?), scenes = ? WHERE id = ?""",
             (int(new_encounter), int(new_encounter), extras, timestamp,
              point.context if same_sense else None, point.explanation if same_sense else None,
              self._merge_examples(existing, point.examples) if same_sense else existing["examples"],
-             point.corrected_sentence if same_sense else None, existing["id"]),
+             point.corrected_sentence if same_sense else None, encode(scenes), existing["id"]),
         )
         return {"status": "merged", "id": existing["id"],
                 "encounter_count": existing["encounter_count"] + int(new_encounter)}
@@ -494,7 +532,14 @@ class Store:
         cursor = db.execute(f"INSERT INTO knowledge ({columns}) VALUES ({placeholders})", tuple(data.values()))
         return {"status": "added", "id": cursor.lastrowid, "encounter_count": 1}
 
-    def _filters(self, *, keyword=None, kind=None, language=None, status=None,
+    @staticmethod
+    def _canonical_scenes(db, labels):
+        names = {normalized(row[0]): row[0] for row in db.execute(
+            "SELECT DISTINCT value FROM knowledge, json_each(COALESCE(knowledge.scenes, '[]')) ORDER BY knowledge.id"
+        )}
+        return unique_scenes(names.get(normalized(label), label) for label in labels)
+
+    def _filters(self, *, keyword=None, kind=None, language=None, status=None, scene=None,
                  include_variants=False, needs_enrichment=False, record_ids=None):
         filters = []
         params = []
@@ -510,6 +555,9 @@ class Store:
         if language is not None:
             filters.append("(language = ? OR (? AND language LIKE ?))")
             params.extend((language, include_variants, language + "-%"))
+        if scene is not None:
+            filters.append("EXISTS (SELECT 1 FROM json_each(COALESCE(knowledge.scenes, '[]')) WHERE normalize(value) = ?)")
+            params.append(normalized(scene))
         if keyword is not None:
             columns = ("title", "sense_key", "meaning", "context", "corrected_sentence", "explanation", "examples", "note", "additional_senses")
             clauses = [f"instr(normalize(coalesce({column}, '')), ?) > 0" for column in columns]
@@ -519,11 +567,11 @@ class Store:
             filters.append("(note IS NULL AND (explanation IS NULL OR trim(explanation) = '' OR example_count(examples) < 2))")
         return filters, params
 
-    def query(self, *, keyword=None, kind=None, language=None, status=None, limit=10, offset=0,
+    def query(self, *, keyword=None, kind=None, language=None, status=None, scene=None, limit=10, offset=0,
               include_variants=False, cursor=None, needs_enrichment=False):
         filters, params = self._filters(keyword=keyword, kind=kind, language=language,
                                         status=status, include_variants=include_variants,
-                                        needs_enrichment=needs_enrichment)
+                                        needs_enrichment=needs_enrichment, scene=scene)
         term = normalized(keyword or "")
         rank_sql = "0"
         rank_params = []
@@ -591,10 +639,10 @@ class Store:
                 f"SELECT * FROM knowledge WHERE {where} ORDER BY last_seen_at DESC, id DESC", params,
             )]
 
-    def review(self, *, language=None, kind=None, limit=5, include_variants=False, include_upcoming=False,
+    def review(self, *, language=None, kind=None, scene=None, limit=5, include_variants=False, include_upcoming=False,
                exclude_ids=None, _db=None):
         timestamp = now()
-        clauses, params = self._filters(language=language, kind=kind, status="new", include_variants=include_variants)
+        clauses, params = self._filters(language=language, kind=kind, scene=scene, status="new", include_variants=include_variants)
         clauses.append("(note IS NULL OR normalize(coalesce(note, '')) <> '')")
         if exclude_ids:
             placeholders = ",".join("?" for _ in exclude_ids)
@@ -642,6 +690,22 @@ class Store:
             return {"records": records, "counts": counts, "next_due_at": next_due,
                     "as_of": timestamp, "algorithm": ALGORITHM}
 
+    def scenes(self, *, language=None, kind=None, include_variants=False) -> dict:
+        filters, params = self._filters(language=language, kind=kind, include_variants=include_variants)
+        where = " AND ".join(filters) or "1"
+        with self.connection() as db:
+            rows = db.execute(f"SELECT knowledge.id, scenes FROM knowledge WHERE {where}", params).fetchall()
+        labels, counts = {}, {}
+        total = 0
+        for row in rows:
+            values = unique_scenes(json.loads(row["scenes"] or "[]"))
+            total += bool(values)
+            for name in values:
+                key = normalized(name)
+                labels.setdefault(key, name)
+                counts[key] = counts.get(key, 0) + 1
+        return {"scenes": [{"name": labels[key], "count": counts[key]} for key in sorted(labels)], "total": total}
+
     def languages(self) -> dict:
         with self.connection() as db:
             codes = set()
@@ -668,13 +732,12 @@ class Store:
         changes = patch.model_dump(exclude_unset=True)
         if not changes:
             return {"status": "failed", "error": "empty_patch"}
-        for required in ("title", "sense_key", "meaning", "status", "review_result"):
+        for required in ("title", "sense_key", "meaning", "status", "review_result", "scenes"):
             if required in changes and changes[required] is None:
                 return {"status": "failed", "error": f"{required}_cannot_be_null"}
         if "review_result" in changes:
             return {"status": "failed", "error": "use_record_review_with_request_id"}
-        data = content_fields(changes)
-        assignments = ", ".join(f"{column} = ?" for column in data)
+        data = content_fields(dict(changes))
         with self.connection(write=True) as db:
             record_id = resolve_id(db, record_id)
             if expected_revision is not None:
@@ -683,6 +746,10 @@ class Store:
                     return {"status": "not_found"}
                 if record(current)["revision"] != expected_revision:
                     return {"status": "failed", "error": "edit_conflict", "record": record(current)}
+            if "scenes" in changes:
+                data["scenes"] = encode(self._canonical_scenes(db, changes["scenes"]))
+                data["scenes_custom"] = 1
+            assignments = ", ".join(f"{column} = ?" for column in data)
             try:
                 cursor = db.execute(
                     f"UPDATE knowledge SET {assignments} WHERE id = ?",
