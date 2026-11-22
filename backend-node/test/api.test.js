@@ -249,6 +249,32 @@ test("host/origin, bounded bodies, duplicate queries and failed DB operations re
   assert.deepEqual(broken.logs, ["cloud_repository_failed", "cloud_repository_failed"]);
 });
 
+test("Railway health probes accept only the exact platform Host on GET health routes", async (t) => {
+  const { base, token } = await fixture(t);
+  const authorization = `Bearer ${await token()}`;
+  async function probe(path, { host = "healthcheck.railway.app", method = "GET", origin } = {}) {
+    return new Promise((resolve, reject) => {
+      const request = httpRequest(base + path, { method, headers: {
+        Host: host, Authorization: authorization, ...(origin === undefined ? {} : { Origin: origin }),
+      } }, (response) => {
+        response.resume();
+        response.once("end", () => resolve(response.statusCode));
+      });
+      request.once("error", reject);
+      request.end();
+    });
+  }
+  assert.equal(await probe("/healthz"), 200);
+  assert.equal(await probe("/readyz"), 200);
+  assert.equal(await probe("/v1/points"), 403);
+  assert.equal(await probe("/mcp", { method: "POST" }), 403);
+  assert.equal(await probe("/readyz", { method: "POST" }), 403);
+  for (const host of ["evil.healthcheck.railway.app", "healthcheck.railway.app.evil.example", "healthcheck.railway.app."])
+    assert.equal(await probe("/readyz", { host }), 403);
+  assert.equal(await probe("/readyz", { origin: "https://attacker.example" }), 403);
+  assert.equal(await probe("/healthz", { origin: "null" }), 403);
+});
+
 test("real PostgreSQL repository shares authenticated HTTP/MCP storage without crossing users", {
   skip: !process.env.TEST_DATABASE_URL,
 }, async (t) => {

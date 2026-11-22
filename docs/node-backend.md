@@ -63,6 +63,11 @@ authorization provider by themselves.
 
 ## Docker
 
+For a Railway deployment with a separate PostgreSQL service, follow the
+[Railway setup and account steps](railway-deployment.md). The guide covers the
+`/backend-node` source root, explicit pre-deploy migration, private database
+reference and real OAuth configuration.
+
 The original `compose.yaml` continues to select Python. Add the Node override to
 select the independent Node image, migration command and PostgreSQL driver URL:
 
