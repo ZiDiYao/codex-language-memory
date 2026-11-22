@@ -24,7 +24,10 @@ function validateAuthority(request, config, path) {
   try { received = new URL(`${publicUrl.protocol}//${host}`); } catch { throw new APIError(403, "invalid_host"); }
   const health = ["/healthz", "/readyz"].includes(path);
   const loopbackHealth = health && (["127.0.0.1", "localhost", "[::1]"].includes(received.hostname));
-  if (received.host !== publicUrl.host && !loopbackHealth) throw new APIError(403, "invalid_host");
+  // Railway probes use this Host instead of the service's public domain. This
+  // exception is limited to existing read-only health routes, never data/MCP.
+  const railwayHealth = health && request.method === "GET" && received.hostname === "healthcheck.railway.app";
+  if (received.host !== publicUrl.host && !loopbackHealth && !railwayHealth) throw new APIError(403, "invalid_host");
   const origin = request.headers.origin;
   if (origin !== undefined && origin !== publicUrl.origin) throw new APIError(403, "invalid_origin");
 }

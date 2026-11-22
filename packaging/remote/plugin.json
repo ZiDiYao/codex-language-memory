@@ -1,15 +1,15 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "language-memory-cloud",
-  "version": "0.1.0-beta.1",
-  "description": "Experimental remote language-learning records with account isolation.",
+  "version": "0.1.0-beta.2",
+  "description": "Language-learning notes, scenes, and reviews with account isolation.",
   "author": {"name": "ZiDiYao"},
   "repository": "https://github.com/ZiDiYao/codex-language-memory",
   "extensions": {
     "com.openai": {
       "interface": {
-        "displayName": "Language memory cloud",
-        "shortDescription": "Store and retrieve learning points through your hosted backend.",
+        "displayName": "Language Memory",
+        "shortDescription": "Save and review language learning points by scene.",
         "developerName": "ZiDiYao"
       }
     }

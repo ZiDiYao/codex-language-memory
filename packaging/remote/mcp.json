@@ -3,12 +3,17 @@
   "mcpServers": {
     "language_memory": {
       "type": "streamable-http",
-      "url": "https://memory.example.com/mcp",
+      "url": "https://language-memory-api.up.railway.app/mcp",
       "extensions": {
         "com.openai": {
           "auth": {
             "type": "oauth",
-            "baseScopes": ["memory:read", "memory:write"]
+            "client": {
+              "mode": "dcr"
+            },
+            "baseScopes": ["memory:read", "memory:write", "offline_access"],
+            "defaultScopes": [],
+            "oidcEnabled": false
           }
         }
       }
