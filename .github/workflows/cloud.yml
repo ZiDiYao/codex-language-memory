@@ -1,0 +1,48 @@
+name: Cloud backend
+on: [push, pull_request]
+permissions:
+  contents: read
+
+jobs:
+  postgres-and-http:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: language_memory
+          POSTGRES_PASSWORD: cloud_ci_only
+          POSTGRES_DB: language_memory_cloud_tests
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U language_memory -d language_memory_cloud_tests"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql+psycopg://language_memory:cloud_ci_only@127.0.0.1:5432/language_memory_cloud_tests
+      TEST_DATABASE_URL: postgresql+psycopg://language_memory:cloud_ci_only@127.0.0.1:5432/language_memory_cloud_tests
+      PUBLIC_URL: https://memory.example.test
+      AUTH_ISSUER: https://identity.example.test/
+      AUTH_AUDIENCE: https://memory.example.test/mcp
+      AUTH_JWKS_URL: https://identity.example.test/.well-known/jwks.json
+      AUTH_REQUIRED_SCOPES: memory:read memory:write
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: python -m pip install -r requirements-cloud-dev.txt
+      - name: Verify forward and reverse migrations on real PostgreSQL
+        run: |
+          python -m alembic upgrade head
+          python -m alembic downgrade base
+          python -m alembic upgrade head
+      - name: Exercise cloud authentication, tenant isolation and persistence
+        run: python -m unittest discover -s tests -p 'test_cloud*.py' -v
+      - name: Build the nonroot runtime image
+        run: docker build -f Dockerfile.cloud -t language-memory-cloud:ci .
+      - run: git diff --check

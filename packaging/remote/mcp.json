@@ -1,0 +1,17 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "language_memory": {
+      "type": "streamable-http",
+      "url": "https://memory.example.com/mcp",
+      "extensions": {
+        "com.openai": {
+          "auth": {
+            "type": "oauth",
+            "baseScopes": ["memory:read", "memory:write"]
+          }
+        }
+      }
+    }
+  }
+}

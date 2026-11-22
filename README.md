@@ -34,6 +34,19 @@ ln -s "$PWD/.agents/skills/language-memory" "$HOME/.agents/skills/language-memor
 
 The source instructions are an alternative to the Beta installer. Inspect an existing registration before replacing it. Database files, environments, credentials and release artifacts are ignored by Git. [Build and test the packaged Beta](docs/beta-release.md#building-and-checking-a-release) before distributing a new version.
 
+## Experimental remote backend
+
+The repository also contains a separate PostgreSQL-backed HTTP service for hosted
+learning records, overlapping scenes and account-scoped operations. It exposes
+Streamable HTTP MCP and a REST API, validates access tokens from an external OAuth
+provider, and includes a nonroot Docker image, Compose setup and explicit Alembic
+migrations. Existing local learning data is not uploaded or migrated automatically.
+
+This first cloud milestone does not include the desktop UI, document exports or
+pronunciation. It is not a published plugin or a complete OAuth authorization
+server. See [setup, provider requirements, tests and release boundaries](docs/remote-backend.md)
+and the [remote manifest template](packaging/remote/README.md).
+
 ## Try it in Codex
 
 Equivalent requests work in any language; these examples are in English:
