@@ -106,6 +106,14 @@ PKCE or token issuance. Requests cannot select a tenant with a `user_id` field.
 The SDK receives a fresh MCP server and transport per request. Account-scoped
 database transactions preserve the same capture and review idempotency rules.
 
+The configured remote package uses the public name **Language Memory**, targets
+`https://language-memory-api.up.railway.app/mcp` and selects DCR with the Auth0
+tenant `language-memory.ca.auth0.com`. Its minimal OAuth request contains only
+`memory:read memory:write offline_access`; extra OIDC identity defaults are disabled.
+The backend itself still requires only the two memory scopes. See
+[Auth0 setup](auth0-setup.md) for provider grants, public discovery values and the
+browser login checks still required before claiming end-to-end authorization.
+
 Place the backend behind an HTTPS ingress, set `PUBLIC_URL` to its actual public
 root and preserve the public `Host` header. Origin and host validation must remain
 consistent with that URL. Request bodies are limited to 1 MiB. Error responses

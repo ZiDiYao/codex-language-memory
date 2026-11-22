@@ -1,8 +1,18 @@
 # Deploy the Node backend to Railway
 
 This guide deploys `backend-node/` and a separate PostgreSQL service. The Python
-backend and desktop plugin remain available. These files describe a deployment;
-they are not evidence that a Railway project has been created or made live.
+backend and desktop plugin remain available. The selected public service root is
+`https://language-memory-api.up.railway.app`; the remote package targets its `/mcp`
+endpoint. Public configuration below does not establish that the client OAuth
+login/consent/callback flow has passed acceptance testing.
+
+Deployment `787bbb7e-409e-4083-bd2d-019028639421` from commit `21a63bd`
+succeeded. Its migration reported `0001_remote_storage`. Public `/healthz`,
+`/readyz` and protected-resource metadata checks returned 200; unauthenticated
+`/mcp` and `/v1/settings` returned 401 with the expected metadata challenge.
+Invalid bearer authentication returned 401 and a foreign Origin returned 403.
+These are deployment and access-control checks; the real Codex browser OAuth
+flow remains pending.
 
 ## Account steps
 
@@ -31,7 +41,8 @@ the configuration-file path. [Railway monorepos](https://docs.railway.com/deploy
 | --- | --- |
 | Root Directory | `/backend-node` |
 | Builder | Dockerfile |
-| Dockerfile path inside the source root | `Dockerfile` |
+| Dockerfile Path in the Railway dashboard | `/backend-node/Dockerfile` |
+| Docker build context | `backend-node` |
 | Pre-deploy command | `node src/migration.js` |
 | Pre-deploy timeout | 300 seconds |
 | Start command | `node src/main.js` |
@@ -40,6 +51,8 @@ the configuration-file path. [Railway monorepos](https://docs.railway.com/deploy
 | Restart policy | On failure, maximum 3 retries |
 | Replicas | 1 initially |
 
+The dashboard's Dockerfile Path is repository-relative even though Root Directory
+is `/backend-node`; the Docker build context remains `backend-node`.
 The Node Dockerfile uses only that subdirectory. Do not select the repository's
 root Python Dockerfile or start the desktop stdio server. No filesystem volume is
 needed on the API service; durable learning records live in PostgreSQL.
@@ -86,10 +99,10 @@ Configure these variables on the **API service**:
 | Variable | Value |
 | --- | --- |
 | `DATABASE_URL` | Private service reference above. |
-| `PUBLIC_URL` | Actual public HTTPS service root, without `/mcp` or a trailing path. |
-| `AUTH_ISSUER` | Real provider's exact HTTPS issuer, preserving its trailing slash if present. |
-| `AUTH_AUDIENCE` | API audience configured at that provider. |
-| `AUTH_JWKS_URL` | Real provider's HTTPS JWKS endpoint. |
+| `PUBLIC_URL` | `https://language-memory-api.up.railway.app` |
+| `AUTH_ISSUER` | `https://language-memory.ca.auth0.com/`; confirm exact agreement with tenant discovery. |
+| `AUTH_AUDIENCE` | `https://language-memory-api.up.railway.app/mcp` |
+| `AUTH_JWKS_URL` | `https://language-memory.ca.auth0.com/.well-known/jwks.json`; confirm the tenant's `jwks_uri`. |
 | `AUTH_REQUIRED_SCOPES` | `memory:read memory:write` unless deliberately changed everywhere. |
 | `CLOUD_ALLOW_INSECURE_LOCAL` | `false`. |
 | `HOST` | `0.0.0.0`. |
@@ -122,13 +135,13 @@ while MCP/REST host and origin validation remain tied to `PUBLIC_URL`. Railway's
 deployment healthcheck does not provide continuous uptime monitoring.
 [Railway healthchecks](https://docs.railway.com/deployments/healthchecks)
 
-Replace the example hostname below with the deployed public domain:
+Read-only checks for the selected public domain:
 
 ```sh
-curl -fsS https://YOUR-ACTUAL-DOMAIN/healthz
-curl -fsS https://YOUR-ACTUAL-DOMAIN/readyz
-curl -fsS https://YOUR-ACTUAL-DOMAIN/.well-known/oauth-protected-resource/mcp
-curl -i https://YOUR-ACTUAL-DOMAIN/v1/points
+curl -fsS https://language-memory-api.up.railway.app/healthz
+curl -fsS https://language-memory-api.up.railway.app/readyz
+curl -fsS https://language-memory-api.up.railway.app/.well-known/oauth-protected-resource/mcp
+curl -i https://language-memory-api.up.railway.app/v1/points
 ```
 
 Expect healthy checks to return 200, discovery to advertise the actual resource
@@ -146,7 +159,11 @@ authorization endpoint or token issuer. The external provider must support the
 target client's authorization-code flow with PKCE S256 and an appropriate client
 registration mechanism, and issue this API's audience and required scopes.
 Configure callbacks/client registration with the actual host before marking the
-plugin usable. See [the provider contract](remote-backend.md#external-authorization-provider).
+plugin usable. The remote package selects DCR and requests the two memory
+scopes plus `offline_access`; it does not depend on an unknown CIMD URL or Enterprise-only client-key
+authentication. Configure Auth0's DCR Strict and default user-delegated grant as
+described in [Auth0 setup](auth0-setup.md). See also
+[the provider contract](remote-backend.md#external-authorization-provider).
 
 Keep credentials in service variables, enable suitable database backups and test
 recovery, and monitor usage and failures. Changing the application image does not

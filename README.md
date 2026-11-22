@@ -48,7 +48,10 @@ uploaded or migrated automatically.
 This first cloud milestone does not include the desktop UI, document exports or
 pronunciation. It is not a published plugin or a complete OAuth authorization
 server. See [setup, provider requirements, tests and release boundaries](docs/remote-backend.md)
-and the [remote manifest template](packaging/remote/README.md).
+and the [configured Language Memory remote package](packaging/remote/README.md).
+That package targets `https://language-memory-api.up.railway.app/mcp` with DCR
+authorization through Auth0. Provider configuration and actual Codex OAuth
+acceptance remain distinct from deployment health; see [Auth0 setup](docs/auth0-setup.md).
 
 ## Try it in Codex
 
