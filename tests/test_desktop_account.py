@@ -175,9 +175,9 @@ class DesktopAccountTests(unittest.TestCase):
         self.assertEqual(self.manager.status()["state"], "connected", self.manager.status())
 
     def expire(self):
-        value = self.credentials.read()
+        value = self.manager.credentials.read()
         value["expires_at"] = time.time() - 20
-        self.credentials.write(value)
+        self.manager.credentials.write(value)
 
     def test_interactive_mcp_session_uses_login_deadline_and_rpc_uses_request_deadline(self):
         self.manager.login_timeout, self.manager.request_timeout = 300, 30
@@ -330,21 +330,21 @@ class DesktopAccountTests(unittest.TestCase):
         state = self.manager.status()
         self.assertEqual((state["mode"], state["state"]), ("cloud", "signed_out"))
         self.assertNotIn("authorization_url", state)
-        self.assertEqual(self.credentials.read(), {})
+        self.assertEqual(self.manager.credentials.read(), {})
         self.assertEqual(len(self.cloud.registrations), 1)
 
     def test_disconnect_and_use_local_invalidate_other_process_and_old_storage(self):
         self.login()
         other = self.new_manager()
         epoch = other.status()["epoch"]
-        storage = account.KeychainTokenStorage(self.credentials, self.manager.state, epoch)
+        storage = account.KeychainTokenStorage(self.manager.credentials, self.manager.state, epoch)
         self.manager.disconnect()
         self.assertEqual(other.status()["mode"], "cloud")
         with self.assertRaises(account.AccountError):
             other.call_tool("get_settings", expected_epoch=epoch)
         with self.assertRaises(account.AccountError):
             asyncio.run(storage.set_tokens(OAuthToken(access_token=access_token(), expires_in=300)))
-        self.assertEqual(self.credentials.read(), {})
+        self.assertEqual(self.manager.credentials.read(), {})
         self.manager.use_local()
         self.assertEqual(other.status()["mode"], "local")
         self.assertGreater(other.status()["epoch"], epoch)
@@ -424,12 +424,12 @@ class DesktopAccountTests(unittest.TestCase):
 
     def test_refresh_cannot_switch_account_identity(self):
         self.login()
-        value = self.credentials.read()
-        storage = account.KeychainTokenStorage(self.credentials, self.manager.state, self.manager.status()["epoch"])
+        value = self.manager.credentials.read()
+        storage = account.KeychainTokenStorage(self.manager.credentials, self.manager.state, self.manager.status()["epoch"])
         with self.assertRaises(account.AccountError) as raised:
             asyncio.run(storage.set_tokens(OAuthToken(access_token=access_token("another-account"), expires_in=300)))
         self.assertEqual(raised.exception.code, "account_changed")
-        self.assertEqual(self.credentials.read(), value)
+        self.assertEqual(self.manager.credentials.read(), value)
 
     def test_keychain_failure_does_not_select_local_or_write_credentials_to_state(self):
         class Unavailable:
@@ -443,6 +443,123 @@ class DesktopAccountTests(unittest.TestCase):
         self.assertEqual(manager.status()["mode"], "cloud")
         self.assertEqual(manager.status()["error"], "credential_store_unavailable")
         self.assertNotIn("private operating", json.dumps(manager.status()))
+
+    def test_failed_legacy_keychain_item_never_blocks_fresh_slot_or_restart(self):
+        class BlockedOldItem(MemoryKeyring):
+            def __init__(self, blocked):
+                super().__init__()
+                self.blocked, self.reads, self.deletes = blocked, [], []
+            def get_password(self, service, username):
+                self.reads.append(username)
+                if username == self.blocked:
+                    raise RuntimeError(-25293, "private old keychain error")
+                return super().get_password(service, username)
+            def delete_password(self, service, username):
+                self.deletes.append(username)
+                if username == self.blocked:
+                    raise RuntimeError(-25293, "private old keychain error")
+                super().delete_password(service, username)
+
+        backend = BlockedOldItem("blocked-legacy")
+        base = account.KeychainCredentials(backend, account="blocked-legacy")
+        legacy = json.dumps({"epoch": 5, "client": {"client_id": "public-client-with-no-completed-login"}})
+        backend.items[(base.service, base.account)] = legacy
+        with self.manager.state.locked() as state:
+            state.update(mode="cloud", state="error", epoch=5, error="credential_store_unavailable")
+        manager = account.AccountManager(state_path=self.state_path, credentials=base, http_transport=self.transport,
+                                         request_timeout=3, login_timeout=3)
+        self.addCleanup(manager.close)
+        with patch.object(account, "_Loopback", FakeCallback):
+            manager.begin_login()
+            manager._login_future.result(timeout=5)
+        self.assertEqual(manager.status()["state"], "connected")
+        self.assertEqual(manager.status()["epoch"], 6)
+        slot = manager.state.read()["credential_slot"]
+        self.assertRegex(slot, r"^[0-9a-f]{32}$")
+        self.assertNotIn(slot, json.dumps(manager.status()))
+        self.assertNotIn(base.account, backend.reads + backend.deletes)
+        self.assertEqual(backend.items[(base.service, base.account)], legacy)
+        restarted = account.AccountManager(state_path=self.state_path, credentials=base, http_transport=self.transport,
+                                           request_timeout=3)
+        self.addCleanup(restarted.close)
+        self.assertEqual(restarted.credentials.account, manager.credentials.account)
+        self.assertEqual(restarted.call_tool("get_settings"), {"enabled": True})
+        self.assertEqual(len(self.cloud.registrations), 1)
+        self.assertNotIn(base.account, backend.reads + backend.deletes)
+
+    def test_each_retry_rotates_failed_connection_slot_without_reading_or_deleting_it(self):
+        class Denied(MemoryKeyring):
+            def __init__(self):
+                super().__init__()
+                self.blocked, self.attempted = None, []
+            def get_password(self, service, username):
+                self.attempted.append(username)
+                if username == self.blocked:
+                    raise RuntimeError(-128, "private denied detail")
+                return super().get_password(service, username)
+            def delete_password(self, service, username):
+                self.attempted.append(username)
+                if username == self.blocked:
+                    raise RuntimeError(-128, "private denied detail")
+                super().delete_password(service, username)
+        backend = Denied()
+        base = account.KeychainCredentials(backend)
+        manager = account.AccountManager(state_path=self.state_path, credentials=base, http_transport=self.transport,
+                                         request_timeout=3)
+        self.addCleanup(manager.close)
+        old_slot = "a" * 32
+        backend.blocked = base.for_slot(old_slot).account
+        backend.items[(base.service, backend.blocked)] = "blocked old envelope"
+        with manager.state.locked() as state:
+            # A credential error may retain an otherwise-connected account, so
+            # both the state and the error code must inform reconnect cleanup.
+            state.update(mode="cloud", state="connected", epoch=5, error="credential_store_denied", credential_slot=old_slot)
+        manager.disconnect()
+        self.assertEqual(manager.status()["state"], "signed_out")
+        with patch.object(account, "_Loopback", FakeCallback):
+            manager.begin_login()
+            manager._login_future.result(timeout=5)
+        self.assertEqual(manager.status()["state"], "connected")
+        self.assertNotEqual(manager.state.read()["credential_slot"], old_slot)
+        self.assertNotIn(backend.blocked, backend.attempted)
+        self.assertIn((base.service, backend.blocked), backend.items)
+
+    def test_legacy_connected_envelope_can_resume_before_explicit_slot_upgrade(self):
+        self.login()
+        legacy = self.manager.credentials.read()
+        legacy["expires_at"] = time.time() - 20
+        self.credentials.write(legacy)
+        with self.manager.state.locked() as state:
+            state.pop("credential_slot")
+        restarted = self.new_manager()
+        self.assertEqual(restarted.credentials.account, self.credentials.account)
+        self.assertEqual(restarted.call_tool("get_settings"), {"enabled": True})
+        self.assertEqual(self.cloud.exchanges[-1]["grant_type"], ["refresh_token"])
+        self.assertEqual(len(self.cloud.registrations), 1)
+
+    def test_keychain_os_status_classification_never_exposes_exception_strings(self):
+        class WrappedFailure:
+            def __init__(self, status): self.status = status
+            def get_password(self, *args):
+                try:
+                    raise RuntimeError(self.status, "private-token-password-provider-response")
+                except RuntimeError as error:
+                    raise ValueError("private wrapper detail") from error
+        for status, code in ((-128, "credential_store_denied"), (-25293, "credential_store_denied"),
+                             (-25308, "credential_store_interaction_required"), (-67030, "credential_store_app_identity"),
+                             (-25291, "credential_store_unavailable")):
+            with self.subTest(status=status):
+                manager = account.AccountManager(state_path=Path(self.temporary.name) / f"status-{status}.json",
+                    credentials=account.KeychainCredentials(WrappedFailure(status)), http_transport=self.transport)
+                self.addCleanup(manager.close)
+                with patch.object(account, "_Loopback", FakeCallback):
+                    manager.begin_login()
+                    manager._login_future.result(timeout=5)
+                public = manager.status()
+                self.assertEqual(public["error"], code)
+                self.assertEqual(public["credential_os_status"], status)
+                self.assertNotIn("private", json.dumps(public))
+                self.assertEqual(public["mode"], "cloud")
 
     def test_initial_token_error_body_never_reaches_sdk_or_transport_logs(self):
         messages = []
@@ -498,11 +615,11 @@ class DesktopAccountTests(unittest.TestCase):
 
     def test_disconnect_revokes_only_old_client_after_local_invalidation_even_if_offline(self):
         self.login()
-        old = self.credentials.read()
+        old = self.manager.credentials.read()
         self.cloud.revoke_failure = True
         result = self.manager.disconnect()
         self.assertEqual((result["mode"], result["state"]), ("cloud", "signed_out"))
-        self.assertEqual(self.credentials.read(), {})
+        self.assertEqual(self.manager.credentials.read(), {})
         self.wait_revocations()
         self.assertEqual(self.manager.status()["state"], "signed_out")
         request = self.cloud.revocations[-1]

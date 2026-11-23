@@ -6,6 +6,25 @@ export function authorizationUrl(value) {
   return url.href;
 }
 
+const accountErrors = Object.freeze({
+  credential_store_denied: "accountKeychainDenied",
+  credential_store_interaction_required: "accountKeychainUnlock",
+  credential_store_app_identity: "accountKeychainIdentity",
+  credential_store_unavailable: "accountKeychainUnavailable",
+  authentication_required: "accountSignedOutHelp",
+  login_cancelled: "accountLoginCancelled",
+  login_timeout: "accountLoginTimeout",
+  oauth_configuration_invalid: "accountConfigurationError",
+  cloud_unavailable: "accountFailure",
+  cloud_tool_failed: "accountFailure",
+  cloud_request_failed: "accountFailure",
+  invalid_cloud_response: "accountFailure",
+  account_changed: "accountChanged",
+});
+export function accountErrorKey(code) {
+  return Object.hasOwn(accountErrors, code) ? accountErrors[code] : null;
+}
+
 export function accountStatus(value) {
   const status = value?.status && typeof value.status === "object" ? value.status : value;
   if (!status || status.mode !== "cloud" ||
@@ -15,7 +34,8 @@ export function accountStatus(value) {
     authorization_url = authorizationUrl(status.authorization_url);
   }
   return { mode: status.mode, state: status.state, epoch: status.epoch ?? null, can_connect: status.can_connect !== false,
-    capabilities: status.capabilities || {}, authorization_url };
+    capabilities: status.capabilities || {}, authorization_url,
+    error: accountErrorKey(status.error) ? status.error : null };
 }
 
 export function accountCanRead(status) {
@@ -23,7 +43,7 @@ export function accountCanRead(status) {
 }
 
 function sourceKey(status) {
-  return status && JSON.stringify([status.mode, status.epoch, status.state, status.capabilities]);
+  return status && JSON.stringify([status.mode, status.epoch, status.state, status.capabilities, status.error]);
 }
 
 export class LocalAccountSession {
@@ -63,7 +83,7 @@ export class LocalAccountSession {
     try {
       const result = await this.call("account/status");
       if (version === this.requestVersion && !this.stopped) await this.accept(result);
-    } catch { if (version === this.requestVersion) this.onError("accountFailure"); }
+    } catch (error) { if (version === this.requestVersion) this.onError(accountErrorKey(error?.message) || "accountFailure"); }
     finally { if (version === this.requestVersion) this.queue(); }
   }
   async change(action) {
@@ -80,7 +100,7 @@ export class LocalAccountSession {
       this.notify();
       await this.accept(await this.call(action));
       return true;
-    } catch { this.onError("accountFailure"); return false; }
+    } catch (error) { this.onError(accountErrorKey(error?.message) || "accountFailure"); return false; }
     finally { this.pending = false; this.transitioning = false; this.notify(); this.queue(); }
   }
   async authorize() {
@@ -97,21 +117,30 @@ export function createLocalProfile({ root, t, openDialog, closeDialog, ...option
   const trigger = $("open");
   const panel = $("dialog");
   let feedbackKey = null;
+  let lastState = null;
+  let lastError = null;
   const render = (status, pending = false) => {
     const connected = accountCanRead(status);
     const connecting = status?.state === "connecting";
-    $("mode").textContent = t("accountCloud");
+    const currentError = status?.error || null;
+    if (currentError !== lastError || (connected && lastState !== "connected")) feedbackKey = null;
+    lastState = status?.state || null;
+    lastError = currentError;
     $("status").textContent = t(!status ? "connecting" : connecting ? "accountConnecting" :
-      connected ? "accountConnectedHelp" : status.state === "error" ? "accountFailure" : "accountSignedOutHelp");
+      connected ? "accountSignedIn" : "accountSignedOut");
     $("connect").hidden = !status || status.can_connect === false || connected || connecting;
     $("disconnect").hidden = !connected && !connecting;
     $("footer").hidden = !connected && !connecting;
     $("authorize").hidden = !connecting || !status.authorization_url;
+    $("help").hidden = connected || !status || connecting;
+    $("help").textContent = t("accountSignedOutHelp");
     for (const button of panel.querySelectorAll("[data-account-action]")) button.disabled = pending;
-    $("feedback").textContent = feedbackKey ? t(feedbackKey) : "";
+    const detail = feedbackKey || accountErrorKey(status?.error);
+    $("feedback").textContent = detail ? t(detail) : "";
+    $("feedback").hidden = !detail;
   };
   const session = new LocalAccountSession({ ...options, onState: render,
-    onError(key) { feedbackKey = key; render(session.status, session.pending); options.onError?.(key); } });
+    onError(key) { feedbackKey = key === "accountFailure" && session.status?.error ? null : key; render(session.status, session.pending); options.onError?.(key); } });
   trigger.addEventListener("click", () => { feedbackKey = null; render(session.status, session.pending); openDialog(panel); trigger.setAttribute("aria-expanded", "true"); session.refresh(); });
   $("close").addEventListener("click", () => closeDialog(panel));
   panel.addEventListener("close", () => { trigger.setAttribute("aria-expanded", "false"); trigger.focus({ preventScroll: true }); });

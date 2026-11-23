@@ -975,3 +975,24 @@ function applyLocalMessages() {
 }
 
 applyLocalMessages();
+
+const profileMessages = {
+  en: ["Account", "Learning activity", "Coming soon", "Your learning activity will appear here when this feature is available.", "Signed in", "Keychain access was declined. Sign in again and allow access when macOS asks.", "Unlock your Mac, then sign in again to allow Keychain access.", "This app could not access Keychain. Reopen Sayrove and try signing in again.", "Keychain is unavailable. Reopen Sayrove and try signing in again.", "Sign-in was cancelled. You can try again.", "Sign-in timed out. Please try again.", "Sign-in is unavailable. Update Sayrove and try again."],
+  zh: ["账号信息", "学习热图", "即将推出", "功能上线后，你的学习活动会显示在这里。", "已登录", "钥匙串访问未获授权。请重新登录，并在 macOS 提示时允许访问。", "请先解锁 Mac，再重新登录以允许访问钥匙串。", "当前应用无法访问钥匙串。请重新打开拾语，再尝试登录。", "钥匙串暂时不可用。请重新打开拾语，再尝试登录。", "已取消登录，你可以重新尝试。", "登录已超时，请重试。", "登录暂时不可用。请更新拾语后重试。"],
+  ja: ["アカウント情報", "学習アクティビティ", "近日公開", "この機能が公開されると、学習アクティビティがここに表示されます。", "ログイン中", "キーチェーンへのアクセスが許可されませんでした。再度ログインし、macOSの確認でアクセスを許可してください。", "Macのロックを解除してから、再度ログインしてキーチェーンへのアクセスを許可してください。", "このアプリはキーチェーンにアクセスできません。Sayroveを開き直して、再度ログインしてください。", "キーチェーンを利用できません。Sayroveを開き直して、再度ログインしてください。", "ログインをキャンセルしました。もう一度お試しいただけます。", "ログインがタイムアウトしました。もう一度お試しください。", "ログインできません。Sayroveを更新して、もう一度お試しください。"],
+  ko: ["계정 정보", "학습 활동", "출시 예정", "이 기능이 출시되면 학습 활동이 여기에 표시됩니다.", "로그인됨", "키체인 접근이 허용되지 않았습니다. 다시 로그인하고 macOS에서 요청하면 접근을 허용하세요.", "Mac 잠금을 해제한 후 다시 로그인하여 키체인 접근을 허용하세요.", "이 앱에서 키체인에 접근할 수 없습니다. Sayrove를 다시 열고 로그인하세요.", "키체인을 사용할 수 없습니다. Sayrove를 다시 열고 로그인하세요.", "로그인이 취소되었습니다. 다시 시도할 수 있습니다.", "로그인 시간이 초과되었습니다. 다시 시도하세요.", "로그인할 수 없습니다. Sayrove를 업데이트한 후 다시 시도하세요."],
+  fr: ["Compte", "Activité d’apprentissage", "Bientôt disponible", "Votre activité d’apprentissage apparaîtra ici lorsque cette fonctionnalité sera disponible.", "Connecté", "L’accès au trousseau a été refusé. Reconnectez-vous et autorisez l’accès lorsque macOS le demande.", "Déverrouillez votre Mac, puis reconnectez-vous pour autoriser l’accès au trousseau.", "Cette application ne peut pas accéder au trousseau. Rouvrez Sayrove, puis reconnectez-vous.", "Le trousseau est indisponible. Rouvrez Sayrove, puis reconnectez-vous.", "Connexion annulée. Vous pouvez réessayer.", "La connexion a expiré. Réessayez.", "Connexion indisponible. Mettez Sayrove à jour, puis réessayez."],
+  es: ["Información de la cuenta", "Actividad de aprendizaje", "Próximamente", "Tu actividad de aprendizaje aparecerá aquí cuando esta función esté disponible.", "Sesión iniciada", "Se rechazó el acceso al llavero. Vuelve a iniciar sesión y permite el acceso cuando macOS lo solicite.", "Desbloquea el Mac y vuelve a iniciar sesión para permitir el acceso al llavero.", "Esta aplicación no puede acceder al llavero. Abre Sayrove de nuevo e intenta iniciar sesión.", "El llavero no está disponible. Abre Sayrove de nuevo e intenta iniciar sesión.", "Se canceló el inicio de sesión. Puedes intentarlo de nuevo.", "Se agotó el tiempo para iniciar sesión. Inténtalo de nuevo.", "No se puede iniciar sesión. Actualiza Sayrove e inténtalo de nuevo."],
+};
+const profileKeys = ["profileAccount", "profileActivity", "profileComingSoon", "profileActivityHelp", "accountSignedIn", "accountKeychainDenied", "accountKeychainUnlock", "accountKeychainIdentity", "accountKeychainUnavailable", "accountLoginCancelled", "accountLoginTimeout", "accountConfigurationError"];
+const publicAccountErrors = {
+  credential_store_denied: "accountKeychainDenied", credential_store_interaction_required: "accountKeychainUnlock",
+  credential_store_app_identity: "accountKeychainIdentity", credential_store_unavailable: "accountKeychainUnavailable",
+  authentication_required: "accountSignedOutHelp", login_cancelled: "accountLoginCancelled", login_timeout: "accountLoginTimeout",
+  oauth_configuration_invalid: "accountConfigurationError", cloud_unavailable: "accountFailure", cloud_tool_failed: "accountFailure",
+  cloud_request_failed: "accountFailure", invalid_cloud_response: "accountFailure",
+};
+for (const [locale, values] of Object.entries(profileMessages)) {
+  Object.assign(messages[locale], Object.fromEntries(profileKeys.map((key, index) => [key, values[index]])));
+  for (const [code, key] of Object.entries(publicAccountErrors)) messages[locale][code] = messages[locale][key];
+}

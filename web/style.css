@@ -666,16 +666,27 @@ summary[aria-expanded="true"] .entry-last-seen { display: none; }
 .cloud-brand-mark { flex: none; display: block; border-radius: 6px; }
 .cloud-account { display: inline-flex; align-items: center; gap: 6px; border-color: transparent; color: var(--muted); font-size: 12px; padding: 6px 9px; white-space: nowrap; }
 .cloud-account:hover:not(:disabled), .cloud-account[aria-expanded="true"] { color: var(--text); background: var(--raised); }
-.cloud-profile-section { min-height: 120px; padding: 20px 0; }
-.cloud-profile-status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
-.cloud-profile-status > span:first-child { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
-.cloud-profile-name { margin-top: 12px; font-size: 14px; overflow-wrap: anywhere; }
-.cloud-profile-email { margin-top: 2px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.profile-dialog { overflow-x: hidden; }
+.profile-section { min-width: 0; padding: 20px 0; }
+.profile-section h3 { font-size: 12px; font-weight: 500; color: var(--muted); }
+.profile-account-row { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.profile-avatar { display: grid; place-items: center; flex: 0 0 38px; height: 38px; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--muted); overflow: hidden; }
+.profile-account-summary { min-width: 0; }
+.profile-account-state { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.profile-name { margin-bottom: 2px; font-size: 14px; overflow-wrap: anywhere; }
+.profile-email { margin-bottom: 2px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.profile-auth-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.profile-feedback { margin-top: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.profile-activity { border-top: 1px solid var(--line); }
+.profile-section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.profile-coming-soon { color: var(--muted); font-size: 10px; border: 1px solid var(--line); padding: 2px 6px; border-radius: 5px; }
+.profile-heatmap { display: grid; grid-template-columns: repeat(26, minmax(0, 1fr)); gap: 3px; width: 100%; min-width: 0; margin: 16px 0 12px; }
+.profile-heatmap > span { min-width: 0; aspect-ratio: 1; border-radius: 2px; background: var(--line); opacity: .55; }
+.profile-activity > .help { line-height: 1.6; }
 .cloud-profile-footer { border-top: 1px solid var(--line); padding-top: 18px; }
 .cloud-profile-logout { width: 100%; padding: 8px 10px; font-size: 12px; }
-.local-profile-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
-.local-profile-footer { display: grid; gap: 8px; }
-.local-profile-footer > button { width: 100%; }
+.profile-footer { display: grid; gap: 8px; }
+.profile-footer > button { width: 100%; }
 .local-account-notice { padding: 14px 0 20px; }
 .cloud-session { display: flex; align-items: center; gap: 16px; width: min(852px, calc(100% - 32px)); margin: 20px auto 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; font-size: 12px; background: var(--surface); }
 .cloud-session p { flex: 1; }

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { accountCanRead, accountStatus, authorizationUrl, createLocalProfile, LocalAccountSession } from "../web/local-profile.js";
+import { accountCanRead, accountErrorKey, accountStatus, authorizationUrl, createLocalProfile, LocalAccountSession } from "../web/local-profile.js";
 import { request, setAccountEpoch } from "../web/transport.js";
 
 const initial = { mode: "cloud", state: "signed_out", epoch: 0, capabilities: { export: false, speech: true } };
@@ -122,6 +122,20 @@ test("authorization URLs reject other origins, unsafe schemes, credentials, frag
   assert.equal(status.sub, undefined);
 });
 
+test("account polling retains only public error codes and refreshes changed errors without exposing diagnostic fields", async () => {
+  const { session, events } = setup();
+  const failed = { ...initial, state: "error", error: "credential_store_denied", credential_os_status: -128, debug: "private detail" };
+  await session.accept(failed);
+  assert.equal(session.status.error, "credential_store_denied");
+  assert.equal(session.status.credential_os_status, undefined);
+  assert.equal(session.status.debug, undefined);
+  await session.accept({ ...failed, error: "credential_store_interaction_required" });
+  assert.equal(events.filter((event) => event[0] === "source").length, 2);
+  assert.equal(accountErrorKey("credential_store_interaction_required"), "accountKeychainUnlock");
+  assert.equal(accountErrorKey("credential_store_app_identity"), "accountKeychainIdentity");
+  assert.equal(accountStatus({ ...failed, error: "private error with token=secret" }).error, null);
+});
+
 test("disposing a page suppresses a late account response and cancels status polling", async () => {
   const old = deferred();
   let canceled = 0;
@@ -170,13 +184,26 @@ test("signed-out cloud profiles offer Sign in, connected profiles offer Sign out
   await profile.session.accept({ ...initial, can_connect: true });
   assert.equal(node("#local-profile-connect").hidden, false);
   assert.equal(node("#local-profile-disconnect").hidden, true);
-  assert.equal(node("#local-profile-mode").textContent, "accountCloud");
-  assert.equal(node("#local-profile-status").textContent, "accountSignedOutHelp");
+  assert.equal(node("#local-profile-status").textContent, "accountSignedOut");
+  assert.equal(node("#local-profile-help").textContent, "accountSignedOutHelp");
   assert.equal(node("#local-profile-footer").hidden, true);
   await profile.session.accept(connected);
   assert.equal(node("#local-profile-connect").hidden, true);
   assert.equal(node("#local-profile-disconnect").hidden, false);
   assert.equal(node("#local-profile-footer").hidden, false);
+  assert.equal(node("#local-profile-status").textContent, "accountSignedIn");
+  profile.session.beforeChange = async () => false;
+  assert.equal(await profile.session.change("account/disconnect"), false);
+  assert.equal(node("#local-profile-feedback").textContent, "accountUnsaved");
+  assert.equal(node("#local-profile-feedback").hidden, false);
+  await profile.session.accept({ ...initial, state: "error", error: "credential_store_app_identity" });
+  assert.equal(node("#local-profile-feedback").textContent, "accountKeychainIdentity");
+  profile.session.beforeChange = async () => true;
+  profile.session.call = async () => { throw new Error("credential_store_denied"); };
+  assert.equal(await profile.session.change("account/connect"), false);
+  assert.equal(node("#local-profile-feedback").textContent, "accountKeychainDenied");
+  await profile.session.accept({ ...initial, state: "error", error: "credential_store_interaction_required" });
+  assert.equal(node("#local-profile-feedback").textContent, "accountKeychainUnlock");
   await profile.session.accept({ ...initial, can_connect: false });
   assert.equal(node("#local-profile-connect").hidden, true);
 });

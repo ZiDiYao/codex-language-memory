@@ -46,6 +46,10 @@ Intel Mac, Windows and Linux binary packages are not included in this Beta.
   or the existing absolute `LANGUAGE_MEMORY_DB`. Beta 37 never routes learning operations to it.
 - Account metadata: `desktop-account.json` and a token-free `desktop-cloud-import-<path-hash>.json` receipt
   beside that backup. OAuth credentials are held in the macOS Keychain.
+  Beta 38 persists a token-free random connection slot in the account metadata. A
+  reconnect skips already-failed old Keychain items; it never resets the system
+  keychain or falls back to plaintext. Old processes must be reloaded after this
+  update because they do not understand the new slot format.
 - First sign-in imports an immutable learning-only snapshot transactionally and idempotently.
   A completed receipt prevents reimport into a later account. Pending imports are bound
   to their original account. Original legacy data remains backed up and archived in the cloud.
@@ -98,7 +102,7 @@ npm run build
 .venv/bin/python -m unittest discover -s tests -v
 node --test tests/*.mjs
 .venv/bin/python scripts/build_beta.py
-.venv/bin/python scripts/test_beta.py dist/language-memory-0.2.0-beta.37-macos-arm64.zip
+.venv/bin/python scripts/test_beta.py dist/language-memory-0.2.0-beta.38-macos-arm64.zip
 ```
 
 Change `VERSION` for the next Beta. The builder copies that version into the packaged

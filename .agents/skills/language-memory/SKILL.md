@@ -9,6 +9,7 @@ Use the `language_memory` MCP tools for persistent learning records. Work from t
 
 ## Account and storage
 
+- Profile's Heatmap is currently a visual placeholder, not learning evidence or activity statistics. Never infer study activity from its cells.
 - Sayrove desktop and the website use the signed-in cloud account. Profile manages sign-in and sign-out; there is no local records mode. Read `get_settings` and its optional `_connection` metadata before working with saved records in a new chat. Do not reuse record IDs or preferences from a previous account.
 - Existing desktop learning data is imported once into the first connected account, preserving capture and review metadata. The old database remains only as a backup. The migration is account-bound and idempotent; later sign-ins to another account do not copy that backup again. Never perform independent record copying or invent encounters to recreate history.
 - If signed out, expired, migration fails or an operation reports `account_changed`, stop persistent operations and ask the user to sign in or reopen the page. Never fall back to local storage or retry a write against another account. Continue learning explanations that do not require saved records. Passwords and authorization tokens belong only in the provider or system credential store.
