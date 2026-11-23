@@ -14,6 +14,11 @@ English, Chinese, Japanese, Korean, French and Spanish.
 
 ## Install the desktop Beta
 
+Beta 44 adds a desktop learning-status filter: All statuses, To Learn and Mastered.
+It combines with language, type, scene and search, and is sent with every page request.
+Changing a card's status refreshes the current filtered list after the save succeeds.
+This desktop-only release leaves the hosted website unchanged.
+
 Beta 43 brings the export calendar into view when expanded, scrolling only inside
 its dialog and respecting reduced-motion preferences. This updates the retained
 date control; cloud export remains unavailable in this release.
