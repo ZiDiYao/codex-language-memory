@@ -13,6 +13,7 @@ await build({
 });
 let html = await readFile(new URL("web/index.html", root), "utf8");
 html = html
+  .replace(/\s*<!-- local-account:start -->[\s\S]*?<!-- local-account:end -->/g, "")
   .replace('<link rel="stylesheet" href="style.css" />', '<link rel="stylesheet" href="/assets/style.css" />\n    <link rel="stylesheet" href="/assets/cloud-layout.css" />')
   .replace('<script src="app.js" type="module"></script>', '<script src="/assets/app.js" type="module"></script>')
   .replace(/<title>[^<]*<\/title>/, '<title>Sayrove</title>')

@@ -6,6 +6,7 @@ from typing import Annotated, Callable
 from pydantic import Field
 
 from exports import ExportSelection, export_history, preview_export
+from desktop_actions import ACCOUNT_ACTIONS, account_action
 import speech
 from store import (Kind, Language, Patch, RecordId, Revision, SceneName, SettingsPatch,
                    Status, Store, StrictModel, Title)
@@ -70,9 +71,19 @@ ACTIONS = {
 
 
 def dispatch(store: Store, request):
-    if not isinstance(request, dict) or set(request) != {"action", "arguments"}:
+    if (not isinstance(request, dict) or not {"action", "arguments"}.issubset(request)
+            or not set(request).issubset({"action", "arguments", "expected_epoch"})):
         raise ValueError("Invalid envelope")
     name = request["action"]
+    if isinstance(name, str) and name in ACCOUNT_ACTIONS:
+        return account_action(store, name, request["arguments"])
     if not isinstance(name, str) or name not in ACTIONS:
         raise ValueError("Unknown action")
+    expected = request.get("expected_epoch")
+    if expected is not None and (type(expected) is not int or expected < 0):
+        raise ValueError("Invalid account epoch")
+    binder = getattr(store, "expect_epoch", None)
+    if binder is not None:
+        with binder(expected):
+            return ACTIONS[name].call(store, request["arguments"])
     return ACTIONS[name].call(store, request["arguments"])

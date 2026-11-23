@@ -15,14 +15,24 @@ from study import StudySessions
 from exports import ExportError, ExportRequest, save_export
 from mcp_app import register_app
 
+ConnectionEpoch = Annotated[int, Field(ge=0, description="Current _connection.epoch from get_settings; required for cloud writes.")]
+
 
 def create_server(store: Store) -> FastMCP:
     server = FastMCP("language_memory")
-    read_only = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
-    local_write = ToolAnnotations(destructiveHint=False, openWorldHint=False)
+    cloud_capable = getattr(store, "account", None) is not None
+    read_only = ToolAnnotations(readOnlyHint=True, openWorldHint=cloud_capable)
+    local_write = ToolAnnotations(destructiveHint=False, openWorldHint=cloud_capable)
     dashboard = Dashboard(store)
     study = StudySessions(store)
     register_app(server, store)
+
+    def write_at_epoch(expected_epoch, operation):
+        binder = getattr(store, "expect_epoch", None)
+        if binder is None:
+            return operation()
+        with binder(expected_epoch, require_cloud=True):
+            return operation()
 
     @server.tool(annotations=read_only)
     def open_memory_page() -> dict[str, Any]:
@@ -30,7 +40,7 @@ def create_server(store: Store) -> FastMCP:
         Show the returned local URL in the Codex browser side panel when available.
         The page shares this server's database and lasts until this process exits.
         """
-        return {"url": dashboard.start(), "title": "Language memory"}
+        return {"url": dashboard.start(), "title": "Sayrove"}
 
     @server.tool(annotations=read_only)
     def get_settings() -> dict[str, Any]:
@@ -42,13 +52,13 @@ def create_server(store: Store) -> FastMCP:
         return store.settings()
 
     @server.tool(annotations=local_write)
-    def update_settings(patch: SettingsPatch) -> dict[str, Any]:
+    def update_settings(patch: SettingsPatch, expected_connection_epoch: ConnectionEpoch | None = None) -> dict[str, Any]:
         """Update supplied settings immediately. ui_language is en/zh/ja/ko/fr/es.
         Set first_language only from the user's confirmation. explanation_language is a global override;
         null resets it to first_language. These do not change the target language or translate old records.
         Capture automatically covers every language while recording is enabled.
         """
-        return store.settings(patch)
+        return write_at_epoch(expected_connection_epoch, lambda: store.settings(patch))
 
     @server.tool(annotations=read_only)
     def list_languages() -> dict[str, Any]:
@@ -71,15 +81,16 @@ def create_server(store: Store) -> FastMCP:
         return store.recording()
 
     @server.tool(annotations=local_write)
-    def set_recording(enabled: bool) -> dict[str, Any]:
+    def set_recording(enabled: bool, expected_connection_epoch: ConnectionEpoch | None = None) -> dict[str, Any]:
         """Enable or pause new saves. Existing entries remain available."""
-        return store.recording(enabled)
+        return write_at_epoch(expected_connection_epoch, lambda: store.recording(enabled))
 
     @server.tool(annotations=local_write)
     def save_points(
         request_id: RequestId,
         items: Annotated[list[dict[str, Any]], Field(min_length=1, max_length=20)],
         source: CaptureMode = "automatic",
+        expected_connection_epoch: ConnectionEpoch | None = None,
     ) -> dict[str, Any]:
         """Save one batch from a learning encounter. Reuse request_id and exact items on retry.
 
@@ -102,7 +113,7 @@ def create_server(store: Store) -> FastMCP:
         Returns one added/merged/skipped/failed outcome per item when processed.
         Skipped means the current capture settings exclude the item.
         """
-        return store.save(request_id, items, source)
+        return write_at_epoch(expected_connection_epoch, lambda: store.save(request_id, items, source))
 
     @server.tool(annotations=read_only)
     def find_points(
@@ -172,7 +183,8 @@ def create_server(store: Store) -> FastMCP:
                             include_upcoming=include_upcoming, exclude_ids=exclude_ids)
 
     @server.tool(annotations=local_write)
-    def record_review(record_id: RecordId, request_id: RequestId, review: Review) -> dict[str, Any]:
+    def record_review(record_id: RecordId, request_id: RequestId, review: Review,
+                      expected_connection_epoch: ConnectionEpoch | None = None) -> dict[str, Any]:
         """Record an actual answered quiz once; reuse request_id and exact arguments on retry.
         result is correct/partial/incorrect/skipped. Set assisted=true if hints or the answer
         were shown before the learner responded. A quiz immediately after you explained or
@@ -185,7 +197,7 @@ def create_server(store: Store) -> FastMCP:
         result from asking a meaning, reading an explanation, or marking Mastered.
         This never changes user-controlled mastery or encounter counts.
         """
-        return store.record_review(record_id, request_id, review)
+        return write_at_epoch(expected_connection_epoch, lambda: store.record_review(record_id, request_id, review))
 
     @server.tool(annotations=local_write)
     def start_study(
@@ -282,8 +294,9 @@ def create_server(store: Store) -> FastMCP:
         """
         return store.learning_preferences(language, patch)
 
-    @server.tool(annotations=ToolAnnotations(openWorldHint=False))
-    def update_point(record_id: RecordId, patch: Patch, expected_revision: Revision | None = None) -> dict[str, Any]:
+    @server.tool(annotations=ToolAnnotations(openWorldHint=cloud_capable))
+    def update_point(record_id: RecordId, patch: Patch, expected_revision: Revision | None = None,
+                     expected_connection_epoch: ConnectionEpoch | None = None) -> dict[str, Any]:
         """Edit supplied fields only. Use null to clear optional content.
         patch.scenes replaces the point's scene labels; [] explicitly removes all
         scenes. User scene edits are preserved across later automatic captures.
@@ -295,17 +308,24 @@ def create_server(store: Store) -> FastMCP:
         Pass the record's revision to avoid overwriting a concurrent page edit. On edit_conflict,
         reread and reconcile the change; do not blindly retry without the revision.
         """
-        return store.update(record_id, patch, expected_revision)
+        return write_at_epoch(expected_connection_epoch, lambda: store.update(record_id, patch, expected_revision))
 
-    @server.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
-    def delete_point(record_id: RecordId) -> dict[str, Any]:
+    @server.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=cloud_capable))
+    def delete_point(record_id: RecordId, expected_connection_epoch: ConnectionEpoch | None = None) -> dict[str, Any]:
         """Delete a specific knowledge point by ID."""
-        return store.delete(record_id)
+        return write_at_epoch(expected_connection_epoch, lambda: store.delete(record_id))
 
     return server
+
+
+def create_desktop_server(path: Path) -> FastMCP:
+    from desktop_account import AccountManager
+    from desktop_store import RoutingStore
+
+    return create_server(RoutingStore(Store(path), AccountManager(state_path=path.with_name("desktop-account.json"))))
 
 
 if __name__ == "__main__":
     default = Path.home() / ".local" / "share" / "codex-language-memory" / "memory.sqlite3"
     path = Path(os.environ.get("LANGUAGE_MEMORY_DB", str(default))).expanduser().resolve()
-    create_server(Store(path)).run(transport="stdio")
+    create_desktop_server(path).run(transport="stdio")

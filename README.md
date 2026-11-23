@@ -11,6 +11,24 @@ Recording is automatic for all languages and enabled by default on new installat
 
 ## Install the local Beta
 
+Beta 36 brings the Sayrove / 拾语 branding and responsive layout to the desktop
+plugin. Open **Profile → Sign in** to use the same cloud account and learning
+records as [Sayrove Web](https://sayrove.up.railway.app). Desktop conversation
+tools and the learning page follow the same selected source. OAuth uses the
+system browser and PKCE; the desktop does not collect a password. Its tokens
+are kept in the macOS Keychain.
+
+Local SQLite records remain on this device. Signing in does not upload them.
+**Use local records** explicitly switches back to them. **Sign out** disconnects
+the desktop cloud session and leaves cloud operations paused until another sign-in
+or an explicit local selection. Cloud mode supports captures, notes, scenes,
+settings and actual reviews; persistent study rounds, learning-profile/history
+tools and file export remain local-only in this release. Local pronunciation
+is available for cloud records through the desktop's installed voices.
+
+After installing, restart Codex and use a new chat to load the updated runtime
+and Skill. Already-running chats can retain the previous plugin process.
+
 Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
 
 To upgrade, download the next Beta and run its **Install.command**. The installer validates the package, tests its runtime, backs up the database and switches versions while preserving learning records and settings. Repeating the same installation is safe. It also migrates the earlier source-checkout installation automatically.

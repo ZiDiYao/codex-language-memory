@@ -9,6 +9,10 @@ export function createHostTransport(app) {
     return reply;
   }
   return {
+    async openExternal(url) {
+      const result = await app.openLink({ url });
+      if (result?.isError) throw new Error("unavailable");
+    },
     async request(route, payload) {
       const reply = await call(route, payload);
       if (reply.file && reply.status === 200) {

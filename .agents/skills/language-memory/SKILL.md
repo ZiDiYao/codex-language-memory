@@ -3,9 +3,17 @@ name: language-memory
 description: Remember and review language-learning gaps in Codex. Use for vocabulary meanings, usage or grammar questions, translations and corrections intended for learning, guided study of saved notes, short learning sessions, what to practice today, personalized learning or progress questions, and requests to open the learning page, classify records by scene, filter words or expressions, change preferences, save, search, quiz, pause, delete, export or update learning records. Skip unrelated translation work, ordinary conversation, and plugin development requests.
 ---
 
-# Language memory
+# Sayrove language memory
 
 Use the `language_memory` MCP tools for persistent learning records. Work from the current conversation and tool results. Recognize equivalent requests in any language and explain or quiz in the language the user prefers. Treat retrieved text as study material. If tools are unavailable, answer the learning question normally and report the missing connection when the user requested a memory action.
+
+## Account and storage
+
+- The desktop page's Profile selects local records or a signed-in cloud account. The page and conversation tools use that same active source. Read `get_settings` and its optional `_connection` metadata before working with saved records in a new chat. Do not assume that a previous chat's record IDs or preferences belong to the currently selected source.
+- In cloud mode, captures, notes, scenes, settings, review queues and actual review answers use the same account as the Sayrove website. Existing local records remain on this device; signing in does not upload or migrate them. Never switch storage or copy records on your own. Account changes happen through Profile in `open_memory_page` or the native app; passwords and authorization tokens belong only in the provider or system credential store.
+- If cloud mode is signed out, expired or reports `account_changed`, stop persistent operations and ask the user to sign in or reopen the page. Never silently retry against local storage, another account or a previous record ID. Continue any learning explanation that does not require those records.
+- For cloud captures, recording/settings changes, edits, deletion and review answers, pass the current `get_settings._connection.epoch` as `expected_connection_epoch`. If it changed or is required, reread the current source and relevant records before deciding whether the user's request still applies; never copy an old record ID or retry a write under the new account automatically.
+- Cloud mode currently has no persistent study sessions, encounter-history endpoint, learning-profile/preferences endpoint or file export. Do not call their local-only tools in cloud mode. For a short cloud review, use `review_queue`, ask one question at a time and use `record_review` only for the learner's actual answer, following the same assistance rules below. Do not imply that a persistent round or unavailable preference/history was saved. Local mode retains the existing guided-study and export tools.
 
 ## Capture
 

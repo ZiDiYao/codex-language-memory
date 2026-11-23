@@ -83,6 +83,7 @@ def main():
             "--specpath", str(ROOT / "build"), "--add-data", str(ROOT / "web") + ":web",
             "--collect-all", "docx", "--collect-data", "reportlab", "--collect-data", "certifi",
             "--recursive-copy-metadata", "mcp", "--copy-metadata", "fsrs",
+            "--collect-all", "keyring", "--copy-metadata", "keyring",
             "--exclude-module", "tkinter", "--exclude-module", "pytest",
             str(ROOT / "release_runtime.py"),
         ], cwd=ROOT, check=True)
