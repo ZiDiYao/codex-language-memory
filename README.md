@@ -14,7 +14,12 @@ English, Chinese, Japanese, Korean, French and Spanish.
 
 ## Install the desktop Beta
 
-Beta 41 uses cloud accounts exclusively. The header uses an icon-only Profile
+Beta 42 adds a brief result transition to desktop filter changes, including when
+the visible records are identical. Unchanged cards retain their editors and state;
+background refreshes remain still, and reduced-motion preferences are respected.
+This desktop-only release leaves the hosted website unchanged.
+
+The desktop uses cloud accounts exclusively. The header uses an icon-only Profile
 button, optically balanced with Settings while retaining accessible labels. Profile and learning preferences use
 800px desktop dialogs that fit smaller screens. Dialogs dismiss through outside
 clicks or Escape, with an accessible Close action for keyboard and screen-reader

@@ -227,7 +227,7 @@ async function changeFilter(name, value) {
     renderKinds();
     renderScenes();
     if (name !== "scene") await loadScenes();
-    await loadRecords(true);
+    await loadRecords(true, false, { animateFilterChange: !runtime });
   } catch (error) {
     selectedLanguage = previous.language;
     selectedKind = previous.kind;
@@ -474,7 +474,7 @@ function clearRecords() {
   editors.clear();
   $("#records").replaceChildren();
 }
-function renderRecords(data, { reset, preserve, expanded, anchorId, anchorTop, filtersKey }) {
+function renderRecords(data, { reset, preserve, expanded, anchorId, anchorTop, filtersKey, animateFilterChange }) {
   const host = $("#records");
   if (reset) {
     const incoming = new Map(data.records.map((record) => [record.id, record]));
@@ -510,7 +510,8 @@ function renderRecords(data, { reset, preserve, expanded, anchorId, anchorTop, f
     host.append(empty);
     added.push(empty);
   }
-  if (!preserve) enterResults(added);
+  // Explicit desktop filter switches also animate cards reused by both filters.
+  if (!preserve) enterResults(animateFilterChange ? [...host.children] : added);
   committedFiltersKey = filtersKey;
   updateLoadState(data.has_more ? "scrollMore" : "allLoaded", { count: displayed.size });
   if (anchorId) {
@@ -539,7 +540,7 @@ function maybeLoadMore() {
     loadRecords();
   }
 }
-async function loadRecords(reset = false, preserve = false) {
+async function loadRecords(reset = false, preserve = false, { animateFilterChange = false } = {}) {
   if (!ready || accountPaused) return false;
   if (reset && !preserve && !(await flushEditors())) return false;
   if (preserve && (hasDirtyEditors() || historyIsInteracting())) return false;
@@ -547,7 +548,7 @@ async function loadRecords(reset = false, preserve = false) {
     reset,
     amount: preserve ? Math.max(pageSize, displayed.size) : pageSize,
     filters: filters(),
-    view: captureHistoryView(reset, preserve),
+    view: { ...captureHistoryView(reset, preserve), animateFilterChange },
   });
 }
 async function loadSettings() {
