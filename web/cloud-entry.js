@@ -4,6 +4,7 @@ import { applyCloudMessages, detectCloudLocale } from "./cloud-i18n.js";
 import { auth0Options, CloudSession, completeCloudCallback } from "./cloud-auth.js";
 import { createCloudTransport, validateCloudConfig } from "./cloud-transport.js";
 import { createCloudProfile, loginRedirectOptions } from "./cloud-profile.js";
+import { openDialog, closeDialog } from "./motion.js";
 
 const $ = (selector) => document.querySelector(selector);
 const locale = detectCloudLocale(navigator.languages || [navigator.language]);
@@ -39,6 +40,7 @@ let navigating = false;
 const profile = createCloudProfile({
   trigger: $("#cloud-profile-open"), panel: $("#cloud-profile"), closeButton: $("#cloud-profile-close"),
   primary: $("#cloud-profile-name"), secondary: $("#cloud-profile-email"),
+  openDialog, closeDialog,
 });
 
 async function login(mode = "login") {

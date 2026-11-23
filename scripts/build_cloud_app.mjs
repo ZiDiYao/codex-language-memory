@@ -34,20 +34,24 @@ html = html
     </aside>
     <main hidden>`)
   .replace('<div class="header-actions">', `<div class="header-actions">
-            <button id="cloud-profile-open" type="button" class="subtle cloud-account" popovertarget="cloud-profile" aria-haspopup="dialog" aria-controls="cloud-profile" aria-expanded="false">
+            <button id="cloud-profile-open" type="button" class="subtle cloud-account" aria-haspopup="dialog" aria-controls="cloud-profile" aria-expanded="false">
               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg>
               <span data-i18n="cloudProfile">Profile</span>
             </button>
-            <section id="cloud-profile" class="cloud-profile" popover="auto" role="dialog" aria-labelledby="cloud-profile-title">
-              <div class="cloud-profile-heading">
+            <dialog id="cloud-profile" class="cloud-profile" aria-labelledby="cloud-profile-title">
+              <div class="dialog-heading">
                 <h2 id="cloud-profile-title" data-i18n="cloudProfile">Profile</h2>
                 <button id="cloud-profile-close" type="button" class="icon-button"><span aria-hidden="true">×</span><span class="sr-only" data-i18n="close">Close</span></button>
               </div>
-              <p class="cloud-profile-status"><span aria-hidden="true"></span><span data-i18n="cloudSignedIn">Signed in</span></p>
-              <p id="cloud-profile-name" class="cloud-profile-name" hidden></p>
-              <p id="cloud-profile-email" class="cloud-profile-email" hidden></p>
-              <button id="cloud-logout" type="button" class="subtle cloud-profile-logout" data-i18n="cloudLogout">Sign out</button>
-            </section>`)
+              <section class="cloud-profile-section" aria-labelledby="cloud-profile-status">
+                <p id="cloud-profile-status" class="cloud-profile-status"><span aria-hidden="true"></span><span data-i18n="cloudSignedIn">Signed in</span></p>
+                <p id="cloud-profile-name" class="cloud-profile-name" hidden></p>
+                <p id="cloud-profile-email" class="cloud-profile-email" hidden></p>
+              </section>
+              <footer class="cloud-profile-footer">
+                <button id="cloud-logout" type="button" class="subtle cloud-profile-logout" data-i18n="cloudLogout">Sign out</button>
+              </footer>
+            </dialog>`)
   .replace(/(<div class="app-heading">\s*)<svg[\s\S]*?<\/svg>/, '$1<img class="cloud-brand-mark" src="/assets/sayrove-mark.svg" width="24" height="24" alt="" />')
   .replace('id="export-open"', 'id="export-open" hidden');
 await writeFile(new URL("index.html", output), html);
