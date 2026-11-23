@@ -12,7 +12,30 @@ your signed-in cloud account. The desktop plugin and website share the same libr
 Recording is automatic for every language when enabled. The learning page supports
 English, Chinese, Japanese, Korean, French and Spanish.
 
+## Product direction
+
+Sayrove is being developed as a language-learning assistant covering vocabulary,
+expressions, grammar, listening/speaking practice and personalized review. The
+next priorities are an editable learning profile (explicit goals, interests and
+real-life situations) and short personalized practice based on actual learning
+evidence. Scenario conversations, listening/speaking exercises and progress
+views can build on that foundation. These are planned features, not capabilities
+of the current cloud API. Keep ordinary questions fast; larger personalization
+work must not become a prerequisite for answering a simple vocabulary question.
+
 ## Install the desktop Beta
+
+Beta 46 adds a short capture context (`get_settings(for_capture=true)`) that returns
+preferences and scene names in one tool call. The desktop reuses validated OAuth
+metadata for up to five minutes within an account epoch and uses the existing
+authenticated REST routes for hot capture/read operations, avoiding an MCP handshake
+for each. Automatic context/save calls each have a 1.5-second foreground budget
+(plus a small worker cancellation allowance); explicit saves retain the normal
+deadline. Timeouts mean unconfirmed, not saved, and never start a retry loop or
+claim a durable background save. Model generation and host tool orchestration are
+outside that transport budget. Capture responses include safe phase timings.
+The learning Skill skips unsupported cloud profile/history calls and reuses a
+fresh context for short follow-ups. The website and hosted backend are unchanged.
 
 Beta 45 gives the packaged learning Skill the display name **Sayrove** and aligns
 assistant-facing brand guidance, connection messages and onboarding copy with it.

@@ -276,7 +276,7 @@ def word_document(records, columns=COLUMNS, include_metadata=True):
             for paragraph in document.paragraphs[start:-1]:
                 paragraph.paragraph_format.keep_with_next = True
     footer = document.sections[0].footer.paragraphs[0]
-    footer.add_run("Language memory | ")
+    footer.add_run("Sayrove | ")
     page = OxmlElement("w:fldSimple")
     page.set(qn("w:instr"), "PAGE")
     footer._p.append(page)
@@ -342,11 +342,11 @@ def pdf_document(records, columns=COLUMNS, include_metadata=True):
         def footer(canvas, document):
             canvas.setFont(name, 8)
             canvas.setFillColor(colors.HexColor("#666666"))
-            canvas.drawString(44, 24, "Language memory")
+            canvas.drawString(44, 24, "Sayrove")
             canvas.drawRightString(A4[0] - 44, 24, str(document.page))
         buffer = io.BytesIO()
         SimpleDocTemplate(buffer, pagesize=A4, rightMargin=44, leftMargin=44, topMargin=40, bottomMargin=42,
-                          title="Language learning records", author="Language memory").build(story, onFirstPage=footer, onLaterPages=footer)
+                          title="Language learning records", author="Sayrove").build(story, onFirstPage=footer, onLaterPages=footer)
         return buffer.getvalue()
 
 

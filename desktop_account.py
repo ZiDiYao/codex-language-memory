@@ -473,7 +473,7 @@ def _import_payload(value):
 
 class AccountManager:
     def __init__(self, *, state_path=None, credentials=None, http_transport=None, login_timeout=300, request_timeout=30,
-                 cloud_only=True):
+                 cloud_only=True, capture_timeout=1.5):
         if type(cloud_only) is not bool:
             raise ValueError("cloud_only must be a boolean")
         self.cloud_only = cloud_only
@@ -487,6 +487,12 @@ class AccountManager:
         self._credential_slots = {}
         self.http_transport = http_transport
         self.login_timeout, self.request_timeout = login_timeout, request_timeout
+        if type(capture_timeout) not in (int, float) or not 0 < capture_timeout <= request_timeout:
+            raise ValueError("Invalid automatic capture timeout")
+        self.capture_timeout = capture_timeout
+        self._http_client = None
+        self._metadata_cache = None
+        self._last_capture_timing = None
         self._lock = threading.RLock()
         self._login_future = None
         self._authorization = None
@@ -702,24 +708,60 @@ class AccountManager:
                              callback_handler=callback.wait if callback else None,
                              timeout=self.login_timeout, interactive=callback is not None,
                              epoch_check=lambda: self._assert_epoch(epoch))
-        async with self._client() as client:
-            prm_response = await client.get(PRM)
-            meta_response = await client.get(DISCOVERY)
+        cached = self._metadata_cache
+        if callback is not None or not cached or cached[0] != epoch or time.monotonic() >= cached[1]:
+            client = self._shared_client()
+            prm_response, meta_response = await asyncio.gather(client.get(PRM), client.get(DISCOVERY))
             if prm_response.status_code != 200 or meta_response.status_code != 200:
                 raise AccountError("oauth_configuration_invalid")
             from mcp.shared.auth import ProtectedResourceMetadata
             prm = ProtectedResourceMetadata.model_validate_json(prm_response.content)
             await provider._validate_resource_match(prm)
-            provider.context.protected_resource_metadata = prm
-            provider.context.auth_server_url = ISSUER
-            provider.context.oauth_metadata = OAuthMetadata.model_validate_json(meta_response.content)
+            metadata = OAuthMetadata.model_validate_json(meta_response.content)
+            provider.context.oauth_metadata = metadata
             provider.validate_metadata()
-            callback and setattr(callback, "issuer_required", meta_response.json().get("authorization_response_iss_parameter_supported", False))
+            cached = (epoch, time.monotonic() + 300, prm, metadata,
+                      meta_response.json().get("authorization_response_iss_parameter_supported", False))
+            self._metadata_cache = cached
+        if cached:
+            await provider._validate_resource_match(cached[2])
+            provider.context.protected_resource_metadata = cached[2].model_copy(deep=True)
+            provider.context.auth_server_url = ISSUER
+            provider.context.oauth_metadata = cached[3].model_copy(deep=True)
+            provider.validate_metadata()
+            callback and setattr(callback, "issuer_required", cached[4])
         return provider
 
     def _client(self, provider=None):
         return httpx.AsyncClient(auth=provider, transport=self.http_transport, follow_redirects=False,
                                  timeout=httpx.Timeout(self.request_timeout), trust_env=False)
+
+    def _shared_client(self):
+        # Owned by the account worker loop. Auth remains per request, never a
+        # shared default that could survive an account/epoch transition.
+        if self._http_client is None:
+            self._http_client = self._client()
+        return self._http_client
+
+    async def _rest(self, provider, method, path, *, params=None, body=None):
+        self._assert_epoch(provider.context.storage.epoch)
+        values = {key: str(value).lower() if isinstance(value, bool) else value
+                  for key, value in (params or {}).items() if value is not None}
+        response = await self._shared_client().request(method, API_ORIGIN + path, auth=provider,
+            params=values, **({"json": body} if body is not None else {}))
+        if response.status_code in (401, 403):
+            self._metadata_cache = None
+            raise AccountError("authentication_required")
+        if response.status_code >= 500:
+            raise AccountError("cloud_unavailable")
+        if response.status_code not in (200, 201, 400, 404, 409, 422):
+            raise AccountError("cloud_request_failed")
+        result = response.json()
+        if not isinstance(result, dict):
+            raise AccountError("invalid_cloud_response")
+        if response.status_code >= 400 and "status" not in result:
+            return {"status": "failed", "error": "invalid_request" if response.status_code in (400, 422) else "not_found"}
+        return result
 
     async def _mcp(self, provider, name=None, arguments=None):
         async with self._client(provider) as client:
@@ -783,14 +825,44 @@ class AccountManager:
             await callback.close()
             _account_context.reset(token)
 
-    async def _remote(self, epoch, *, name=None, arguments=None, path=None, params=None, method="GET", body=None):
+    async def _remote(self, epoch, *, name=None, arguments=None, path=None, params=None, method="GET", body=None,
+                      budget=None, capture_context=False):
         token = _account_context.set(True)
+        budget = self.request_timeout if budget is None else budget
+        started = time.perf_counter()
+        locked_at = metadata_at = finished_at = None
+        successful = False
+        automatic = name == "save_points" and (arguments or {}).get("source", "automatic") == "automatic"
+        def timing():
+            end = finished_at or time.perf_counter()
+            return {"total_ms": round((end - started) * 1000), "deadline_ms": round(budget * 1000),
+                "lock_wait_ms": round(((locked_at or end) - started) * 1000),
+                "metadata_ms": round(((metadata_at or end) - locked_at) * 1000) if locked_at else 0,
+                "request_ms": round((end - metadata_at) * 1000) if metadata_at else 0}
         try:
-            async with asyncio.timeout(self.request_timeout):
-                async with self.state.operation(self.request_timeout):
+            async with asyncio.timeout(budget):
+                async with self.state.operation(budget):
+                    locked_at = time.perf_counter()
                     self._assert_epoch(epoch)
                     provider = await self._provider(epoch)
-                    if path is None:
+                    metadata_at = time.perf_counter()
+                    if capture_context:
+                        settings, scenes = await asyncio.gather(
+                            self._rest(provider, "GET", "/v1/settings"),
+                            self._rest(provider, "GET", "/v1/scenes", params={"include_variants": True}))
+                        if "enabled" not in settings or not isinstance(scenes.get("scenes"), list):
+                            raise AccountError("invalid_cloud_response")
+                        names = [scene["name"] for scene in scenes["scenes"] if isinstance(scene, dict) and isinstance(scene.get("name"), str)]
+                        result = {**settings, "_capture": {"scene_names": names[:100], "scenes_truncated": len(names) > 100,
+                            "fetched_at": time.time(), "reuse_for_seconds": 60,
+                            "automatic_timeout_ms": round(self.capture_timeout * 1000),
+                            "last_capture_timing": self._last_capture_timing,
+                            "unsupported": ["learning_profile", "learning_preferences", "point_history", "study_sessions", "exports"]}}
+                    elif path is None and name in ("get_settings", "list_scenes", "find_points", "save_points"):
+                        routes = {"get_settings": "/v1/settings", "list_scenes": "/v1/scenes", "find_points": "/v1/points", "save_points": "/v1/captures"}
+                        result = await self._rest(provider, "POST" if name == "save_points" else "GET", routes[name],
+                            body=arguments if name == "save_points" else None, params=None if name == "save_points" else arguments)
+                    elif path is None:
                         result = await self._mcp(provider, name, arguments)
                     else:
                         async with self._client(provider) as client:
@@ -813,12 +885,20 @@ class AccountManager:
                         state.update(state="connected")
                         state.pop("error", None)
                         state.pop("credential_os_status", None)
+                    finished_at = time.perf_counter()
+                    successful = True
+                    if capture_context or automatic:
+                        result = {**result, "_timing": timing()}
                     return result
         except Exception as error:
+            if isinstance(error, (TimeoutError, httpx.TimeoutException)) and budget < self.request_timeout:
+                raise AccountError("capture_budget_exceeded") from None
             safe = _account_error(error)
             self._failure(epoch, safe.code, safe.credential_os_status)
             raise safe from None
         finally:
+            if automatic:
+                self._last_capture_timing = {**timing(), "response_received": successful}
             _account_context.reset(token)
 
     def _call(self, *, expected_epoch=None, **kwargs):
@@ -829,19 +909,23 @@ class AccountManager:
             raise AccountError("authentication_required")
         future = self._submit(self._remote(state["epoch"], **kwargs))
         try:
-            result = future.result(timeout=self.request_timeout + 2)
+            result = future.result(timeout=kwargs.get("budget", self.request_timeout) + 0.15)
             self._assert_epoch(state["epoch"])
             return result
         except FutureTimeout:
             future.cancel()
-            raise AccountError("cloud_unavailable") from None
+            raise AccountError("capture_budget_exceeded" if "budget" in kwargs else "cloud_unavailable") from None
+
+    def capture_context(self, *, expected_epoch=None):
+        return self._call(name="get_settings", capture_context=True, expected_epoch=expected_epoch, budget=self.capture_timeout)
 
     def call_tool(self, name, args=None, *, expected_epoch=None):
         # The deployed server is the authority for supported tool names. Names
         # remain bounded; an unsupported tool returns an explicit error, never SQLite.
         if not isinstance(name, str) or not name or len(name) > 100 or (args is not None and not isinstance(args, dict)):
             raise AccountError("unsupported_cloud_operation")
-        return self._call(name=name, arguments=args, expected_epoch=expected_epoch)
+        budget = {"budget": self.capture_timeout} if name == "save_points" and (args or {}).get("source", "automatic") == "automatic" else {}
+        return self._call(name=name, arguments=args, expected_epoch=expected_epoch, **budget)
 
     def request_api(self, method, path, params=None, json=None, *, expected_epoch=None):
         import re
@@ -871,6 +955,10 @@ class AccountManager:
                     task.cancel()
                 if pending:
                     await asyncio.gather(*pending, return_exceptions=True)
+                if self._http_client is not None:
+                    await self._http_client.aclose()
+                    self._http_client = None
+                self._metadata_cache = None
             try:
                 asyncio.run_coroutine_threadsafe(shutdown(), loop).result(timeout=2)
             except Exception:

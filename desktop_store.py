@@ -150,13 +150,13 @@ class RoutingStore:
     def _api(self, path, *, epoch):
         return self._response(self._account.request_api("GET", path, expected_epoch=epoch))
 
-    def _dispatch(self, method, *, arguments=(), keywords=None, cloud, metadata=False):
+    def _dispatch(self, method, *, arguments=(), keywords=None, cloud, metadata=False, migrate=True):
         snapshot = self._snapshot()
         if snapshot["mode"] == "local":
             value = getattr(self._local, method)(*arguments, **(keywords or {}))
         else:
             self._connected(snapshot)
-            if self._migration is not None:
+            if migrate and self._migration is not None:
                 self._migration.ensure(self._account, expected_epoch=snapshot["epoch"])
             value = cloud(snapshot["epoch"])
         self._unchanged(snapshot)
@@ -180,13 +180,21 @@ class RoutingStore:
                     self._tool("update_settings", {"patch": patch.model_dump(mode="json", exclude_unset=True)}, epoch=epoch))
         return self._dispatch("settings", arguments=(patch,), cloud=cloud, metadata=True)
 
+    def capture_context(self):
+        ready = self._migration is None or self._migration.capture_ready()
+        result = self._dispatch("settings", cloud=lambda epoch: self._response(
+            self._account.capture_context(expected_epoch=epoch)), metadata=True, migrate=False)
+        return {**result, "_capture": {**result.get("_capture", {}), "capture_ready": ready}}
+
     def recording(self, enabled: bool | None = None):
         return self._dispatch("recording", arguments=(enabled,), cloud=lambda epoch: (
             self._tool("get_recording", {}, epoch=epoch) if enabled is None else self._tool("set_recording", {"enabled": enabled}, epoch=epoch)))
 
     def save(self, request_id, items, source="automatic"):
+        if source == "automatic" and self._migration is not None and not self._migration.capture_ready():
+            raise CloudAccountUnavailable("cloud_import_unavailable")
         return self._dispatch("save", arguments=(request_id, items, source), cloud=lambda epoch: self._tool(
-            "save_points", {"request_id": request_id, "items": items, "source": source}, epoch=epoch))
+            "save_points", {"request_id": request_id, "items": items, "source": source}, epoch=epoch), migrate=source != "automatic")
 
     def query(self, *, keyword=None, kind=None, language=None, status=None, scene=None, limit=10, offset=0,
               include_variants=False, cursor=None, needs_enrichment=False):

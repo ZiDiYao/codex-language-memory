@@ -115,7 +115,7 @@ def refresh_extension(action, result, locations):
 
 def print_ready(result):
     label = "Already installed" if result["status"] == "already_installed" else "Ready"
-    print(f"{label}: Language Memory {result['version']}.")
+    print(f"{label}: Sayrove {result['version']}.")
     print("Your learning records and settings are preserved.")
     if result.get("database_backup"):
         print("A database backup was created before updating.")
@@ -124,12 +124,12 @@ def print_ready(result):
 
 
 def print_disconnected(result):
-    print("Language Memory disconnected. Your records, backups and release files were kept.")
+    print("Sayrove disconnected. Your records, backups and release files were kept.")
     print(result["next_step"])
 
 
 def print_status(result):
-    print(f"Language Memory: {result['version'] or 'not installed'}")
+    print(f"Sayrove: {result['version'] or 'not installed'}")
     checks = [("runtime_available", "Runtime")]
     if result["extension"]["enabled"]:
         print("Native Codex extension: connected")
@@ -153,7 +153,7 @@ def print_result(action, result, as_json):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Install, update or run Codex Language Memory.")
+    parser = argparse.ArgumentParser(description="Install, update or run Sayrove.")
     parser.add_argument("action", choices=("install", "serve", "healthcheck", "migrate", "status", "rollback", "uninstall", "connect-extension"))
     parser.add_argument("--package", type=Path)
     parser.add_argument("--sandbox-root", type=Path, help=argparse.SUPPRESS)
@@ -179,7 +179,7 @@ def main():
         refresh_extension(args.action, result, locations)
         print_result(args.action, result, args.json)
     except (InstallError, OSError, ValueError, sqlite3.Error, subprocess.TimeoutExpired) as error:
-        print(f"Language Memory: {error}", file=sys.stderr)
+        print(f"Sayrove: {error}", file=sys.stderr)
         raise SystemExit(1) from None
 
 

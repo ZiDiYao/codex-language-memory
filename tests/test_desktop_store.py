@@ -20,6 +20,10 @@ POINT = {
 
 
 class FakeAccount:
+    def capture_context(self, *, expected_epoch=None):
+        result = self.call_tool("get_settings", {}, expected_epoch=expected_epoch)
+        return {**result, "_capture": {"scene_names": ["Food & cooking"]}}
+
     def __init__(self, mode="cloud", state="connected"):
         self.mode, self.state, self.epoch = mode, state, 1
         self.calls = []
@@ -79,6 +83,20 @@ class ForbiddenLocal:
 
 
 class DesktopRoutingTests(unittest.TestCase):
+    def test_capture_context_is_epoch_bound_and_does_not_start_pending_migration(self):
+        class PendingMigration:
+            def capture_ready(self): return False
+            def ensure(self, *args, **kwargs): raise AssertionError("Slow import must not run during a short question")
+        account = FakeAccount()
+        routed = RoutingStore(None, account, migration=PendingMigration())
+        context = routed.capture_context()
+        self.assertFalse(context["_capture"]["capture_ready"])
+        self.assertEqual(context["_connection"]["epoch"], account.epoch)
+        with self.assertRaises(CloudAccountUnavailable):
+            with routed.expect_epoch(account.epoch, require_cloud=True):
+                routed.save("pending-import", [POINT], "automatic")
+        self.assertEqual([name for name, _ in account.calls], ["get_settings"])
+
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)

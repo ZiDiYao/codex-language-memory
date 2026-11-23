@@ -105,6 +105,13 @@ class DesktopMigration:
             raise MigrationError("cloud_import_too_large")
         return payload, hashlib.sha256(encoded).hexdigest()
 
+    def capture_ready(self):
+        """A short automatic capture must not start a potentially long import."""
+        if not self.database.exists() and not self.receipt.exists():
+            return True
+        receipt = self._read()
+        return bool(receipt and receipt["status"] == "complete")
+
     def ensure(self, account, *, expected_epoch):
         if not self.database.exists() and not self.receipt.exists():
             return  # New installation: all learning data starts in the cloud.

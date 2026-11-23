@@ -34,7 +34,7 @@ def connection_error(error):
     conflict = {"account_changed", "connection_epoch_required", "account_busy", "cloud_import_account_mismatch"}
     unavailable = {"cloud_unavailable", "credential_store_unavailable", "credential_store_denied",
                    "credential_store_interaction_required", "credential_store_app_identity",
-                   "account_state_unavailable", "invalid_cloud_response", "cloud_import_unavailable"}
+                   "account_state_unavailable", "invalid_cloud_response", "cloud_import_unavailable", "capture_budget_exceeded"}
     invalid = {"cloud_feature_unavailable", "unsupported_cloud_operation", "cloud_request_failed", "cloud_tool_failed", "cloud_import_too_large"}
     if code not in authentication | conflict | unavailable | invalid:
         return None

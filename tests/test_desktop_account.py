@@ -77,9 +77,11 @@ class MockCloud:
         self.unexpected_urls = []
         self.imports = []
         self.import_status = 200
+        self.requests = []
 
     async def __call__(self, request):
         url = str(request.url)
+        self.requests.append((request.method, request.url.path))
         if url == account.PRM:
             return httpx.Response(200, json={"resource": account.RESOURCE, "authorization_servers": [account.ISSUER],
                                               "scopes_supported": ["memory:read", "memory:write"]})
@@ -112,6 +114,26 @@ class MockCloud:
             if not request.headers.get("authorization"):
                 return httpx.Response(401, headers={"WWW-Authenticate": 'Bearer resource_metadata="' + account.PRM + '"'})
             if request.url.path.startswith("/v1/"):
+                tools = {"/v1/settings": "get_settings", "/v1/scenes": "list_scenes", "/v1/points": "find_points", "/v1/captures": "save_points"}
+                if request.url.path in tools:
+                    name = tools[request.url.path]
+                    payload = request.headers["authorization"].split(".")[1]
+                    self.subjects.append(json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))["sub"])
+                    arguments = json.loads(request.content) if request.method == "POST" else dict(request.url.params)
+                    self.calls.append({"name": name, "arguments": arguments})
+                    if self.tool_entered:
+                        self.tool_entered.set()
+                        while not self.tool_release.is_set():
+                            await asyncio.sleep(0.01)
+                    if self.tool_error:
+                        return httpx.Response(503, json={"error": "unavailable"})
+                    if name == "get_settings":
+                        return httpx.Response(200, json={"enabled": True})
+                    if name == "list_scenes":
+                        return httpx.Response(200, json={"scenes": [{"name": "Food & cooking", "count": 1}], "total": 1})
+                    if name == "find_points":
+                        return httpx.Response(200, json={"records": [], "has_more": False, "next_cursor": None})
+                    return httpx.Response(200, json={"status": "processed", "results": [], "replayed": False})
                 if request.url.path == "/v1/desktop-imports":
                     self.imports.append({"method": request.method, "body": json.loads(request.content)})
                     return httpx.Response(self.import_status, json={"status": "imported" if self.import_status == 200 else "failed",
@@ -146,6 +168,68 @@ class MockCloud:
 
 
 class DesktopAccountTests(unittest.TestCase):
+    def test_capture_context_coalesces_settings_and_scenes_without_mcp_handshakes(self):
+        self.login()
+        before = len(self.cloud.requests)
+        result = self.manager.capture_context(expected_epoch=self.manager.status()["epoch"])
+        self.assertTrue(result["enabled"])
+        self.assertEqual(result["_capture"]["scene_names"], ["Food & cooking"])
+        self.assertIn("learning_profile", result["_capture"]["unsupported"])
+        self.assertCountEqual(self.cloud.requests[before:], [("GET", "/v1/settings"), ("GET", "/v1/scenes")])
+        self.assertLess(result["_timing"]["total_ms"], result["_timing"]["deadline_ms"])
+
+    def test_hot_tools_reuse_validated_metadata_and_use_authenticated_rest(self):
+        self.login()
+        before = len(self.cloud.requests)
+        self.manager.call_tool("find_points", {"language": "en", "include_variants": True, "status": "new", "cursor": "opaque/+=="})
+        result = self.manager.call_tool("save_points", {"request_id": "perf-idempotent", "items": [], "source": "automatic"})
+        self.assertEqual(self.cloud.requests[before:], [("GET", "/v1/points"), ("POST", "/v1/captures")])
+        self.assertEqual(self.cloud.calls[-2]["arguments"]["include_variants"], "true")
+        self.assertEqual(self.cloud.calls[-2]["arguments"]["cursor"], "opaque/+==")
+        self.assertEqual(self.cloud.calls[-1]["arguments"]["request_id"], "perf-idempotent")
+        self.assertEqual(result["status"], "processed")
+        self.assertEqual(result["_timing"]["deadline_ms"], 1500)
+
+    def test_expired_metadata_is_revalidated_before_sending_credentials(self):
+        self.login()
+        value = self.manager._metadata_cache
+        self.manager._metadata_cache = (value[0], 0, *value[2:])
+        self.cloud.metadata_override["token_endpoint"] = "https://evil.example/token"
+        count = len(self.cloud.calls)
+        with self.assertRaises(account.AccountError) as raised:
+            self.manager.call_tool("get_settings")
+        self.assertEqual(raised.exception.code, "oauth_configuration_invalid")
+        self.assertEqual(len(self.cloud.calls), count)
+        self.assertEqual(self.cloud.unexpected_urls, [])
+
+    def test_automatic_capture_has_a_bounded_wait_and_no_synchronous_retry(self):
+        self.login()
+        self.manager.capture_timeout = 0.05
+        self.cloud.tool_entered, self.cloud.tool_release = threading.Event(), threading.Event()
+        started = time.monotonic()
+        with self.assertRaises(account.AccountError) as raised:
+            self.manager.call_tool("save_points", {"request_id": "bounded-save", "items": [], "source": "automatic"})
+        self.assertEqual(raised.exception.code, "capture_budget_exceeded")
+        self.assertLess(time.monotonic() - started, 1)
+        self.assertEqual(sum(call["name"] == "save_points" for call in self.cloud.calls), 1)
+        self.assertFalse(self.manager._last_capture_timing["response_received"])
+        self.assertEqual(self.manager.status()["state"], "connected")
+        self.cloud.tool_entered = None
+        self.assertTrue(self.manager.call_tool("get_settings")["enabled"])
+
+    def test_capture_context_refreshes_tokens_once_and_rejects_old_account_epoch(self):
+        self.login()
+        self.expire()
+        epoch = self.manager.status()["epoch"]
+        self.manager.capture_context(expected_epoch=epoch)
+        self.assertEqual(sum(form["grant_type"] == ["refresh_token"] for form in self.cloud.exchanges), 1)
+        self.manager.disconnect()
+        count = len(self.cloud.requests)
+        with self.assertRaises(account.AccountError) as raised:
+            self.manager.capture_context(expected_epoch=epoch)
+        self.assertEqual(raised.exception.code, "account_changed")
+        self.assertEqual(len(self.cloud.requests), count)
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="sayrove-account-test-")
         self.addCleanup(self.temporary.cleanup)

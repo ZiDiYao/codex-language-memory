@@ -43,13 +43,15 @@ def create_server(store: Store) -> FastMCP:
         return {"url": dashboard.start(), "title": "Sayrove"}
 
     @server.tool(annotations=read_only)
-    def get_settings() -> dict[str, Any]:
+    def get_settings(for_capture: bool = False) -> dict[str, Any]:
         """Read recording, interface language, confirmed first_language and default explanation override.
 
         A null first_language means the user has not confirmed it. Never infer it from the UI or learning language.
         A null explanation_language uses first_language unless a target-language preference overrides it.
+        Set for_capture=true for a short-timeout cloud capture context including scene names.
+        Reuse that context during the short learning exchange; do not fetch an unsupported cloud profile.
         """
-        return store.settings()
+        return store.capture_context() if for_capture and hasattr(store, "capture_context") else store.settings()
 
     @server.tool(annotations=local_write)
     def update_settings(patch: SettingsPatch, expected_connection_epoch: ConnectionEpoch | None = None) -> dict[str, Any]:
