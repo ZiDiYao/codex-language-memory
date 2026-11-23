@@ -320,9 +320,13 @@ def create_server(store: Store) -> FastMCP:
 
 def create_desktop_server(path: Path) -> FastMCP:
     from desktop_account import AccountManager
+    from desktop_migration import DesktopMigration
     from desktop_store import RoutingStore
 
-    return create_server(RoutingStore(Store(path), AccountManager(state_path=path.with_name("desktop-account.json"))))
+    # Existing SQLite is a one-time migration source/backup. Never open a new
+    # local learning database in the production cloud client.
+    account = AccountManager(state_path=path.with_name("desktop-account.json"))
+    return create_server(RoutingStore(None, account, migration=DesktopMigration(path)))
 
 
 if __name__ == "__main__":

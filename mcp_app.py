@@ -104,7 +104,7 @@ def register_app(server, store):
                  })
     def open_memory_app() -> dict[str, Any]:
         """Open Sayrove inside the host: browse notes, edit and change settings.
-        Uses the same local database as conversational tools. Hosts without MCP Apps can
+        Uses the same signed-in account as conversational tools. Hosts without MCP Apps can
         use open_memory_page instead. Opening the app does not record a learning encounter.
         """
         return {"ready": True}

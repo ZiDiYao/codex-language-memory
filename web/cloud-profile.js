@@ -14,7 +14,7 @@ export function loginRedirectOptions(mode = "login") {
 }
 
 /** Use the same modal motion as Settings; app.js owns Escape/backdrop dismissal. */
-export function createCloudProfile({ trigger, panel, closeButton, primary, secondary, openDialog, closeDialog }) {
+export function createCloudProfile({ trigger, panel, closeButton, primary, secondary, statusNode, t, openDialog, closeDialog }) {
   const close = () => closeDialog(panel);
   trigger.addEventListener("click", () => {
     openDialog(panel);
@@ -27,6 +27,10 @@ export function createCloudProfile({ trigger, panel, closeButton, primary, secon
   closeButton.addEventListener("click", () => close());
   return {
     close,
+    setStatus(key) {
+      statusNode.dataset.i18n = key;
+      statusNode.textContent = t(key);
+    },
     setUser(user) {
       const details = profileDetails(user);
       primary.textContent = details.primary || "";

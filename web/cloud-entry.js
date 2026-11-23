@@ -40,7 +40,7 @@ let navigating = false;
 const profile = createCloudProfile({
   trigger: $("#cloud-profile-open"), panel: $("#cloud-profile"), closeButton: $("#cloud-profile-close"),
   primary: $("#cloud-profile-name"), secondary: $("#cloud-profile-email"),
-  openDialog, closeDialog,
+  statusNode: $("#cloud-profile-status"), t, openDialog, closeDialog,
 });
 
 async function login(mode = "login") {
@@ -83,7 +83,10 @@ async function initialize() {
     client = new Auth0Client(auth0Options(config, window.location.origin));
     session = new CloudSession(client, {
       issuer: `https://${config.auth0Domain}/`,
-      onRequired: (reason) => sessionMessage(reason === "accountChanged" ? "cloudAccountChanged" : "cloudSessionExpired"),
+      onRequired: (reason) => {
+        profile.setStatus("accountSignedOut");
+        sessionMessage(reason === "accountChanged" ? "cloudAccountChanged" : "cloudSessionExpired");
+      },
     });
     if (!(await completeCloudCallback(client, window.location, window.history))) {
       // Memory caching intentionally avoids persisted bearer/refresh tokens.
@@ -93,6 +96,7 @@ async function initialize() {
     document.querySelectorAll("[data-cloud-login]").forEach((button) => { button.disabled = false; });
     if (!(await client.isAuthenticated())) { status("cloudLoginHelp"); return; }
     await session.getToken();
+    profile.setStatus("accountSignedIn");
     profile.setUser(await client.getUser());
     runtime = {
       ...createCloudTransport({ apiBaseUrl: config.apiBaseUrl, session }),

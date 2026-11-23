@@ -41,8 +41,18 @@ Intel Mac, Windows and Linux binary packages are not included in this Beta.
 - Codex: one `mcp_servers.language_memory` entry in its user `config.toml`.
   A configured `CODEX_HOME` is respected. Unrelated settings and comments are preserved.
 - Skill: `~/.agents/skills/language-memory` points to the installed release through `current`.
-- Data: `~/.local/share/codex-language-memory/memory.sqlite3`, or the existing absolute
-  `LANGUAGE_MEMORY_DB` from this integration's MCP configuration.
+- Active learning data: the signed-in account on the hosted PostgreSQL service.
+- Legacy migration source/backup: `~/.local/share/codex-language-memory/memory.sqlite3`,
+  or the existing absolute `LANGUAGE_MEMORY_DB`. Beta 37 never routes learning operations to it.
+- Account metadata: `desktop-account.json` and a token-free `desktop-cloud-import-<path-hash>.json` receipt
+  beside that backup. OAuth credentials are held in the macOS Keychain.
+  Beta 38 persists a token-free random connection slot in the account metadata. A
+  reconnect skips already-failed old Keychain items; it never resets the system
+  keychain or falls back to plaintext. Old processes must be reloaded after this
+  update because they do not understand the new slot format.
+- First sign-in imports an immutable learning-only snapshot transactionally and idempotently.
+  A completed receipt prevents reimport into a later account. Pending imports are bound
+  to their original account. Original legacy data remains backed up and archived in the cloud.
 - Database backups: `backups/` beside the database, with private file permissions.
 - Configuration backups: the install directory's `backups/`, also private.
 
@@ -70,7 +80,7 @@ native Plugins directory, run **Connect Extension.command** after installation.
 It uses the installed Codex CLI to add a personal local marketplace and verifies
 that `language-memory@language-memory-local` is installed and enabled before removing
 the duplicate direct MCP and Skill registration. No public listing is created.
-The plugin points at the managed `current` runtime and the same database.
+The plugin points at the managed `current` runtime and the same cloud account.
 
 Once connected, future Install.command and Roll Back.command runs refresh the native
 plugin's cached Skill automatically. If refresh fails, the direct MCP installation
@@ -92,17 +102,26 @@ npm run build
 .venv/bin/python -m unittest discover -s tests -v
 node --test tests/*.mjs
 .venv/bin/python scripts/build_beta.py
-.venv/bin/python scripts/test_beta.py dist/language-memory-0.2.0-beta.36-macos-arm64.zip
+.venv/bin/python scripts/test_beta.py dist/language-memory-0.2.0-beta.41-macos-arm64.zip
 ```
 
 Change `VERSION` for the next Beta. The builder copies that version into the packaged
 manifest, collects third-party license notices, bundles the runtime and assets, writes
 `release.json`, and creates the ZIP with `ditto` to preserve framework symlinks and modes.
 `dist/SHA256SUMS.txt` contains the archive checksum. Build outputs are ignored by Git.
-Do not use `--skip-freeze` after changing Python, JavaScript, CSS or native App
-HTML: all of them live inside the frozen runtime. It is only for repackaging
-outer assets such as the Skill, plugin manifest and command files when the
-frozen runtime is unchanged.
+Do not use `--skip-freeze` alone after changing Python, JavaScript, CSS or native
+App HTML: it neither rebuilds nor synchronizes those assets. Ordinarily rebuild
+the frozen runtime. A UI-only release can instead preserve an already verified
+runtime core to retain its Keychain code identity, but only with these guards:
+verify the base package inventory; prove Python sources, dependencies and build
+inputs are unchanged; rebuild the native HTML; independently copy the runtime
+and replace its entire `_internal/web` tree; then repackage. Compare every
+non-web runtime file/symlink, executable SHA256, CDHash and designated requirement
+against the base, verify the signature, and run the extracted package acceptance
+suite. Never edit the active installation or reuse a core after Python/dependency
+changes. The controlled Beta 39 build follows this path from Beta 38; Beta 40 preserves
+the same core through the verified Beta 39 package. Beta 41 likewise retains
+the verified core while updating the header icons.
 
 `scripts/test_beta.py` extracts the actual archive and executes its command files in a
 temporary profile whose paths contain spaces. Runtime PATH excludes developer tools.
@@ -116,6 +135,9 @@ the native bundle test must also run on the build Mac before uploading a release
 For diagnostics, the bundled executable supports `status --json`. The hidden
 `--sandbox-root` option redirects installation, configuration, Skill and default data
 paths to an isolated test profile; it does not change HOME or CODEX_HOME.
+For `serve`, this explicit sandbox flag exercises the retained legacy SQLite engine
+for offline fixture acceptance. Installed production launch arguments do not include it.
+Cloud authentication, import and routing have separate isolated tests.
 
 After tests pass, create a GitHub prerelease for the matching commit and upload the
 ZIP, SHA256SUMS.txt and test report. Keep release visibility consistent with repository

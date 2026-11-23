@@ -3,7 +3,7 @@ WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY web ./web
-COPY scripts/build_cloud_app.mjs ./scripts/build_cloud_app.mjs
+COPY scripts/build_cloud_app.mjs scripts/profile_markup.mjs ./scripts/
 RUN npm run build:web
 
 FROM node:24-bookworm-slim

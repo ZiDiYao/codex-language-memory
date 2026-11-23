@@ -133,7 +133,7 @@ test("cloud-only adapters cannot fall back to local export/speech or the native 
   delete globalThis.languageMemoryRuntime;
   globalThis.languageMemoryHost = { async request() { return Response.json({ enabled: true }); } };
   assert.deepEqual(await (await request("api", { action: "settings/read" })).json(), { enabled: true });
-  assert.deepEqual(capabilities(), { export: true, speech: true });
+  assert.deepEqual(capabilities(), { export: false, speech: true });
   const transport = createCloudTransport({ apiBaseUrl: "https://memory.example", session: { getToken() { throw new Error("must not request credentials"); } } });
   await assert.rejects(transport.request("export", { format: "pdf" }), /unavailable/);
   await assert.rejects(transport.request("api", { action: "speech/play", arguments: { record_id: 7 } }), /unavailable/);

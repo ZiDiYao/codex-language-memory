@@ -65,6 +65,7 @@ export const messages = {
     notebook: "Learning language",
     allLanguages: "All languages",
     search: "Search",
+    clearSearch: "Clear search",
     searchPlaceholder: "Search meanings, expressions or grammar",
     kind: "Type",
     scene: "Scene",
@@ -224,6 +225,7 @@ export const messages = {
     notebook: "学习语言",
     allLanguages: "全部语言",
     search: "搜索",
+    clearSearch: "清空搜索",
     searchPlaceholder: "搜索词义、表达或语法",
     kind: "类型",
     scene: "场景",
@@ -379,6 +381,7 @@ export const messages = {
     notebook: "学習言語",
     allLanguages: "すべての言語",
     search: "検索",
+    clearSearch: "検索をクリア",
     searchPlaceholder: "意味・表現・文法を検索",
     kind: "種類",
     scene: "場面",
@@ -540,6 +543,7 @@ export const messages = {
     notebook: "학습 언어",
     allLanguages: "모든 언어",
     search: "검색",
+    clearSearch: "검색 지우기",
     searchPlaceholder: "뜻, 표현 또는 문법 검색",
     kind: "유형",
     scene: "상황",
@@ -700,6 +704,7 @@ export const messages = {
     notebook: "Langue étudiée",
     allLanguages: "Toutes les langues",
     search: "Rechercher",
+    clearSearch: "Effacer la recherche",
     searchPlaceholder: "Rechercher un sens, une expression ou une règle",
     kind: "Type",
     scene: "Situation",
@@ -860,6 +865,7 @@ export const messages = {
     notebook: "Idioma de aprendizaje",
     allLanguages: "Todos los idiomas",
     search: "Buscar",
+    clearSearch: "Borrar búsqueda",
     searchPlaceholder: "Buscar significados, expresiones o gramática",
     kind: "Tipo",
     scene: "Situación",
@@ -955,14 +961,14 @@ export const messages = {
 };
 
 const accountMessages = {
-  en: ["Profile", "Local records", "Cloud records", "Your notes are stored on this Mac. Sign in to use your cloud library.", "Signed in. Your cloud library is available here and on the web.", "Opening sign-in in your browser…", "Sign in to view your cloud records, or choose local records.", "Sign in", "Sign out", "Use local records", "Continue in browser", "Could not connect. Try again.", "Save or copy your unsaved drafts before switching accounts.", "Use Continue in browser to open the sign-in page.", "Your account changed. Copy any unsaved drafts, then reopen this page."],
-  zh: ["账户", "本地记录", "云端记录", "笔记保存在这台 Mac 上。登录后可使用云端学习库。", "已登录。你可以在这里和网页查看云端学习库。", "正在浏览器中打开登录页面…", "登录以查看云端记录，或选择使用本地记录。", "登录", "退出登录", "使用本地记录", "在浏览器中继续", "暂时无法连接，请重试。", "切换账户前，请先保存或复制未保存的草稿。", "点击“在浏览器中继续”打开登录页面。", "账户已变化。请复制未保存的草稿，再重新打开此页面。"],
-  ja: ["アカウント", "ローカルの記録", "クラウドの記録", "ノートはこのMacに保存されています。ログインするとクラウドのノートを使えます。", "ログイン中です。クラウドのノートをここでもWebでも確認できます。", "ブラウザーでログイン画面を開いています…", "ログインしてクラウドの記録を見るか、ローカルの記録を選んでください。", "ログイン", "ログアウト", "ローカルの記録を使う", "ブラウザーで続ける", "接続できませんでした。もう一度お試しください。", "アカウントを切り替える前に、下書きを保存またはコピーしてください。", "「ブラウザーで続ける」でログイン画面を開いてください。", "アカウントが変わりました。未保存の下書きをコピーしてから、このページを開き直してください。"],
-  ko: ["프로필", "로컬 기록", "클라우드 기록", "노트는 이 Mac에 저장됩니다. 로그인하면 클라우드 학습 노트를 사용할 수 있습니다.", "로그인되었습니다. 여기와 웹에서 클라우드 노트를 볼 수 있습니다.", "브라우저에서 로그인 화면을 여는 중…", "클라우드 기록을 보려면 로그인하거나 로컬 기록을 선택하세요.", "로그인", "로그아웃", "로컬 기록 사용", "브라우저에서 계속", "연결할 수 없습니다. 다시 시도하세요.", "계정을 전환하기 전에 저장하지 않은 초안을 저장하거나 복사하세요.", "브라우저에서 계속을 눌러 로그인 화면을 여세요.", "계정이 변경되었습니다. 저장하지 않은 초안을 복사한 후 이 페이지를 다시 여세요."],
-  fr: ["Profil", "Notes locales", "Notes du cloud", "Vos notes sont stockées sur ce Mac. Connectez-vous pour utiliser votre bibliothèque cloud.", "Connecté. Votre bibliothèque cloud est disponible ici et sur le Web.", "Ouverture de la connexion dans le navigateur…", "Connectez-vous pour voir vos notes du cloud ou choisissez les notes locales.", "Se connecter", "Se déconnecter", "Utiliser les notes locales", "Continuer dans le navigateur", "Connexion impossible. Réessayez.", "Enregistrez ou copiez vos brouillons avant de changer de compte.", "Utilisez Continuer dans le navigateur pour ouvrir la connexion.", "Votre compte a changé. Copiez vos brouillons non enregistrés, puis rouvrez cette page."],
-  es: ["Perfil", "Notas locales", "Notas en la nube", "Tus notas se guardan en este Mac. Inicia sesión para usar tu biblioteca en la nube.", "Sesión iniciada. Tu biblioteca en la nube está disponible aquí y en la web.", "Abriendo el inicio de sesión en el navegador…", "Inicia sesión para ver tus notas en la nube o elige las notas locales.", "Iniciar sesión", "Cerrar sesión", "Usar notas locales", "Continuar en el navegador", "No se pudo conectar. Inténtalo de nuevo.", "Guarda o copia los borradores antes de cambiar de cuenta.", "Usa Continuar en el navegador para abrir el inicio de sesión.", "Tu cuenta cambió. Copia los borradores sin guardar y vuelve a abrir esta página."],
+  en: ["Profile", "Cloud records", "Signed in. Your cloud library is available here and on the web.", "Opening sign-in in your browser…", "Sign in to view and save your cloud learning notes.", "Sign in", "Sign out", "Continue in browser", "Could not connect. Try again.", "Save or copy your unsaved drafts before signing out.", "Use Continue in browser to open the sign-in page.", "Your account changed. Copy any unsaved drafts, then reopen this page."],
+  zh: ["账户", "云端记录", "已登录。你可以在这里和网页查看云端学习库。", "正在浏览器中打开登录页面…", "登录后即可查看和保存云端学习笔记。", "登录", "退出登录", "在浏览器中继续", "暂时无法连接，请重试。", "退出登录前，请先保存或复制未保存的草稿。", "点击“在浏览器中继续”打开登录页面。", "账户已变化。请复制未保存的草稿，再重新打开此页面。"],
+  ja: ["アカウント", "クラウドの記録", "ログイン中です。クラウドのノートをここでもWebでも確認できます。", "ブラウザーでログイン画面を開いています…", "ログインして、クラウドの学習ノートを確認・保存しましょう。", "ログイン", "ログアウト", "ブラウザーで続ける", "接続できませんでした。もう一度お試しください。", "ログアウトする前に、下書きを保存またはコピーしてください。", "「ブラウザーで続ける」でログイン画面を開いてください。", "アカウントが変わりました。未保存の下書きをコピーしてから、このページを開き直してください。"],
+  ko: ["프로필", "클라우드 기록", "로그인되었습니다. 여기와 웹에서 클라우드 노트를 볼 수 있습니다.", "브라우저에서 로그인 화면을 여는 중…", "로그인하여 클라우드 학습 노트를 확인하고 저장하세요.", "로그인", "로그아웃", "브라우저에서 계속", "연결할 수 없습니다. 다시 시도하세요.", "로그아웃하기 전에 저장하지 않은 초안을 저장하거나 복사하세요.", "브라우저에서 계속을 눌러 로그인 화면을 여세요.", "계정이 변경되었습니다. 저장하지 않은 초안을 복사한 후 이 페이지를 다시 여세요."],
+  fr: ["Profil", "Notes du cloud", "Connecté. Votre bibliothèque cloud est disponible ici et sur le Web.", "Ouverture de la connexion dans le navigateur…", "Connectez-vous pour consulter et enregistrer vos notes d’apprentissage dans le cloud.", "Se connecter", "Se déconnecter", "Continuer dans le navigateur", "Connexion impossible. Réessayez.", "Enregistrez ou copiez vos brouillons avant de vous déconnecter.", "Utilisez Continuer dans le navigateur pour ouvrir la connexion.", "Votre compte a changé. Copiez vos brouillons non enregistrés, puis rouvrez cette page."],
+  es: ["Perfil", "Notas en la nube", "Sesión iniciada. Tu biblioteca en la nube está disponible aquí y en la web.", "Abriendo el inicio de sesión en el navegador…", "Inicia sesión para consultar y guardar tus notas de aprendizaje en la nube.", "Iniciar sesión", "Cerrar sesión", "Continuar en el navegador", "No se pudo conectar. Inténtalo de nuevo.", "Guarda o copia los borradores antes de cerrar sesión.", "Usa Continuar en el navegador para abrir el inicio de sesión.", "Tu cuenta cambió. Copia los borradores sin guardar y vuelve a abrir esta página."],
 };
-const keys = ["accountProfile", "accountLocal", "accountCloud", "accountLocalHelp", "accountConnectedHelp", "accountConnecting", "accountSignedOutHelp", "accountLogin", "accountLogout", "accountUseLocal", "accountContinue", "accountFailure", "accountUnsaved", "accountOpenHelp", "accountChanged"];
+const keys = ["accountProfile", "accountCloud", "accountConnectedHelp", "accountConnecting", "accountSignedOutHelp", "accountLogin", "accountLogout", "accountContinue", "accountFailure", "accountUnsaved", "accountOpenHelp", "accountChanged"];
 function applyLocalMessages() {
   for (const [locale, values] of Object.entries(accountMessages)) {
     Object.assign(messages[locale], Object.fromEntries(keys.map((key, index) => [key, values[index]])));
@@ -975,3 +981,24 @@ function applyLocalMessages() {
 }
 
 applyLocalMessages();
+
+const profileMessages = {
+  en: ["Account", "Learning activity", "Coming soon", "Your learning activity will appear here when this feature is available.", "Signed in", "Keychain access was declined. Sign in again and allow access when macOS asks.", "Unlock your Mac, then sign in again to allow Keychain access.", "This app could not access Keychain. Reopen Sayrove and try signing in again.", "Keychain is unavailable. Reopen Sayrove and try signing in again.", "Sign-in was cancelled. You can try again.", "Sign-in timed out. Please try again.", "Sign-in is unavailable. Update Sayrove and try again."],
+  zh: ["账号信息", "学习热图", "即将推出", "功能上线后，你的学习活动会显示在这里。", "已登录", "钥匙串访问未获授权。请重新登录，并在 macOS 提示时允许访问。", "请先解锁 Mac，再重新登录以允许访问钥匙串。", "当前应用无法访问钥匙串。请重新打开拾语，再尝试登录。", "钥匙串暂时不可用。请重新打开拾语，再尝试登录。", "已取消登录，你可以重新尝试。", "登录已超时，请重试。", "登录暂时不可用。请更新拾语后重试。"],
+  ja: ["アカウント情報", "学習アクティビティ", "近日公開", "この機能が公開されると、学習アクティビティがここに表示されます。", "ログイン中", "キーチェーンへのアクセスが許可されませんでした。再度ログインし、macOSの確認でアクセスを許可してください。", "Macのロックを解除してから、再度ログインしてキーチェーンへのアクセスを許可してください。", "このアプリはキーチェーンにアクセスできません。Sayroveを開き直して、再度ログインしてください。", "キーチェーンを利用できません。Sayroveを開き直して、再度ログインしてください。", "ログインをキャンセルしました。もう一度お試しいただけます。", "ログインがタイムアウトしました。もう一度お試しください。", "ログインできません。Sayroveを更新して、もう一度お試しください。"],
+  ko: ["계정 정보", "학습 활동", "출시 예정", "이 기능이 출시되면 학습 활동이 여기에 표시됩니다.", "로그인됨", "키체인 접근이 허용되지 않았습니다. 다시 로그인하고 macOS에서 요청하면 접근을 허용하세요.", "Mac 잠금을 해제한 후 다시 로그인하여 키체인 접근을 허용하세요.", "이 앱에서 키체인에 접근할 수 없습니다. Sayrove를 다시 열고 로그인하세요.", "키체인을 사용할 수 없습니다. Sayrove를 다시 열고 로그인하세요.", "로그인이 취소되었습니다. 다시 시도할 수 있습니다.", "로그인 시간이 초과되었습니다. 다시 시도하세요.", "로그인할 수 없습니다. Sayrove를 업데이트한 후 다시 시도하세요."],
+  fr: ["Compte", "Activité d’apprentissage", "Bientôt disponible", "Votre activité d’apprentissage apparaîtra ici lorsque cette fonctionnalité sera disponible.", "Connecté", "L’accès au trousseau a été refusé. Reconnectez-vous et autorisez l’accès lorsque macOS le demande.", "Déverrouillez votre Mac, puis reconnectez-vous pour autoriser l’accès au trousseau.", "Cette application ne peut pas accéder au trousseau. Rouvrez Sayrove, puis reconnectez-vous.", "Le trousseau est indisponible. Rouvrez Sayrove, puis reconnectez-vous.", "Connexion annulée. Vous pouvez réessayer.", "La connexion a expiré. Réessayez.", "Connexion indisponible. Mettez Sayrove à jour, puis réessayez."],
+  es: ["Información de la cuenta", "Actividad de aprendizaje", "Próximamente", "Tu actividad de aprendizaje aparecerá aquí cuando esta función esté disponible.", "Sesión iniciada", "Se rechazó el acceso al llavero. Vuelve a iniciar sesión y permite el acceso cuando macOS lo solicite.", "Desbloquea el Mac y vuelve a iniciar sesión para permitir el acceso al llavero.", "Esta aplicación no puede acceder al llavero. Abre Sayrove de nuevo e intenta iniciar sesión.", "El llavero no está disponible. Abre Sayrove de nuevo e intenta iniciar sesión.", "Se canceló el inicio de sesión. Puedes intentarlo de nuevo.", "Se agotó el tiempo para iniciar sesión. Inténtalo de nuevo.", "No se puede iniciar sesión. Actualiza Sayrove e inténtalo de nuevo."],
+};
+const profileKeys = ["profileAccount", "profileActivity", "profileComingSoon", "profileActivityHelp", "accountSignedIn", "accountKeychainDenied", "accountKeychainUnlock", "accountKeychainIdentity", "accountKeychainUnavailable", "accountLoginCancelled", "accountLoginTimeout", "accountConfigurationError"];
+const publicAccountErrors = {
+  credential_store_denied: "accountKeychainDenied", credential_store_interaction_required: "accountKeychainUnlock",
+  credential_store_app_identity: "accountKeychainIdentity", credential_store_unavailable: "accountKeychainUnavailable",
+  authentication_required: "accountSignedOutHelp", login_cancelled: "accountLoginCancelled", login_timeout: "accountLoginTimeout",
+  oauth_configuration_invalid: "accountConfigurationError", cloud_unavailable: "accountFailure", cloud_tool_failed: "accountFailure",
+  cloud_request_failed: "accountFailure", invalid_cloud_response: "accountFailure",
+};
+for (const [locale, values] of Object.entries(profileMessages)) {
+  Object.assign(messages[locale], Object.fromEntries(profileKeys.map((key, index) => [key, values[index]])));
+  for (const [code, key] of Object.entries(publicAccountErrors)) messages[locale][code] = messages[locale][key];
+}

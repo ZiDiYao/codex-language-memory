@@ -1,6 +1,7 @@
 import pg from 'pg';
 
 export const SCHEMA_REVISION = '0001_remote_storage';
+export const NODE_SCHEMA_REVISION = '0002_desktop_imports';
 
 // Keep PostgreSQL microseconds in cursors. The driver's default Date parser
 // truncates them, which can skip points encountered in the same millisecond.
@@ -36,5 +37,8 @@ export function createPool(url, options = {}) {
 
 export async function checkSchema(pool) {
   const result = await pool.query('SELECT version_num FROM alembic_version');
-  return result.rows.length === 1 && result.rows[0].version_num === SCHEMA_REVISION;
+  if (result.rows.length !== 1 || result.rows[0].version_num !== SCHEMA_REVISION) return false;
+  const extensions = await pool.query('SELECT revision FROM lm_node_migrations');
+  return extensions.rows.length === 1 && extensions.rows[0].revision === NODE_SCHEMA_REVISION
+    && (await pool.query("SELECT to_regclass('lm_desktop_imports') AS name")).rows[0].name != null;
 }

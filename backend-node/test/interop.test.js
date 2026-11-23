@@ -42,14 +42,19 @@ async function isolatedSchema(t) {
   return { pool, python, repository: new Repository(pool, principal) };
 }
 
-test('Node migration matches Python metadata and accepts an existing Python schema', { skip: !enabled }, async t => {
+test('Shared base migration matches Python; Node extensions preserve Python CRUD compatibility', { skip: !enabled }, async t => {
   const first = await isolatedSchema(t);
-  assert.equal((await migrate(first.pool)).status, 'migrated');
+  // Alembic owns only the shared base tables. Its exact-metadata check runs
+  // before applying the independently versioned, additive Node extension.
+  assert.equal((await migrate(first.pool, { baseOnly: true })).status, 'migrated');
   assert.equal(first.python('schema_check').status, 'ok');
+  assert.equal((await migrate(first.pool)).status, 'migrated');
   assert.equal((await migrate(first.pool)).status, 'current');
   const second = await isolatedSchema(t);
   assert.equal(second.python('migrate').status, 'ok');
+  assert.equal((await migrate(second.pool)).status, 'migrated');
   assert.equal((await migrate(second.pool)).status, 'current');
+  assert.equal(second.python('settings').enabled, true);
 });
 
 test('Node and Python share identities, receipts, revisions, scenes, senses and review cards', { skip: !enabled }, async t => {

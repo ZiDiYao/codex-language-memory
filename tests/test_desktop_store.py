@@ -86,7 +86,7 @@ class DesktopRoutingTests(unittest.TestCase):
 
     def test_local_mode_preserves_store_records_preferences_and_desktop_features(self):
         account = FakeAccount("local", "signed_out")
-        routed = RoutingStore(self.local, account)
+        routed = RoutingStore(self.local, account, cloud_only=False)
         self.assertIs(routed.account, account)
         self.assertFalse(routed.is_cloud)
         self.assertIs(routed.database, self.local)
@@ -120,7 +120,7 @@ class DesktopRoutingTests(unittest.TestCase):
         self.local.save("already-local", [POINT])
         before = self.local.path.read_bytes()
         account = FakeAccount()
-        routed = RoutingStore(self.local, account)
+        routed = RoutingStore(self.local, account, cloud_only=False)
         self.assertTrue(routed.is_cloud)
         settings = routed.settings()
         self.assertEqual(settings["ui_language"], "zh")
@@ -213,7 +213,7 @@ class DesktopRoutingTests(unittest.TestCase):
         identifier = self.local.save("local-before-switch", [POINT])["results"][0]["id"]
         self.local.settings(SettingsPatch(ui_language="ja", enabled=False))
         account = FakeAccount()
-        routed = RoutingStore(self.local, account)
+        routed = RoutingStore(self.local, account, cloud_only=False)
         self.assertEqual(routed.query()["records"][0]["id"], 900)
         self.assertEqual(routed.settings()["ui_language"], "zh")
         account.mode, account.state, account.epoch = "local", "signed_out", 2
@@ -230,7 +230,7 @@ class DesktopRoutingTests(unittest.TestCase):
             routed.query()
         self.assertEqual(error.exception.code, "account_changed")
         account = FakeAccount("local", "signed_out")
-        routed = RoutingStore(self.local, account)
+        routed = RoutingStore(self.local, account, cloud_only=False)
         original = self.local.query
         def changed_query(**filters):
             value = original(**filters)
@@ -241,7 +241,7 @@ class DesktopRoutingTests(unittest.TestCase):
 
     def test_mode_change_inside_local_transaction_rolls_back(self):
         account = FakeAccount("local", "signed_out")
-        routed = RoutingStore(self.local, account)
+        routed = RoutingStore(self.local, account, cloud_only=False)
         with self.assertRaises(CloudAccountUnavailable):
             with routed.connection(write=True) as database:
                 database.execute("UPDATE settings SET recording=0 WHERE id=1")
@@ -291,7 +291,7 @@ class DesktopRoutingTests(unittest.TestCase):
         self.assertEqual(error.exception.code, "connection_epoch_required")
         self.assertEqual(account.calls, [])
         account = FakeAccount("local", "signed_out")
-        routed = RoutingStore(self.local, account)
+        routed = RoutingStore(self.local, account, cloud_only=False)
         with routed.expect_epoch(None, require_cloud=True):
             self.assertEqual(routed.query()["records"], [])
             account.mode, account.state, account.epoch = "cloud", "connected", 2

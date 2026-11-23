@@ -82,7 +82,7 @@ class AppTransportTests(unittest.TestCase):
 class AppProtocolTests(unittest.IsolatedAsyncioTestCase):
     async def test_stdio_discovers_global_entry_resource_and_app_only_actions(self):
         with tempfile.TemporaryDirectory() as directory:
-            params = StdioServerParameters(command=sys.executable, args=[str(APP / "server.py")],
+            params = StdioServerParameters(command=sys.executable, args=[str(APP / "release_runtime.py"), "serve", "--sandbox-root", directory],
                 cwd=directory, env={**os.environ, "LANGUAGE_MEMORY_DB": str(Path(directory) / "app.sqlite3")})
             async with stdio_client(params) as streams, ClientSession(*streams) as session:
                 await session.initialize()

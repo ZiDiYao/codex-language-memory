@@ -21,6 +21,7 @@ import secrets
 import tempfile
 import threading
 import time
+import uuid
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
@@ -44,9 +45,27 @@ _account_context = contextvars.ContextVar("sayrove_account_context", default=Fal
 
 class AccountError(ValueError):
     """Only a stable, non-sensitive error code may cross the desktop boundary."""
-    def __init__(self, code="cloud_unavailable"):
+    def __init__(self, code="cloud_unavailable", *, credential_os_status=None):
         self.code = code
+        self.credential_os_status = credential_os_status
         super().__init__(code)
+
+
+def _credential_failure(error):
+    """Extract only numeric Security.framework status, never exception text."""
+    status = None
+    seen = set()
+    while error is not None and id(error) not in seen and len(seen) < 8:
+        seen.add(id(error))
+        status = next((arg for arg in getattr(error, "args", ())
+                       if type(arg) is int and -(2 ** 31) <= arg < 0), status)
+        if status is not None:
+            break
+        error = error.__cause__ or error.__context__
+    code = ({-128: "credential_store_denied", -25293: "credential_store_denied",
+             -25308: "credential_store_interaction_required", -67030: "credential_store_app_identity"}
+            .get(status, "credential_store_unavailable"))
+    return AccountError(code, credential_os_status=status)
 
 
 class _QuietOAuth(logging.Filter):
@@ -61,8 +80,9 @@ for _sdk_logger in ("mcp.client.auth.oauth2", "mcp.client.streamable_http", "mcp
 
 
 class _StateFile:
-    def __init__(self, path):
+    def __init__(self, path, *, cloud_only=True):
         self.path = Path(path)
+        self.cloud_only = cloud_only
 
     @contextmanager
     def locked(self):
@@ -79,11 +99,20 @@ class _StateFile:
                             or state.get("state") not in ("signed_out", "connecting", "connected", "error")
                             or type(state.get("epoch")) is not int or state["epoch"] < 0):
                         raise ValueError()
+                    slot = state.get("credential_slot")
+                    if slot is not None and (not isinstance(slot, str) or len(slot) != 32
+                                             or any(char not in "0123456789abcdef" for char in slot)):
+                        raise ValueError()
                 except (ValueError, OSError):
                     raise AccountError("account_state_unavailable") from None
             else:
-                state = {"mode": "local", "state": "connected", "epoch": 0}
+                state = {"mode": "cloud" if self.cloud_only else "local",
+                         "state": "signed_out" if self.cloud_only else "connected", "epoch": 0}
             before = dict(state)
+            if self.cloud_only and state["mode"] == "local":
+                state.update(mode="cloud", state="signed_out", epoch=state["epoch"] + 1)
+                state.pop("error", None)
+                state.pop("login_deadline", None)
             yield state
             if state != before or not self.path.exists():
                 fd, temporary = tempfile.mkstemp(prefix=".account-", dir=self.path.parent)
@@ -132,6 +161,9 @@ class KeychainCredentials:
         self._backend = backend
         self.service, self.account = service, account
 
+    def for_slot(self, slot):
+        return KeychainCredentials(self._backend, service=self.service, account=self.account + ":connection:" + slot)
+
     def _keyring(self):
         if self._backend is None:
             try:
@@ -139,8 +171,8 @@ class KeychainCredentials:
                 self._backend = Keyring()
                 if self._backend.priority <= 0:
                     raise ValueError()
-            except Exception:
-                raise AccountError("credential_store_unavailable") from None
+            except Exception as error:
+                raise _credential_failure(error) from None
         return self._backend
 
     def read(self):
@@ -150,22 +182,22 @@ class KeychainCredentials:
             if not isinstance(result, dict):
                 raise ValueError()
             return result
-        except Exception:
-            raise AccountError("credential_store_unavailable") from None
+        except Exception as error:
+            raise _credential_failure(error) from None
 
     def write(self, value):
         try:
             self._keyring().set_password(self.service, self.account, json.dumps(value, separators=(",", ":")))
-        except Exception:
-            raise AccountError("credential_store_unavailable") from None
+        except Exception as error:
+            raise _credential_failure(error) from None
 
     def clear(self):
         try:
             backend = self._keyring()
             if backend.get_password(self.service, self.account) is not None:
                 backend.delete_password(self.service, self.account)
-        except Exception:
-            raise AccountError("credential_store_unavailable") from None
+        except Exception as error:
+            raise _credential_failure(error) from None
 
 
 def _token_identity(tokens):
@@ -417,14 +449,42 @@ def _account_error(error):
     return AccountError("cloud_unavailable")
 
 
+def _import_payload(value):
+    """Capture a bounded JSON object before handing it to the account worker."""
+    tables = {"knowledge", "settings", "capture_preferences", "encounters", "review_events", "memory_states",
+              "learner_preferences", "export_receipts", "study_sessions", "study_items", "study_answers"}
+    if (not isinstance(value, dict) or set(value) != {"schema_version", "source_id", "tables"}
+            or type(value.get("schema_version")) is not int or value["schema_version"] != 1
+            or not isinstance(value.get("source_id"), str)
+            or not isinstance(value.get("tables"), dict) or set(value["tables"]) != tables
+            or any(not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows)
+                   for rows in value["tables"].values())):
+        raise AccountError("unsupported_cloud_operation")
+    try:
+        if str(uuid.UUID(value["source_id"])) != value["source_id"]:
+            raise ValueError()
+        encoded = json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+        if len(encoded.encode("utf-8")) > 8 * 1024 * 1024:
+            raise ValueError()
+        return json.loads(encoded)
+    except (ValueError, TypeError, UnicodeError):
+        raise AccountError("unsupported_cloud_operation") from None
+
+
 class AccountManager:
-    def __init__(self, *, state_path=None, credentials=None, http_transport=None, login_timeout=300, request_timeout=30):
-        self.state = _StateFile(state_path or Path.home() / "Library/Application Support/Codex Language Memory/account-state.json")
+    def __init__(self, *, state_path=None, credentials=None, http_transport=None, login_timeout=300, request_timeout=30,
+                 cloud_only=True):
+        if type(cloud_only) is not bool:
+            raise ValueError("cloud_only must be a boolean")
+        self.cloud_only = cloud_only
+        self.state = _StateFile(state_path or Path.home() / "Library/Application Support/Codex Language Memory/account-state.json",
+                                cloud_only=cloud_only)
         # Separate profiles can have the same numeric epoch. Bind their Keychain
         # items to the canonical state path, so neither reads nor deletes another
         # profile's account while same-profile MCP processes still share refresh.
         namespace = hashlib.sha256(os.fsencode(self.state.path.resolve())).hexdigest()
-        self.credentials = credentials or KeychainCredentials(account="language-memory-cloud:" + namespace)
+        self._base_credentials = credentials or KeychainCredentials(account="language-memory-cloud:" + namespace)
+        self._credential_slots = {}
         self.http_transport = http_transport
         self.login_timeout, self.request_timeout = login_timeout, request_timeout
         self._lock = threading.RLock()
@@ -436,6 +496,20 @@ class AccountManager:
         self._closed = False
         self._revocations = set()
         self.state.read()
+
+    def _credentials_for(self, state):
+        slot = state.get("credential_slot")
+        if slot is None:
+            # Existing connected releases retain their original Keychain item.
+            # Failed legacy items are never accessed by a new login.
+            return self._base_credentials
+        if slot not in self._credential_slots:
+            self._credential_slots.setdefault(slot, self._base_credentials.for_slot(slot))
+        return self._credential_slots[slot]
+
+    @property
+    def credentials(self):
+        return self._credentials_for(self.state.read())
 
     def status(self):
         with self._lock:
@@ -451,6 +525,8 @@ class AccountManager:
                 result["authorization_url"] = self._authorization
             if state.get("error"):
                 result["error"] = state["error"]
+                if type(state.get("credential_os_status")) is int:
+                    result["credential_os_status"] = state["credential_os_status"]
             return result
 
     def _submit(self, coroutine):
@@ -480,35 +556,52 @@ class AccountManager:
             raise AccountError("account_changed")
 
     def _change(self, mode, state):
+        if self.cloud_only and mode != "cloud":
+            raise AccountError("unsupported_cloud_operation")
         with self._lock:
             revoke = None
             with self.state.locked() as stored:
-                if stored["mode"] == "cloud":
+                old_credentials, can_clear, cleanup_error = self._credentials_for(stored), False, None
+                # A failed/signed-out item may have an inaccessible ACL from an
+                # older executable. Never read or delete it before reconnecting.
+                credential_blocked = stored.get("error") in {
+                    "credential_store_unavailable", "credential_store_denied",
+                    "credential_store_interaction_required", "credential_store_app_identity",
+                }
+                if stored["mode"] == "cloud" and stored["state"] == "connected" and not credential_blocked:
                     try:
-                        old = self.credentials.read()
+                        old = old_credentials.read()
+                        can_clear = True
                         client, tokens = old.get("client", {}), old.get("tokens", {})
                         if (old.get("epoch") == stored["epoch"] and client.get("issuer") == ISSUER
                                 and client.get("token_endpoint_auth_method") == "none"
                                 and isinstance(client.get("client_id"), str) and client["client_id"]
                                 and isinstance(tokens.get("refresh_token"), str) and tokens["refresh_token"]):
                             revoke = (tokens["refresh_token"], client["client_id"])
-                    except AccountError:
-                        pass
+                    except AccountError as error:
+                        cleanup_error = error
                 stored.update(mode=mode, state=state, epoch=stored["epoch"] + 1)
                 stored.pop("error", None)
+                stored.pop("credential_os_status", None)
                 stored.pop("login_deadline", None)
                 if state == "connecting":
                     stored["login_deadline"] = time.time() + self.login_timeout
+                    stored["credential_slot"] = secrets.token_hex(16)
                 self._authorization = None
                 self._login_epoch = None
                 if self._login_future:
                     self._login_future.cancel()
                     self._login_future = None
                 # Commit local invalidation before any optional revocation IO.
-                try:
-                    self.credentials.clear()
-                except AccountError:
-                    stored["error"] = "credential_store_unavailable"
+                if can_clear:
+                    try:
+                        old_credentials.clear()
+                    except AccountError as error:
+                        cleanup_error = error
+                if cleanup_error is not None and state != "connecting":
+                    stored["error"] = cleanup_error.code
+                    if cleanup_error.credential_os_status is not None:
+                        stored["credential_os_status"] = cleanup_error.credential_os_status
                 epoch = stored["epoch"]
             if revoke:
                 coroutine = self._revoke(*revoke)
@@ -547,8 +640,32 @@ class AccountManager:
         return self.status()
 
     def use_local(self):
+        # Kept solely for explicit legacy fixtures; production never exposes a
+        # local storage mode and cannot silently fall back after sign-out.
+        if self.cloud_only:
+            raise AccountError("unsupported_cloud_operation")
         self._change("local", "connected")
         return self.status()
+
+    def account_fingerprint(self, *, expected_epoch=None):
+        """Internal receipt binding, never included in public account status."""
+        with self.state.locked() as state:
+            if expected_epoch is not None and state["epoch"] != expected_epoch:
+                raise AccountError("account_changed")
+            if state["mode"] != "cloud" or state["state"] != "connected":
+                raise AccountError("authentication_required")
+            value = self._credentials_for(state).read()
+            if value.get("epoch") != state["epoch"]:
+                raise AccountError("authentication_required")
+            try:
+                fingerprint, _ = _token_identity(OAuthToken.model_validate(value.get("tokens")))
+                client = value.get("client", {})
+                if (value.get("identity") != fingerprint or client.get("issuer") != ISSUER
+                        or client.get("token_endpoint_auth_method") != "none"):
+                    raise ValueError()
+            except Exception:
+                raise AccountError("authentication_required") from None
+            return fingerprint
 
     def begin_login(self):
         with self._lock:
@@ -619,7 +736,7 @@ class AccountManager:
                         raise AccountError("invalid_cloud_response")
                     return result.structuredContent
 
-    def _failure(self, epoch, code):
+    def _failure(self, epoch, code, credential_os_status=None):
         with self.state.locked() as state:
             if state["epoch"] != epoch or state["mode"] != "cloud":
                 return
@@ -628,11 +745,14 @@ class AccountManager:
             elif state["state"] != "connected":
                 state["state"] = "error"
             state["error"] = code
+            state.pop("credential_os_status", None)
+            if credential_os_status is not None:
+                state["credential_os_status"] = credential_os_status
             state.pop("login_deadline", None)
             if state["state"] == "signed_out":
                 state["epoch"] += 1
                 try:
-                    self.credentials.clear()
+                    self._credentials_for(state).clear()
                 except AccountError:
                     pass
 
@@ -651,16 +771,19 @@ class AccountManager:
                             raise AccountError("account_changed")
                         state.update(state="connected")
                         state.pop("error", None)
+                        state.pop("credential_os_status", None)
                         state.pop("login_deadline", None)
         except asyncio.CancelledError:
             raise
         except Exception as error:
-            self._failure(epoch, "login_timeout" if isinstance(error, TimeoutError) else _account_error(error).code)
+            safe = _account_error(error)
+            self._failure(epoch, "login_timeout" if isinstance(error, TimeoutError) else safe.code,
+                          safe.credential_os_status)
         finally:
             await callback.close()
             _account_context.reset(token)
 
-    async def _remote(self, epoch, *, name=None, arguments=None, path=None, params=None):
+    async def _remote(self, epoch, *, name=None, arguments=None, path=None, params=None, method="GET", body=None):
         token = _account_context.set(True)
         try:
             async with asyncio.timeout(self.request_timeout):
@@ -671,12 +794,14 @@ class AccountManager:
                         result = await self._mcp(provider, name, arguments)
                     else:
                         async with self._client(provider) as client:
-                            response = await client.get(API_ORIGIN + path, params=params)
+                            response = await client.request(method, API_ORIGIN + path, params=params,
+                                                            **({"json": body} if body is not None else {}))
                             if response.status_code in (401, 403):
                                 raise AccountError("authentication_required")
                             if response.status_code >= 500:
                                 raise AccountError("cloud_unavailable")
-                            if response.status_code not in (200, 404):
+                            accepted = (200, 201, 400, 404, 409, 413, 422) if path == "/v1/desktop-imports" else (200, 404)
+                            if response.status_code not in accepted:
                                 raise AccountError("cloud_request_failed")
                             result = response.json()
                             if not isinstance(result, dict):
@@ -687,10 +812,11 @@ class AccountManager:
                             raise AccountError("account_changed")
                         state.update(state="connected")
                         state.pop("error", None)
+                        state.pop("credential_os_status", None)
                     return result
         except Exception as error:
             safe = _account_error(error)
-            self._failure(epoch, safe.code)
+            self._failure(epoch, safe.code, safe.credential_os_status)
             raise safe from None
         finally:
             _account_context.reset(token)
@@ -719,6 +845,8 @@ class AccountManager:
 
     def request_api(self, method, path, params=None, json=None, *, expected_epoch=None):
         import re
+        if method == "POST" and path == "/v1/desktop-imports" and not params:
+            return self._call(path=path, method=method, body=_import_payload(json), expected_epoch=expected_epoch)
         valid = path in ("/v1/changes", "/v1/languages", "/v1/settings") if isinstance(path, str) else False
         if isinstance(path, str) and re.fullmatch(r"/v1/points/[1-9][0-9]{0,15}", path):
             valid = int(path.rsplit("/", 1)[1]) <= 9007199254740991

@@ -697,9 +697,21 @@ $("#search-form").addEventListener("submit", (event) => {
   loadRecords(true);
 });
 let searchTimer;
+function renderSearchClear() {
+  $("#search-clear").hidden = !$("#search").value;
+}
+renderSearchClear();
 $("#search").addEventListener("input", () => {
+  renderSearchClear();
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => loadRecords(true), 250);
+});
+$("#search-clear").addEventListener("click", () => {
+  clearTimeout(searchTimer);
+  $("#search").value = "";
+  renderSearchClear();
+  $("#search").focus({ preventScroll: true });
+  loadRecords(true);
 });
 $("#retry-load").addEventListener("click", () => {
   loadRecords(true);
@@ -788,10 +800,11 @@ if (localAccount) {
       sceneCatalog = [];
       selectedLanguage = selectedKind = selectedScene = "";
       $("#search").value = "";
+      renderSearchClear();
       $("#settings-fields").disabled = true;
       localePicker.button.disabled = true;
       renderCatalog(); renderKinds(); renderScenes();
-      Object.assign(available, { export: status.mode === "local", speech: true }, status.capabilities);
+      Object.assign(available, { export: false, speech: true }, status.capabilities);
       $("#export-open").hidden = !available.export;
       if ($("#settings-dialog").open) closeDialog($("#settings-dialog"));
       if ($("#export-dialog").open) closeDialog($("#export-dialog"));
@@ -803,7 +816,7 @@ if (localAccount) {
       badge.dataset.i18n = status.state === "connecting" ? "connecting" : "accountSignedOut";
       badge.textContent = t(badge.dataset.i18n);
       $("#load-sentinel").hidden = !accountCanRead(status);
-      if (accountCanRead(status)) await initialize(!previous && status.mode === "local");
+      if (accountCanRead(status)) await initialize(false);
     },
   });
   localProfile.session.notify();

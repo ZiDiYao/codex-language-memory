@@ -48,7 +48,7 @@ async def exercise(archive):
 
         def parameters():
             config = configuration()
-            return StdioServerParameters(command=config["command"], args=config["args"],
+            return StdioServerParameters(command=config["command"], args=[*config["args"], "--sandbox-root", str(sandbox)],
                                          env={**environment, **config["env"]}, cwd=config["cwd"])
 
         async def call(session, name, arguments=None):
