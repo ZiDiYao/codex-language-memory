@@ -131,7 +131,7 @@ export const messages = {
       "Codex automatically captures learning points in any language. Capture depends on tool calls and may miss a point. Say “Remember this” to save it explicitly.",
     loading: "Loading…",
     disconnected:
-      "Connection lost. Reopen the language memory page from Codex.",
+      "Connection lost. Reopen Sayrove from Codex.",
     invalid: "Please check the values you entered.",
     unavailable: "Unable to read or save right now. Please reopen the page.",
     conflict:
@@ -289,7 +289,7 @@ export const messages = {
     limitsHelp:
       "Codex 会从各语言的学习问题中提取知识点并自动保存。自动保存依赖工具调用，可能漏记，可用“记一下这个”补记。",
     loading: "正在读取…",
-    disconnected: "连接已断开，请在 Codex 中重新打开语言学习页面。",
+    disconnected: "连接已断开，请在 Codex 中重新打开 Sayrove。",
     invalid: "请检查填写的内容。",
     unavailable: "暂时无法读取或保存，请重新打开页面。",
     conflict: "已有相同知识点，请修改已有记录或选择另一个标题。",
@@ -448,7 +448,7 @@ export const messages = {
       "Codex が各言語の学習内容を自動で記録します。ツール呼び出しに依存するため、記録漏れは「これを覚えておいて」で補えます。",
     loading: "読み込み中…",
     disconnected:
-      "接続が切れました。Codex から学習ページを開き直してください。",
+      "接続が切れました。Codex から Sayrove を開き直してください。",
     invalid: "入力内容を確認してください。",
     unavailable: "読み込みまたは保存ができません。ページを開き直してください。",
     conflict:
@@ -609,7 +609,7 @@ export const messages = {
       "Codex가 모든 언어의 학습 내용을 자동으로 기록합니다. 도구 호출에 의존하므로 누락될 수 있습니다. “이것을 기억해 줘”라고 요청해 보완할 수 있습니다.",
     loading: "불러오는 중…",
     disconnected:
-      "연결이 끊겼습니다. Codex에서 학습 페이지를 다시 열어 주세요.",
+      "연결이 끊겼습니다. Codex에서 Sayrove를 다시 열어 주세요.",
     invalid: "입력한 내용을 확인해 주세요.",
     unavailable: "지금 읽거나 저장할 수 없습니다. 페이지를 다시 열어 주세요.",
     conflict:
@@ -771,7 +771,7 @@ export const messages = {
       "Codex enregistre automatiquement les points d’apprentissage dans toutes les langues. Cela dépend des appels d’outils et peut omettre un point. Dites « Retiens ceci » pour le sauvegarder explicitement.",
     loading: "Chargement…",
     disconnected:
-      "Connexion perdue. Rouvrez la page de mémoire linguistique depuis Codex.",
+      "Connexion perdue. Rouvrez Sayrove depuis Codex.",
     invalid: "Vérifiez les valeurs saisies.",
     unavailable:
       "Lecture ou enregistrement impossible pour le moment. Rouvrez la page.",
@@ -931,7 +931,7 @@ export const messages = {
       "Codex registra automáticamente los conocimientos de cualquier idioma. Depende de las llamadas a herramientas y puede omitir algún punto. Di « Recuerda esto » para guardarlo explícitamente.",
     loading: "Cargando…",
     disconnected:
-      "Se perdió la conexión. Vuelve a abrir la página de memoria de idiomas desde Codex.",
+      "Se perdió la conexión. Vuelve a abrir Sayrove desde Codex.",
     invalid: "Comprueba los valores introducidos.",
     unavailable: "No se puede leer ni guardar ahora. Vuelve a abrir la página.",
     conflict: "Este conocimiento ya existe. Edítalo o elige otro título.",

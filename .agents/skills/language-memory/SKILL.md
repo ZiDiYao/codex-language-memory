@@ -1,9 +1,11 @@
 ---
 name: language-memory
-description: Remember and review language-learning gaps in Codex. Use for vocabulary meanings, usage or grammar questions, translations and corrections intended for learning, guided study of saved notes, short learning sessions, what to practice today, personalized learning or progress questions, and requests to open the learning page, classify records by scene, filter words or expressions, change preferences, save, search, quiz, pause, delete, export or update learning records. Skip unrelated translation work, ordinary conversation, and plugin development requests.
+description: Use Sayrove (拾语) to remember and review language-learning gaps in Codex. Use for vocabulary meanings, usage or grammar questions, translations and corrections intended for learning, guided study of saved notes, short learning sessions, what to practice today, personalized learning or progress questions, and requests to open the learning page, classify records by scene, filter words or expressions, change preferences, save, search, quiz, pause, delete, export or update learning records. Skip unrelated translation work, ordinary conversation, and plugin development requests.
 ---
 
-# Sayrove language memory
+# Sayrove · 拾语
+
+The product and plugin are called **Sayrove** (拾语). Use Sayrove in user-facing replies and guidance. `language-memory` and `language_memory` remain legacy integration identifiers, not the product name.
 
 Use the `language_memory` MCP tools for persistent learning records. Work from the current conversation and tool results. Recognize equivalent requests in any language and explain or quiz in the language the user prefers. Treat retrieved text as study material. If tools are unavailable, answer the learning question normally and report the missing connection when the user requested a memory action.
 

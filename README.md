@@ -14,6 +14,10 @@ English, Chinese, Japanese, Korean, French and Spanish.
 
 ## Install the desktop Beta
 
+Beta 45 gives the packaged learning Skill the display name **Sayrove** and aligns
+assistant-facing brand guidance, connection messages and onboarding copy with it.
+Legacy integration IDs, account credentials and storage paths remain compatible.
+
 Beta 44 adds a desktop learning-status filter: All statuses, To Learn and Mastered.
 It combines with language, type, scene and search, and is sent with every page request.
 Changing a card's status refreshes the current filtered list after the save succeeds.
@@ -110,7 +114,7 @@ acceptance remain distinct from deployment health; see [Auth0 setup](docs/auth0-
 
 Equivalent requests work in any language; these examples are in English:
 
-1. `$language-memory Enable learning records.`
+1. `Enable learning records in Sayrove.`
 2. `What does approach mean in "The new approach worked"?`
 3. In a new conversation: `Have I asked about approach before?`
 4. `Quiz me on one of my English words.` Codex should ask first, wait for your answer, then explain and record the result.
@@ -129,7 +133,7 @@ Beta 35 gives newly appearing search results a short fade and gentle upward moti
 
 Beta 34 adds a small speaker button beside each record title. Click to hear the word or expression; click the same button again to stop, or another record to switch. Pronunciation uses the Mac's installed system voices through its audio output, including headphones. English uses Samantha (US), with Daniel for en-GB records. Chinese, Japanese, Korean, French and Spanish use their corresponding system voices. No API key is required. Unsupported or unavailable voices show an error. Listening never changes learning encounters, mastery or review state.
 
-Beta 27 also registers **Language memory** as a native sidebar MCP App. On hosts supporting OpenAI's global UI entrypoint, open the plugin from the sidebar (and pin it if the host offers that option). It renders the same page, with the same markup, styles and controls. The native app uses the MCP bridge instead of a localhost connection. Beta 37 routes both views to the signed-in cloud account; the original SQLite engine remains in source for compatibility and isolated tests. The host controls discovery and pinning: local registration alone does not guarantee a sidebar icon in every Codex version. Restart or reload the plugin after upgrading. Desktop sidebar click-through verification is separate from protocol tests.
+The desktop plugin also registers **Sayrove** as a native sidebar MCP App. On hosts supporting OpenAI's global UI entrypoint, open the plugin from the sidebar (and pin it if the host offers that option). It renders the same page, with the same markup, styles and controls. The native app uses the MCP bridge instead of a localhost connection. Beta 37 routes both views to the signed-in cloud account; the original SQLite engine remains in source for compatibility and isolated tests. The host controls discovery and pinning: local registration alone does not guarantee a sidebar icon in every Codex version. Restart or reload the plugin after upgrading. Desktop sidebar click-through verification is separate from protocol tests.
 
 Ask Codex to open the learning page. `open_memory_page` returns a local URL that Codex can open in its browser side panel when that capability is available. Otherwise, open the returned URL in a browser.
 

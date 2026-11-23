@@ -26,7 +26,7 @@ export async function request(route, payload) {
 
 export async function saveDownload(response) {
   if (globalThis.languageMemoryRuntime?.capabilities?.export === false) throw new Error("unavailable");
-  const filename = response.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/)?.[1] || "language-memory";
+  const filename = response.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/)?.[1] || "sayrove";
   const blob = await response.blob();
   if (globalThis.languageMemoryHost) {
     await globalThis.languageMemoryHost.download(blob, filename, response.headers.get("X-Export-Receipt"));

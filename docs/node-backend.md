@@ -106,7 +106,7 @@ PKCE or token issuance. Requests cannot select a tenant with a `user_id` field.
 The SDK receives a fresh MCP server and transport per request. Account-scoped
 database transactions preserve the same capture and review idempotency rules.
 
-The configured remote package uses the public name **Language Memory**, targets
+The configured remote package uses the public name **Sayrove**, targets
 `https://language-memory-api.up.railway.app/mcp` and selects DCR with the Auth0
 tenant `language-memory.ca.auth0.com`. Its minimal OAuth request contains only
 `memory:read memory:write offline_access`; extra OIDC identity defaults are disabled.

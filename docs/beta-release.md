@@ -102,7 +102,7 @@ npm run build
 .venv/bin/python -m unittest discover -s tests -v
 node --test tests/*.mjs
 .venv/bin/python scripts/build_beta.py
-.venv/bin/python scripts/test_beta.py dist/language-memory-0.2.0-beta.44-macos-arm64.zip
+.venv/bin/python scripts/test_beta.py dist/language-memory-0.2.0-beta.45-macos-arm64.zip
 ```
 
 Change `VERSION` for the next Beta. The builder copies that version into the packaged
@@ -127,6 +127,8 @@ Beta 43 uses the same verified core for calendar scrolling in the retained expor
 dialog; it does not enable cloud export or deploy the hosted website.
 Beta 44 retains the same core and adds the desktop learning-status filter, using
 the existing cloud query contract without changing the hosted Web interface.
+Beta 45 keeps that core while updating UI messages, the packaged Skill's display
+metadata and product-name guidance to Sayrove. Legacy technical IDs stay compatible.
 
 `scripts/test_beta.py` extracts the actual archive and executes its command files in a
 temporary profile whose paths contain spaces. Runtime PATH excludes developer tools.
