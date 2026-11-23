@@ -72,6 +72,7 @@ async function listen(button, recordId) {
 }
 let selectedLanguage = "";
 let selectedKind = "";
+let selectedStatus = "";
 let committedFiltersKey = null;
 let selectedScene = "";
 let sceneCatalog = [];
@@ -123,6 +124,12 @@ const scenePicker = new Picker($("#scene"), {
   label: "Scene",
   onChange: (value) => changeFilter("scene", value),
 });
+const statusPicker = !runtime ? new Picker($("#status"), {
+  label: "Learning status",
+  onChange: (value) => changeFilter("status", value),
+}) : null;
+$("#status").hidden = !statusPicker;
+$(".history-selectors").classList.toggle("has-status-filter", !!statusPicker);
 const localePicker = new Picker($("#ui-language"), {
   label: "Interface language",
   value: locale,
@@ -191,6 +198,13 @@ function renderScenes() {
   scenePicker.button.title = selectedScene ? sceneLabel(selectedScene, t) : t("allScenes");
   scenePicker.button.disabled = !sceneCatalog.length;
 }
+function renderStatus() {
+  if (!statusPicker) return;
+  statusPicker.setLabel(t("status"));
+  statusPicker.setOptions([["", "allStatuses"], ["new", "new"], ["mastered", "mastered"]]
+    .map(([value, key]) => ({ value, label: t(key) })));
+  statusPicker.setValue(selectedStatus);
+}
 async function loadScenes(preserve = false) {
   const version = ++sceneCatalogVersion;
   const scope = { include_variants: true };
@@ -209,32 +223,38 @@ async function changeFilter(name, value) {
   if (switchingFilters) {
     languagePicker.setValue(selectedLanguage);
     scenePicker.setValue(selectedScene);
+    statusPicker?.setValue(selectedStatus);
     return;
   }
-  if (value === ({ language: selectedLanguage, kind: selectedKind, scene: selectedScene })[name]) return;
-  const previous = { language: selectedLanguage, kind: selectedKind, scene: selectedScene };
+  if (value === ({ language: selectedLanguage, kind: selectedKind, scene: selectedScene, status: selectedStatus })[name]) return;
+  const previous = { language: selectedLanguage, kind: selectedKind, scene: selectedScene, status: selectedStatus };
   switchingFilters = true;
   try {
     if (!(await flushEditors())) {
       languagePicker.setValue(selectedLanguage);
       scenePicker.setValue(selectedScene);
+      statusPicker?.setValue(selectedStatus);
       return;
     }
     if (name === "language") selectedLanguage = value;
     else if (name === "kind") selectedKind = value;
+    else if (name === "status") selectedStatus = value;
     else selectedScene = value;
     renderCatalog();
     renderKinds();
     renderScenes();
-    if (name !== "scene") await loadScenes();
-    await loadRecords(true);
+    renderStatus();
+    if (name === "language" || name === "kind") await loadScenes();
+    await loadRecords(true, false, { animateFilterChange: !runtime });
   } catch (error) {
     selectedLanguage = previous.language;
     selectedKind = previous.kind;
     selectedScene = previous.scene;
+    selectedStatus = previous.status;
     renderCatalog();
     renderKinds();
     renderScenes();
+    renderStatus();
     showError(error);
   } finally { switchingFilters = false; }
 }
@@ -276,6 +296,7 @@ function applyLocale() {
   renderKinds();
   renderScenes();
   renderLanguagePreferences();
+  renderStatus();
   refreshEditorLocales();
   exportDialog?.relabel();
   localProfile?.relabel();
@@ -344,6 +365,7 @@ function filters() {
     language: selectedLanguage,
     kind: selectedKind,
     scene: selectedScene,
+    status: selectedStatus,
   })) {
     if (value) result[key] = value;
   }
@@ -428,9 +450,11 @@ function card(record, expanded = false) {
     statusButtons.forEach((control) => { control.disabled = true; });
     try {
       if (!(await editor.setStatus(button.dataset.status))) details.open = true;
+      else if (selectedStatus && editor.record.status !== selectedStatus) await loadRecords(true, true);
     } finally {
       statusButtons.forEach((control) => { control.disabled = false; });
-      if (restoreFocus && document.activeElement === document.body) button.focus({ preventScroll: true });
+      if (restoreFocus && document.activeElement === document.body)
+        (button.isConnected ? button : statusPicker?.button)?.focus({ preventScroll: true });
     }
   }));
   editors.set(record.id, editor);
@@ -474,7 +498,7 @@ function clearRecords() {
   editors.clear();
   $("#records").replaceChildren();
 }
-function renderRecords(data, { reset, preserve, expanded, anchorId, anchorTop, filtersKey }) {
+function renderRecords(data, { reset, preserve, expanded, anchorId, anchorTop, filtersKey, animateFilterChange }) {
   const host = $("#records");
   if (reset) {
     const incoming = new Map(data.records.map((record) => [record.id, record]));
@@ -510,7 +534,8 @@ function renderRecords(data, { reset, preserve, expanded, anchorId, anchorTop, f
     host.append(empty);
     added.push(empty);
   }
-  if (!preserve) enterResults(added);
+  // Explicit desktop filter switches also animate cards reused by both filters.
+  if (!preserve) enterResults(animateFilterChange ? [...host.children] : added);
   committedFiltersKey = filtersKey;
   updateLoadState(data.has_more ? "scrollMore" : "allLoaded", { count: displayed.size });
   if (anchorId) {
@@ -539,7 +564,7 @@ function maybeLoadMore() {
     loadRecords();
   }
 }
-async function loadRecords(reset = false, preserve = false) {
+async function loadRecords(reset = false, preserve = false, { animateFilterChange = false } = {}) {
   if (!ready || accountPaused) return false;
   if (reset && !preserve && !(await flushEditors())) return false;
   if (preserve && (hasDirtyEditors() || historyIsInteracting())) return false;
@@ -547,7 +572,7 @@ async function loadRecords(reset = false, preserve = false) {
     reset,
     amount: preserve ? Math.max(pageSize, displayed.size) : pageSize,
     filters: filters(),
-    view: captureHistoryView(reset, preserve),
+    view: { ...captureHistoryView(reset, preserve), animateFilterChange },
   });
 }
 async function loadSettings() {
@@ -798,12 +823,12 @@ if (localAccount) {
       versions = undefined;
       catalog = { languages: [], counts: {}, kinds: {}, by_language: {} };
       sceneCatalog = [];
-      selectedLanguage = selectedKind = selectedScene = "";
+      selectedLanguage = selectedKind = selectedScene = selectedStatus = "";
       $("#search").value = "";
       renderSearchClear();
       $("#settings-fields").disabled = true;
       localePicker.button.disabled = true;
-      renderCatalog(); renderKinds(); renderScenes();
+      renderCatalog(); renderKinds(); renderScenes(); renderStatus();
       Object.assign(available, { export: false, speech: true }, status.capabilities);
       $("#export-open").hidden = !available.export;
       if ($("#settings-dialog").open) closeDialog($("#settings-dialog"));
