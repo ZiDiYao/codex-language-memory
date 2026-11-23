@@ -398,6 +398,7 @@ function card(record, expanded = false) {
     t, api, languageName, uiLocale: locale, card: details,
     onChange: (updated) => { displayed.set(updated.id, updated); renderSummary(updated); },
     onDeleted: async (deleted) => {
+      editors.get(deleted.id)?.dispose();
       editors.delete(deleted.id);
       displayed.delete(deleted.id);
       details.remove();
@@ -455,6 +456,7 @@ function captureHistoryView(reset, preserve) {
   };
 }
 function clearRecords() {
+  for (const editor of editors.values()) editor.dispose();
   displayed.clear();
   editors.clear();
   $("#records").replaceChildren();
@@ -466,7 +468,9 @@ function renderRecords(data, { reset, preserve, expanded, anchorId, anchorTop, f
     for (const [id, previous] of displayed) {
       const next = incoming.get(id);
       if (next && JSON.stringify(previous) === JSON.stringify(next)) continue;
-      editors.get(id)?.card.remove();
+      const editor = editors.get(id);
+      editor?.dispose();
+      editor?.card.remove();
       editors.delete(id);
       displayed.delete(id);
     }

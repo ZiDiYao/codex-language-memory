@@ -13,7 +13,7 @@ await build({
 });
 let html = await readFile(new URL("web/index.html", root), "utf8");
 html = html
-  .replace('<link rel="stylesheet" href="style.css" />', '<link rel="stylesheet" href="/assets/style.css" />')
+  .replace('<link rel="stylesheet" href="style.css" />', '<link rel="stylesheet" href="/assets/style.css" />\n    <link rel="stylesheet" href="/assets/cloud-layout.css" />')
   .replace('<script src="app.js" type="module"></script>', '<script src="/assets/app.js" type="module"></script>')
   .replace(/<title>[^<]*<\/title>/, '<title>Sayrove</title>')
   .replace('</title>', '</title>\n    <link rel="icon" type="image/svg+xml" href="/assets/sayrove-mark.svg" />')
@@ -52,6 +52,7 @@ html = html
   .replace('id="export-open"', 'id="export-open" hidden');
 await writeFile(new URL("index.html", output), html);
 await copyFile(new URL("web/style.css", root), new URL("assets/style.css", output));
+await copyFile(new URL("web/cloud-layout.css", root), new URL("assets/cloud-layout.css", output));
 await copyFile(new URL("web/assets/sayrove-mark.svg", root), new URL("assets/sayrove-mark.svg", output));
 await copyFile(new URL("node_modules/@auth0/auth0-spa-js/dist/auth0-spa-js.worker.production.js", root), new URL("assets/auth0-worker.js", output));
 console.log("Built public learning library in build/cloud-web (external scripts and styles). ");
