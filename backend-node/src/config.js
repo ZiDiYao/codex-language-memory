@@ -50,7 +50,11 @@ export function loadConfig(environment = process.env) {
   if (!requiredScopes.length) throw new Error("AUTH_REQUIRED_SCOPES must contain at least one scope");
   const rawPort = environment.PORT ?? "8080";
   if (!/^\d+$/.test(rawPort) || Number(rawPort) < 1 || Number(rawPort) > 65535) throw new Error("PORT must be between 1 and 65535");
-  return Object.freeze({ databaseUrl, publicUrl, authIssuer, authAudience, authJwksUrl,
+  const enrichmentApiKey = environment.OPENAI_API_KEY || null;
+  const enrichmentModel = environment.SAYROVE_ENRICHMENT_MODEL || null;
+  if (enrichmentModel != null && (typeof enrichmentModel !== 'string' || !enrichmentModel.trim()))
+    throw new Error('SAYROVE_ENRICHMENT_MODEL must name a model');
+  return Object.freeze({ enrichmentApiKey, enrichmentModel, databaseUrl, publicUrl, authIssuer, authAudience, authJwksUrl,
     requiredScopes: Object.freeze(requiredScopes), allowInsecureLocal, webAllowedOrigins,
     host: environment.HOST ?? "0.0.0.0", port: Number(rawPort), resourceUrl: publicUrl + "/mcp" });
 }

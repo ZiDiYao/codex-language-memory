@@ -4,7 +4,7 @@ import { enter, enterResults, reveal, conceal, openDialog, closeDialog, disclosu
 
 import { EntryEditor } from "./entry-editor.js";
 import { RecordFeed } from "./record-feed.js";
-import { languageSelection } from "./history-model.js";
+import { languageSelection, enrichmentSummary } from "./history-model.js";
 import { sceneSelection, sceneLabel } from "./scene-model.js";
 import { ExportDialog } from "./export-dialog.js";
 import { request, saveDownload, capabilities, openExternal, setAccountEpoch } from "./transport.js";
@@ -412,12 +412,15 @@ function card(record, expanded = false) {
   });
   mastery.append(...statusButtons);
   const preview = element("p", undefined, "entry-preview");
+  const enrichment = element("small", undefined, "entry-enrichment");
+  enrichment.setAttribute("role", "status");
   const lastSeen = translated("small", "lastSeen", { date: record.last_seen_at }, "entry-last-seen");
   if (!available.speech) heading.classList.add("without-speech");
   heading.append(title, ...(available.speech ? [listenButton] : []), mastery, element("span", undefined, "entry-chevron"));
-  summary.append(heading, preview, lastSeen);
+  summary.append(heading, preview, enrichment, lastSeen);
   function renderSummary(point) {
-    const fullTitle = point.note_title || t("untitledNote");
+    const presentation = enrichmentSummary(point);
+    const fullTitle = presentation.title || t("untitledNote");
     title.textContent = fullTitle;
     title.title = fullTitle;
     title.lang = point.language;
@@ -427,6 +430,14 @@ function card(record, expanded = false) {
     });
     preview.textContent = point.note_preview;
     preview.hidden = !point.note_preview;
+    enrichment.hidden = !presentation.messageKey;
+    if (presentation.messageKey) {
+      enrichment.dataset.i18n = presentation.messageKey;
+      enrichment.textContent = t(presentation.messageKey);
+    } else {
+      delete enrichment.dataset.i18n;
+      enrichment.textContent = "";
+    }
   }
   renderSummary(record);
   const editor = new EntryEditor(record, {

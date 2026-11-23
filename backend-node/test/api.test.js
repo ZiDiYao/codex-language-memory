@@ -369,7 +369,7 @@ test("fresh stateless MCP requests initialize/list/call and concurrent users nev
   assert.equal(init.headers.get("mcp-session-id"), null);
   const tools = await rpc();
   assert.equal(tools.status, 200);
-  assert.equal(tools.body.result.tools.length, 12);
+  assert.equal(tools.body.result.tools.length, 13);
   assert.ok(tools.body.result.tools.some((tool) => tool.name === "save_points"));
   assert.ok(!tools.body.result.tools.some((tool) => ["export_points", "start_study", "open_memory_page"].includes(tool.name)));
   const saved = await rpc("tools/call", { name: "save_points", arguments: { request_id: "mcp-capture-once", items: [point] } });
@@ -480,4 +480,21 @@ test("real PostgreSQL repository shares authenticated HTTP/MCP storage without c
   const repeated = await service.call("/v1/captures", { method: "POST", body: { request_id: "real-pg-capture", items: [point] } });
   assert.equal(repeated.body.replayed, true);
   assert.equal((await service.call("/v1/points")).body.records[0].encounter_count, 1);
+});
+
+test('lightweight observations and capture_points share verified scope and advertise capability', async t => {
+  const observed = [];
+  const service = await fixture(t, { repositoryFactory: principal => ({
+    settings: async () => ({ enabled: true }),
+    observe: async (...args) => { observed.push({ principal, args }); return { status: 'processed', results: [{ status: 'added', id: 1, enrichment_state: 'pending' }] }; },
+  }) });
+  assert.equal((await service.call('/v1/settings')).body._capabilities.lightweight_capture, true);
+  const body = { request_id: 'minimal-api-observation', items: [{ kind: 'word', language: 'en', title: 'celery' }] };
+  assert.equal((await service.call('/v1/observations', { method: 'POST', body })).body.results[0].enrichment_state, 'pending');
+  assert.equal((await service.call('/v1/observations', { method: 'POST', authorization: '', body })).status, 401);
+  const rpc = await service.rpc('tools/call', { name: 'capture_points', arguments: body }, 'bob');
+  assert.equal(rpc.body.result.structuredContent.results[0].status, 'added');
+  assert.equal(observed.length, 2);
+  assert.equal(observed[0].principal.subject, 'alice'); assert.equal(observed[1].principal.subject, 'bob');
+  assert.deepEqual(observed[0].args, [body.request_id, body.items, 'automatic']);
 });

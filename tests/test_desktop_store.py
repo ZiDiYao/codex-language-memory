@@ -54,6 +54,7 @@ class FakeAccount:
             "update_settings": {"enabled": True, "ui_language": "zh", **arguments.get("patch", {})},
             "get_recording": {"enabled": True}, "set_recording": {"enabled": arguments.get("enabled")},
             "save_points": {"status": "processed", "replayed": False, "results": [{"status": "added", "id": 900}]},
+            "capture_points": {"status": "processed", "replayed": False, "results": [{"status": "added", "id": 900, "enrichment_state": "pending"}]},
             "find_points": {"records": [{"id": 900, "title": "Cloud note"}], "has_more": False, "next_cursor": None},
             "list_scenes": {"scenes": [{"name": "Cloud scene", "count": 1}], "total": 1},
             "list_languages": {"languages": ["fr"], "counts": {"fr": 1}, "kinds": {"word": 1}, "by_language": {"fr": {"word": 1}}},
@@ -83,6 +84,22 @@ class ForbiddenLocal:
 
 
 class DesktopRoutingTests(unittest.TestCase):
+    def test_lightweight_capture_keeps_account_epoch_and_does_not_touch_local_store(self):
+        account = FakeAccount()
+        routed = RoutingStore(ForbiddenLocal(), account)
+        items = [{"kind": "word", "language": "en", "title": "celery", "context": "芹菜的英文咋说"}]
+        with routed.expect_epoch(account.epoch, require_cloud=True):
+            result = routed.capture("lightweight-once", items)
+        self.assertEqual(result["results"][0]["enrichment_state"], "pending")
+        self.assertEqual(account.calls, [("capture_points", {"request_id": "lightweight-once", "items": items, "source": "automatic"})])
+        with self.assertRaises(CloudAccountUnavailable):
+            with routed.expect_epoch(account.epoch - 1, require_cloud=True):
+                routed.capture("wrong-account", items)
+        account.after_call = lambda: setattr(account, "epoch", account.epoch + 1)
+        with self.assertRaises(CloudAccountUnavailable):
+            with routed.expect_epoch(account.epoch, require_cloud=True):
+                routed.capture("changed-account", items)
+
     def test_capture_context_is_epoch_bound_and_does_not_start_pending_migration(self):
         class PendingMigration:
             def capture_ready(self): return False

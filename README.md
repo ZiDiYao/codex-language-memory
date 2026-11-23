@@ -25,6 +25,12 @@ work must not become a prerequisite for answering a simple vocabulary question.
 
 ## Install the desktop Beta
 
+The development branch adds [lightweight capture and durable backend enrichment](backend-node/ENRICHMENT.md).
+With a supporting backend, Codex submits only the observed target and necessary context;
+the server records it immediately and prepares the study note asynchronously. This requires
+the Node migration and server-side provider configuration before deployment. See the
+[baseline and measured comparison](docs/capture-performance.md) for scope and limitations.
+
 Beta 46 adds a short capture context (`get_settings(for_capture=true)`) that returns
 preferences and scene names in one tool call. The desktop reuses validated OAuth
 metadata for up to five minutes within an account epoch and uses the existing
@@ -219,7 +225,9 @@ Developer requests to improve the extension must not start a lesson. If tools ar
 
 ## Capture decisions
 
-Codex interprets the conversation and generates the contextual definition, explanation, and examples before saving. New captures require an explanation and two to five distinct example sentences. Codex adds common collocations or natural usage, a relevant pitfall when useful, and example translations in the preferred explanation language. Duplicate example originals are rejected. Saved notes omit routine source links and originality footers unless attribution is requested. The backend validates and stores that content; it does not make a second AI call. For older incomplete records, Codex can retrieve `needs_enrichment=true` records and fill a missing explanation or append examples through `update_point` without adding an encounter or changing mastery. Existing examples and user-edited notes are preserved; the quality checks do not restrict freely edited notes. The page itself does not run a background AI worker.
+Codex identifies the actual learning gap. When settings advertise lightweight capture, it submits only kind, target language, title and necessary original context to `capture_points`. The backend performs normalized deduplication and atomically records the encounter with a durable enrichment job. Its server-side AI prepares the definition, explanation, examples, translations and scenes outside the foreground request. Pending content is shown as being prepared and is excluded from quizzes. Backend enrichment never creates another encounter, review result or mastery change, and cannot overwrite a custom note or resurrect a deleted record.
+
+Older backends retain the rich `save_points` contract: Codex generates the contextual definition, explanation and two to five distinct examples before saving. The same content validation is applied to backend-generated notes; freely edited notes remain unrestricted. Legacy incomplete records can be enriched through `update_point`, preserving existing examples and user edits. Do not use that manual enrichment workflow on pending backend jobs. The page displays job state; it does not run an AI worker in the browser.
 
 | Request | What to capture |
 | --- | --- |
@@ -246,6 +254,7 @@ FSRS-6 (`fsrs==6.3.2`) updates each point's memory state after actual unassisted
 | `memory_app_request` | App-only transport for validated page actions and exports; hidden from model tool selection |
 | `list_languages` | List language groups and record counts |
 | `list_scenes` | List overlapping scenes and distinct record counts, optionally scoped by language and type |
+| `capture_points` | Minimal observed targets; supporting cloud backend deduplicates and enriches asynchronously |
 | `save_points` | Batch save with per-item added, merged, skipped, or failed outcomes |
 | `find_points` | Search by scene, keyword, type, language, mastery, or missing generated content; follow `next_cursor` for more |
 | `review_queue` | Due FSRS points, then unassessed; current notes, latest attempts, scope counts, round exclusions and optional early practice |

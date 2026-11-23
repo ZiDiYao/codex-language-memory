@@ -83,9 +83,12 @@ const query = z.object({ ...sceneScope, keyword: defaultNull(title), scene: defa
 const sceneQuery = z.object(sceneScope).strict();
 const reviewQuery = z.object({ ...sceneScope, scene: defaultNull(sceneName), limit: limit.default(5), include_upcoming: z.boolean().default(false) }).strict();
 const capture = z.object({ request_id: requestId, items: z.array(z.record(z.string(), z.unknown())).min(1).max(20), source: z.enum(['automatic','explicit']).default('automatic') }).strict();
+const observation = z.object({ kind, language, title, context: defaultNull(text), corrected_sentence: defaultNull(text) }).strict();
+const observations = z.object({ request_id: requestId, items: z.array(z.record(z.string(), z.unknown())).min(1).max(20),
+  source: z.enum(['automatic','explicit']).default('automatic') }).strict();
 const pointUpdate = z.object({ patch, expected_revision: defaultNull(revision) }).strict();
 const reviewAttempt = z.object({ record_id: recordId, request_id: requestId, review }).strict();
-export const schemas = { point, patch, review, settings, settingsPatch, query, sceneQuery, reviewQuery, capture, pointUpdate, reviewAttempt,
+export const schemas = { observation, observations, point, patch, review, settings, settingsPatch, query, sceneQuery, reviewQuery, capture, pointUpdate, reviewAttempt,
   KnowledgePoint: point, Patch: patch, Review: review, LearningSettings: settings, SettingsPatch: settingsPatch,
   Query: query, SceneQuery: sceneQuery, ReviewQuery: reviewQuery, Capture: capture, PointUpdate: pointUpdate, ReviewAttempt: reviewAttempt,
 };
@@ -95,7 +98,7 @@ export function parse(name, value) {
   try {
     // Capture items are validated individually by the repository. One invalid
     // item must not prevent valid items in the same batch from being saved.
-    if (schema !== capture) validateDatabaseText(value);
+    if (schema !== capture && schema !== observations) validateDatabaseText(value);
     return schema.parse(value);
   } catch { throw new ValidationError(); }
 }
@@ -111,3 +114,5 @@ export const validateSceneQuery = value => parse('sceneQuery', value);
 export const validateReviewQuery = value => parse('reviewQuery', value);
 export const validatePointUpdate = value => parse('pointUpdate', value);
 export const validateReviewAttempt = value => parse('reviewAttempt', value);
+
+export const validateObservation = value => parse('observation', value);

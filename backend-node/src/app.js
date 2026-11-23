@@ -5,7 +5,7 @@ import { MAX_DESKTOP_IMPORT_BODY } from "./desktop-import.js";
 
 export const MAX_BODY = 1024 * 1024;
 const REST_METHODS = Object.freeze({
-  "/v1/settings": ["GET", "PATCH"], "/v1/points": ["GET"], "/v1/captures": ["POST"],
+  "/v1/settings": ["GET", "PATCH"], "/v1/points": ["GET"], "/v1/captures": ["POST"], "/v1/observations": ["POST"],
   "/v1/scenes": ["GET"], "/v1/review-queue": ["GET"], "/v1/reviews": ["POST"],
   "/v1/languages": ["GET"], "/v1/changes": ["GET"],
   "/v1/desktop-imports": ["POST"],
@@ -155,13 +155,17 @@ export function createApp({ config, repositoryFactory, verifyToken, readiness, l
         if (url.search) throw new APIError(422, "invalid_request");
         result = await call("import_desktop", await readJson(request, MAX_DESKTOP_IMPORT_BODY));
       }
-      else if (path === "/v1/settings" && request.method === "GET") result = await call("settings");
+      else if (path === "/v1/settings" && request.method === "GET") result = { ...await call("settings"), _capabilities: { lightweight_capture: true } };
       else if (path === "/v1/settings" && request.method === "PATCH") result = await call("settings", parse("settingsPatch", await readJson(request)));
       else if (["/v1/languages", "/v1/changes"].includes(path) && request.method === "GET") {
         if (url.search) throw new APIError(422, "invalid_request");
         result = await call(path === "/v1/languages" ? "languages" : "versions");
       }
       else if (path === "/v1/points" && request.method === "GET") result = await call("query", queryArguments(url.searchParams, "query"));
+      else if (path === "/v1/observations" && request.method === "POST") {
+        const args = parse("observations", await readJson(request));
+        result = await call("observe", args.request_id, args.items, args.source);
+      }
       else if (path === "/v1/captures" && request.method === "POST") {
         const args = parse("capture", await readJson(request));
         result = await call("save", args.request_id, args.items, args.source);

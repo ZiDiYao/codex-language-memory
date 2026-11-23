@@ -1,0 +1,1881 @@
+{
+  "benchmark": "actual-codex-cli-controlled-prompt-and-tool-schema",
+  "mode": "legacy",
+  "model": "gpt-6.1-sol",
+  "reasoning_effort": "high",
+  "contract": "Apply the current rich capture contract: first call get_settings(for_capture=true) to read confirmed recording/language preferences. The returned scene catalog is enough; no extra reads. Then answer the learning question and save the observed learning point using save_points with a unique request_id and source=automatic. You must generate kind, target language, canonical title, stable sense_key, Chinese meaning, useful concise Chinese explanation, at least two distinct English example sentences with Chinese translations, and a suitable scenes list. For a correction keep the original in context and revision in corrected_sentence. Respect recording and enabled types. Wait for the confirmed save before reporting success.\n",
+  "contract_sha256": "558bc7e7a2a00965fc3b3b908a9f4e423460245052f32f64b678867fdc22a2c2",
+  "fixture_sha256": "93111bc3aefd0b3e33f3ef67083bd136aa5e872eb4a3861abffd640f0edc7fdc",
+  "scope": "actual model work plus CLI/MCP overhead; fixture replies immediate, no real database or network persistence",
+  "not_measured": [
+    "production Codex app UI streaming",
+    "cloud database latency",
+    "backend enrichment completion"
+  ],
+  "results": [
+    {
+      "index": 0,
+      "question": "芹菜的英文咋说",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 16.496138916991185,
+      "first_agent_message_s": 3.2439405829645693,
+      "final_response_s": 15.886832082993351,
+      "turn_started_s": 0.6974015000159852,
+      "active_turn_s": 15.7987374169752,
+      "tool_calls": [
+        {
+          "at_ns": 1795477062699705000,
+          "name": "get_settings",
+          "arguments": {
+            "for_capture": true
+          }
+        },
+        {
+          "at_ns": 1795477071088370000,
+          "name": "save_points",
+          "arguments": {
+            "expected_connection_epoch": 1,
+            "request_id": "auto-celery-20261123-c8f6e204-9a73-4b15",
+            "source": "automatic",
+            "items": [
+              {
+                "kind": "word",
+                "language": "en",
+                "title": "celery",
+                "sense_key": "celery.n.vegetable",
+                "meaning": "芹菜",
+                "explanation": "celery 是不可数名词，指芹菜；一根芹菜可说 a stalk of celery。",
+                "context": "用户问：芹菜的英文咋说",
+                "examples": [
+                  {
+                    "text": "I put celery in the soup.",
+                    "translation": "我在汤里放了芹菜。"
+                  },
+                  {
+                    "text": "She bought a bunch of celery.",
+                    "translation": "她买了一把芹菜。"
+                  }
+                ],
+                "scenes": [
+                  "Food & cooking"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "tool_payload_bytes": 616,
+      "usage": {
+        "input_tokens": 91920,
+        "cached_input_tokens": 78720,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 453,
+        "reasoning_output_tokens": 51
+      },
+      "events": [
+        {
+          "elapsed_s": 0.21853616699809209,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac5-ad67-7820-9c67-c72c13356f65"
+          }
+        },
+        {
+          "elapsed_s": 0.6974015000159852,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 3.2439405829645693,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "我先查看你的记录和语言偏好，再回答并保存这个词。\n"
+            }
+          }
+        },
+        {
+          "elapsed_s": 5.9865427920012735,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 5.988051874970552,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"enabled\": true, \"first_language\": \"zh\", \"explanation_language\": null, \"enabled_types\": [\"word\", \"expression\", \"grammar\", \"correction\"], \"_connection\": {\"state\": \"connected\", \"epoch\": 1}, \"_capture\": {\"capture_ready\": true, \"scene_names\": [\"Food & cooking\", \"Cleaning & hygiene\", \"Everyday conversation\"], \"reuse_for_seconds\": 120}}"
+                  }
+                ],
+                "structured_content": {
+                  "enabled": true,
+                  "first_language": "zh",
+                  "explanation_language": null,
+                  "enabled_types": [
+                    "word",
+                    "expression",
+                    "grammar",
+                    "correction"
+                  ],
+                  "_connection": {
+                    "state": "connected",
+                    "epoch": 1
+                  },
+                  "_capture": {
+                    "capture_ready": true,
+                    "scene_names": [
+                      "Food & cooking",
+                      "Cleaning & hygiene",
+                      "Everyday conversation"
+                    ],
+                    "reuse_for_seconds": 120
+                  }
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 10.373756667017005,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_2",
+              "type": "agent_message",
+              "text": "芹菜的英文是 celery。\n"
+            }
+          }
+        },
+        {
+          "elapsed_s": 14.375717499991879,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "save_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "request_id": "auto-celery-20261123-c8f6e204-9a73-4b15",
+                "source": "automatic",
+                "items": [
+                  {
+                    "kind": "word",
+                    "language": "en",
+                    "title": "celery",
+                    "sense_key": "celery.n.vegetable",
+                    "meaning": "芹菜",
+                    "explanation": "celery 是不可数名词，指芹菜；一根芹菜可说 a stalk of celery。",
+                    "context": "用户问：芹菜的英文咋说",
+                    "examples": [
+                      {
+                        "text": "I put celery in the soup.",
+                        "translation": "我在汤里放了芹菜。"
+                      },
+                      {
+                        "text": "She bought a bunch of celery.",
+                        "translation": "她买了一把芹菜。"
+                      }
+                    ],
+                    "scenes": [
+                      "Food & cooking"
+                    ]
+                  }
+                ]
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 14.376537750009447,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "save_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "request_id": "auto-celery-20261123-c8f6e204-9a73-4b15",
+                "source": "automatic",
+                "items": [
+                  {
+                    "kind": "word",
+                    "language": "en",
+                    "title": "celery",
+                    "sense_key": "celery.n.vegetable",
+                    "meaning": "芹菜",
+                    "explanation": "celery 是不可数名词，指芹菜；一根芹菜可说 a stalk of celery。",
+                    "context": "用户问：芹菜的英文咋说",
+                    "examples": [
+                      {
+                        "text": "I put celery in the soup.",
+                        "translation": "我在汤里放了芹菜。"
+                      },
+                      {
+                        "text": "She bought a bunch of celery.",
+                        "translation": "她买了一把芹菜。"
+                      }
+                    ],
+                    "scenes": [
+                      "Food & cooking"
+                    ]
+                  }
+                ]
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"status\": \"processed\", \"replayed\": false, \"results\": [{\"index\": 0, \"status\": \"added\", \"id\": 1, \"encounter_count\": 1}]}"
+                  }
+                ],
+                "structured_content": {
+                  "status": "processed",
+                  "replayed": false,
+                  "results": [
+                    {
+                      "index": 0,
+                      "status": "added",
+                      "id": 1,
+                      "encounter_count": 1
+                    }
+                  ]
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 15.886832082993351,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_4",
+              "type": "agent_message",
+              "text": "芹菜的英文是 **celery**。已保存到学习记录。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 15.949495291977655,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 91920,
+              "cached_input_tokens": 78720,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 453,
+              "reasoning_output_tokens": 51
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:37:36.893763Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:37:36.896331Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    },
+    {
+      "index": 1,
+      "question": "rinse 是什么意思",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 14.255745999980718,
+      "first_agent_message_s": 3.5721171670011245,
+      "final_response_s": 13.581859250029083,
+      "turn_started_s": 0.6490610420005396,
+      "active_turn_s": 13.606684957980178,
+      "tool_calls": [
+        {
+          "at_ns": 1795477078881168000,
+          "name": "get_settings",
+          "arguments": {
+            "for_capture": true
+          }
+        },
+        {
+          "at_ns": 1795477084791479000,
+          "name": "save_points",
+          "arguments": {
+            "expected_connection_epoch": 1,
+            "request_id": "rinse-auto-20261123-7cd0e194-3b86-4fab-927e-61952ad48c30",
+            "source": "automatic",
+            "items": [
+              {
+                "kind": "word",
+                "language": "en",
+                "title": "rinse",
+                "sense_key": "rinse.verb.wash_with_water",
+                "meaning": "（用清水）冲洗；漂洗",
+                "explanation": "指用清水冲去污垢、肥皂或其他残留物，通常不强调用力搓洗。常用于洗食物、漂洗衣物或漱口。",
+                "examples": [
+                  {
+                    "text": "Rinse the vegetables before cooking.",
+                    "translation": "烹饪前把蔬菜冲洗干净。"
+                  },
+                  {
+                    "text": "Rinse the soap out of your hair.",
+                    "translation": "把头发上的肥皂冲洗干净。"
+                  }
+                ],
+                "scenes": [
+                  "Food & cooking",
+                  "Cleaning & hygiene"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "tool_payload_bytes": 720,
+      "usage": {
+        "input_tokens": 73547,
+        "cached_input_tokens": 61056,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 397,
+        "reasoning_output_tokens": 0
+      },
+      "events": [
+        {
+          "elapsed_s": 0.1855024590040557,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac5-edc9-7401-a90d-87a2bef1d4ca"
+          }
+        },
+        {
+          "elapsed_s": 0.6490610420005396,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 3.5721171670011245,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "我先确认你的学习记录偏好，再解释并保存这个词。\n"
+            }
+          }
+        },
+        {
+          "elapsed_s": 5.669301334011834,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 5.671293709019665,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"enabled\": true, \"first_language\": \"zh\", \"explanation_language\": null, \"enabled_types\": [\"word\", \"expression\", \"grammar\", \"correction\"], \"_connection\": {\"state\": \"connected\", \"epoch\": 1}, \"_capture\": {\"capture_ready\": true, \"scene_names\": [\"Food & cooking\", \"Cleaning & hygiene\", \"Everyday conversation\"], \"reuse_for_seconds\": 120}}"
+                  }
+                ],
+                "structured_content": {
+                  "enabled": true,
+                  "first_language": "zh",
+                  "explanation_language": null,
+                  "enabled_types": [
+                    "word",
+                    "expression",
+                    "grammar",
+                    "correction"
+                  ],
+                  "_connection": {
+                    "state": "connected",
+                    "epoch": 1
+                  },
+                  "_capture": {
+                    "capture_ready": true,
+                    "scene_names": [
+                      "Food & cooking",
+                      "Cleaning & hygiene",
+                      "Everyday conversation"
+                    ],
+                    "reuse_for_seconds": 120
+                  }
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 11.579135834006593,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_2",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "save_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "request_id": "rinse-auto-20261123-7cd0e194-3b86-4fab-927e-61952ad48c30",
+                "source": "automatic",
+                "items": [
+                  {
+                    "kind": "word",
+                    "language": "en",
+                    "title": "rinse",
+                    "sense_key": "rinse.verb.wash_with_water",
+                    "meaning": "（用清水）冲洗；漂洗",
+                    "explanation": "指用清水冲去污垢、肥皂或其他残留物，通常不强调用力搓洗。常用于洗食物、漂洗衣物或漱口。",
+                    "examples": [
+                      {
+                        "text": "Rinse the vegetables before cooking.",
+                        "translation": "烹饪前把蔬菜冲洗干净。"
+                      },
+                      {
+                        "text": "Rinse the soap out of your hair.",
+                        "translation": "把头发上的肥皂冲洗干净。"
+                      }
+                    ],
+                    "scenes": [
+                      "Food & cooking",
+                      "Cleaning & hygiene"
+                    ]
+                  }
+                ]
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 11.59319508401677,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_2",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "save_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "request_id": "rinse-auto-20261123-7cd0e194-3b86-4fab-927e-61952ad48c30",
+                "source": "automatic",
+                "items": [
+                  {
+                    "kind": "word",
+                    "language": "en",
+                    "title": "rinse",
+                    "sense_key": "rinse.verb.wash_with_water",
+                    "meaning": "（用清水）冲洗；漂洗",
+                    "explanation": "指用清水冲去污垢、肥皂或其他残留物，通常不强调用力搓洗。常用于洗食物、漂洗衣物或漱口。",
+                    "examples": [
+                      {
+                        "text": "Rinse the vegetables before cooking.",
+                        "translation": "烹饪前把蔬菜冲洗干净。"
+                      },
+                      {
+                        "text": "Rinse the soap out of your hair.",
+                        "translation": "把头发上的肥皂冲洗干净。"
+                      }
+                    ],
+                    "scenes": [
+                      "Food & cooking",
+                      "Cleaning & hygiene"
+                    ]
+                  }
+                ]
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"status\": \"processed\", \"replayed\": false, \"results\": [{\"index\": 0, \"status\": \"added\", \"id\": 1, \"encounter_count\": 1}]}"
+                  }
+                ],
+                "structured_content": {
+                  "status": "processed",
+                  "replayed": false,
+                  "results": [
+                    {
+                      "index": 0,
+                      "status": "added",
+                      "id": 1,
+                      "encounter_count": 1
+                    }
+                  ]
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 13.581859250029083,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_3",
+              "type": "agent_message",
+              "text": "rinse 意为“冲洗、漂洗”，通常指用清水洗去污垢或残留物。已保存。\n例：Rinse the vegetables.（把蔬菜冲洗一下。）"
+            }
+          }
+        },
+        {
+          "elapsed_s": 13.61041679198388,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 73547,
+              "cached_input_tokens": 61056,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 397,
+              "reasoning_output_tokens": 0
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:37:53.358944Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:37:53.361310Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    },
+    {
+      "index": 2,
+      "question": "hold a grudge 怎么用",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 14.553540082997642,
+      "first_agent_message_s": 3.348694375017658,
+      "final_response_s": 13.911609250004403,
+      "turn_started_s": 0.7158704160246998,
+      "active_turn_s": 13.837669666972943,
+      "tool_calls": [
+        {
+          "at_ns": 1795477093415164000,
+          "name": "get_settings",
+          "arguments": {
+            "for_capture": true
+          }
+        },
+        {
+          "at_ns": 1795477099328982000,
+          "name": "save_points",
+          "arguments": {
+            "expected_connection_epoch": 1,
+            "request_id": "capture-20261123-hold-a-grudge-c8b42d91",
+            "source": "automatic",
+            "items": [
+              {
+                "kind": "expression",
+                "language": "en",
+                "title": "hold a grudge",
+                "sense_key": "hold_a_grudge.persisting_resentment",
+                "meaning": "记恨；心怀怨恨",
+                "explanation": "指因过去受到伤害或不公平对待而长期记恨。常用 hold a grudge against someone；说明原因可接 over/about something。",
+                "context": "用户问：hold a grudge 怎么用",
+                "examples": [
+                  {
+                    "text": "She still holds a grudge against me for missing her wedding.",
+                    "translation": "她仍因我没参加她的婚礼而记恨我。"
+                  },
+                  {
+                    "text": "I don't hold a grudge over what happened.",
+                    "translation": "我并不因发生的事而怀恨在心。"
+                  }
+                ],
+                "scenes": [
+                  "Everyday conversation"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "tool_payload_bytes": 818,
+      "usage": {
+        "input_tokens": 73573,
+        "cached_input_tokens": 61056,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 412,
+        "reasoning_output_tokens": 0
+      },
+      "events": [
+        {
+          "elapsed_s": 0.21344525000313297,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac6-2596-7202-a50f-2aff81c8b47b"
+          }
+        },
+        {
+          "elapsed_s": 0.7158704160246998,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 3.348694375017658,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "我会先读取记录偏好，再说明用法并保存学习点。\n"
+            }
+          }
+        },
+        {
+          "elapsed_s": 5.945345250016544,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 5.946799291006755,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"enabled\": true, \"first_language\": \"zh\", \"explanation_language\": null, \"enabled_types\": [\"word\", \"expression\", \"grammar\", \"correction\"], \"_connection\": {\"state\": \"connected\", \"epoch\": 1}, \"_capture\": {\"capture_ready\": true, \"scene_names\": [\"Food & cooking\", \"Cleaning & hygiene\", \"Everyday conversation\"], \"reuse_for_seconds\": 120}}"
+                  }
+                ],
+                "structured_content": {
+                  "enabled": true,
+                  "first_language": "zh",
+                  "explanation_language": null,
+                  "enabled_types": [
+                    "word",
+                    "expression",
+                    "grammar",
+                    "correction"
+                  ],
+                  "_connection": {
+                    "state": "connected",
+                    "epoch": 1
+                  },
+                  "_capture": {
+                    "capture_ready": true,
+                    "scene_names": [
+                      "Food & cooking",
+                      "Cleaning & hygiene",
+                      "Everyday conversation"
+                    ],
+                    "reuse_for_seconds": 120
+                  }
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 11.859582208038773,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_2",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "save_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "request_id": "capture-20261123-hold-a-grudge-c8b42d91",
+                "source": "automatic",
+                "items": [
+                  {
+                    "kind": "expression",
+                    "language": "en",
+                    "title": "hold a grudge",
+                    "sense_key": "hold_a_grudge.persisting_resentment",
+                    "meaning": "记恨；心怀怨恨",
+                    "explanation": "指因过去受到伤害或不公平对待而长期记恨。常用 hold a grudge against someone；说明原因可接 over/about something。",
+                    "context": "用户问：hold a grudge 怎么用",
+                    "examples": [
+                      {
+                        "text": "She still holds a grudge against me for missing her wedding.",
+                        "translation": "她仍因我没参加她的婚礼而记恨我。"
+                      },
+                      {
+                        "text": "I don't hold a grudge over what happened.",
+                        "translation": "我并不因发生的事而怀恨在心。"
+                      }
+                    ],
+                    "scenes": [
+                      "Everyday conversation"
+                    ]
+                  }
+                ]
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 11.861068333033472,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_2",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "save_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "request_id": "capture-20261123-hold-a-grudge-c8b42d91",
+                "source": "automatic",
+                "items": [
+                  {
+                    "kind": "expression",
+                    "language": "en",
+                    "title": "hold a grudge",
+                    "sense_key": "hold_a_grudge.persisting_resentment",
+                    "meaning": "记恨；心怀怨恨",
+                    "explanation": "指因过去受到伤害或不公平对待而长期记恨。常用 hold a grudge against someone；说明原因可接 over/about something。",
+                    "context": "用户问：hold a grudge 怎么用",
+                    "examples": [
+                      {
+                        "text": "She still holds a grudge against me for missing her wedding.",
+                        "translation": "她仍因我没参加她的婚礼而记恨我。"
+                      },
+                      {
+                        "text": "I don't hold a grudge over what happened.",
+                        "translation": "我并不因发生的事而怀恨在心。"
+                      }
+                    ],
+                    "scenes": [
+                      "Everyday conversation"
+                    ]
+                  }
+                ]
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"status\": \"processed\", \"replayed\": false, \"results\": [{\"index\": 0, \"status\": \"added\", \"id\": 1, \"encounter_count\": 1}]}"
+                  }
+                ],
+                "structured_content": {
+                  "status": "processed",
+                  "replayed": false,
+                  "results": [
+                    {
+                      "index": 0,
+                      "status": "added",
+                      "id": 1,
+                      "encounter_count": 1
+                    }
+                  ]
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 13.911609250004403,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_3",
+              "type": "agent_message",
+              "text": "**hold a grudge** 表示“记恨”，常用 hold a grudge against someone（记恨某人）。\n\n例：She still holds a grudge against me.\n她仍然记恨我。\n\n已保存学习点。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 13.922946666018106,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 73573,
+              "cached_input_tokens": 61056,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 412,
+              "reasoning_output_tokens": 0
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:38:07.645756Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:38:07.649443Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    },
+    {
+      "index": 3,
+      "question": "I very like it 这样说自然吗",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 16.088878875016235,
+      "first_agent_message_s": 3.268182000028901,
+      "final_response_s": 15.090732250013389,
+      "turn_started_s": 0.712351625028532,
+      "active_turn_s": 15.376527249987703,
+      "tool_calls": [
+        {
+          "at_ns": 1795477108025918000,
+          "name": "get_settings",
+          "arguments": {
+            "for_capture": true
+          }
+        },
+        {
+          "at_ns": 1795477115110408000,
+          "name": "save_points",
+          "arguments": {
+            "expected_connection_epoch": 1,
+            "request_id": "auto-20261123-very-like-7b3e91a2",
+            "source": "automatic",
+            "items": [
+              {
+                "kind": "correction",
+                "language": "en",
+                "title": "I really like it.",
+                "sense_key": "correction.like.degree.really_not_very",
+                "meaning": "我很喜欢它。",
+                "explanation": "very 不能直接修饰动词 like；表达“很喜欢”可用 really like，或在宾语后加 very much。",
+                "context": "用户问：“I very like it”这样说自然吗？原句：I very like it.",
+                "corrected_sentence": "I really like it.",
+                "examples": [
+                  {
+                    "text": "I really like it.",
+                    "translation": "我很喜欢它。"
+                  },
+                  {
+                    "text": "I like this song very much.",
+                    "translation": "我非常喜欢这首歌。"
+                  }
+                ],
+                "scenes": [
+                  "Everyday conversation"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "tool_payload_bytes": 767,
+      "usage": {
+        "input_tokens": 73635,
+        "cached_input_tokens": 66944,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 446,
+        "reasoning_output_tokens": 75
+      },
+      "events": [
+        {
+          "elapsed_s": 0.22712137503549457,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac6-5e81-78e2-90d8-d407f45c9b18"
+          }
+        },
+        {
+          "elapsed_s": 0.712351625028532,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 3.268182000028901,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "我先确认记录偏好，再说明更自然的表达并保存要点。\n"
+            }
+          }
+        },
+        {
+          "elapsed_s": 6.000852041004691,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 6.001865208032541,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"enabled\": true, \"first_language\": \"zh\", \"explanation_language\": null, \"enabled_types\": [\"word\", \"expression\", \"grammar\", \"correction\"], \"_connection\": {\"state\": \"connected\", \"epoch\": 1}, \"_capture\": {\"capture_ready\": true, \"scene_names\": [\"Food & cooking\", \"Cleaning & hygiene\", \"Everyday conversation\"], \"reuse_for_seconds\": 120}}"
+                  }
+                ],
+                "structured_content": {
+                  "enabled": true,
+                  "first_language": "zh",
+                  "explanation_language": null,
+                  "enabled_types": [
+                    "word",
+                    "expression",
+                    "grammar",
+                    "correction"
+                  ],
+                  "_connection": {
+                    "state": "connected",
+                    "epoch": 1
+                  },
+                  "_capture": {
+                    "capture_ready": true,
+                    "scene_names": [
+                      "Food & cooking",
+                      "Cleaning & hygiene",
+                      "Everyday conversation"
+                    ],
+                    "reuse_for_seconds": 120
+                  }
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 13.085498208005447,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_2",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "save_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "request_id": "auto-20261123-very-like-7b3e91a2",
+                "source": "automatic",
+                "items": [
+                  {
+                    "kind": "correction",
+                    "language": "en",
+                    "title": "I really like it.",
+                    "sense_key": "correction.like.degree.really_not_very",
+                    "meaning": "我很喜欢它。",
+                    "explanation": "very 不能直接修饰动词 like；表达“很喜欢”可用 really like，或在宾语后加 very much。",
+                    "context": "用户问：“I very like it”这样说自然吗？原句：I very like it.",
+                    "corrected_sentence": "I really like it.",
+                    "examples": [
+                      {
+                        "text": "I really like it.",
+                        "translation": "我很喜欢它。"
+                      },
+                      {
+                        "text": "I like this song very much.",
+                        "translation": "我非常喜欢这首歌。"
+                      }
+                    ],
+                    "scenes": [
+                      "Everyday conversation"
+                    ]
+                  }
+                ]
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 13.08886600000551,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_2",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "save_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "request_id": "auto-20261123-very-like-7b3e91a2",
+                "source": "automatic",
+                "items": [
+                  {
+                    "kind": "correction",
+                    "language": "en",
+                    "title": "I really like it.",
+                    "sense_key": "correction.like.degree.really_not_very",
+                    "meaning": "我很喜欢它。",
+                    "explanation": "very 不能直接修饰动词 like；表达“很喜欢”可用 really like，或在宾语后加 very much。",
+                    "context": "用户问：“I very like it”这样说自然吗？原句：I very like it.",
+                    "corrected_sentence": "I really like it.",
+                    "examples": [
+                      {
+                        "text": "I really like it.",
+                        "translation": "我很喜欢它。"
+                      },
+                      {
+                        "text": "I like this song very much.",
+                        "translation": "我非常喜欢这首歌。"
+                      }
+                    ],
+                    "scenes": [
+                      "Everyday conversation"
+                    ]
+                  }
+                ]
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"status\": \"processed\", \"replayed\": false, \"results\": [{\"index\": 0, \"status\": \"added\", \"id\": 1, \"encounter_count\": 1}]}"
+                  }
+                ],
+                "structured_content": {
+                  "status": "processed",
+                  "replayed": false,
+                  "results": [
+                    {
+                      "index": 0,
+                      "status": "added",
+                      "id": 1,
+                      "encounter_count": 1
+                    }
+                  ]
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 15.090732250013389,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_3",
+              "type": "agent_message",
+              "text": "不自然。very 不能直接修饰动词 like，表达“很喜欢”可用 really：I really like it. 已保存纠错要点。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 15.100723874988034,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 73635,
+              "cached_input_tokens": 66944,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 446,
+              "reasoning_output_tokens": 75
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:38:22.214813Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:38:22.217488Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    },
+    {
+      "index": 4,
+      "question": "turn off 和 turn on 分别什么意思",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 21.30296937498497,
+      "first_agent_message_s": 3.2174545419984497,
+      "final_response_s": 20.73088500002632,
+      "turn_started_s": 0.6908844590070657,
+      "active_turn_s": 20.612084915977903,
+      "tool_calls": [
+        {
+          "at_ns": 1795477123838564000,
+          "name": "get_settings",
+          "arguments": {
+            "for_capture": true
+          }
+        },
+        {
+          "at_ns": 1795477135929920000,
+          "name": "save_points",
+          "arguments": {
+            "expected_connection_epoch": 1,
+            "request_id": "auto-20261123-turn-on-off-6f82c9b4",
+            "source": "automatic",
+            "items": [
+              {
+                "kind": "expression",
+                "language": "en",
+                "title": "turn off",
+                "sense_key": "turn_off.deactivate_device",
+                "meaning": "关闭（电器、灯或设备）",
+                "explanation": "表示让电器、灯或设备停止运行，与 turn on 相反。代词作宾语时放中间，如 turn it off。",
+                "examples": [
+                  {
+                    "text": "Please turn off the light.",
+                    "translation": "请关灯。"
+                  },
+                  {
+                    "text": "Turn off the TV before you leave.",
+                    "translation": "离开前把电视关掉。"
+                  }
+                ],
+                "scenes": [
+                  "Everyday conversation"
+                ]
+              },
+              {
+                "kind": "expression",
+                "language": "en",
+                "title": "turn on",
+                "sense_key": "turn_on.activate_device",
+                "meaning": "打开（电器、灯或设备）",
+                "explanation": "表示让电器、灯或设备开始运行，与 turn off 相反。代词作宾语时放中间，如 turn it on。",
+                "examples": [
+                  {
+                    "text": "Please turn on the light.",
+                    "translation": "请开灯。"
+                  },
+                  {
+                    "text": "I turn on the computer every morning.",
+                    "translation": "我每天早上打开电脑。"
+                  }
+                ],
+                "scenes": [
+                  "Everyday conversation"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "tool_payload_bytes": 1145,
+      "usage": {
+        "input_tokens": 73880,
+        "cached_input_tokens": 67200,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 715,
+        "reasoning_output_tokens": 240
+      },
+      "events": [
+        {
+          "elapsed_s": 0.19249354203930125,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac6-9d39-7723-a223-787210635130"
+          }
+        },
+        {
+          "elapsed_s": 0.6908844590070657,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 3.2174545419984497,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "我会先确认记录和语言偏好，再解释并按设置保存学习点。\n"
+            }
+          }
+        },
+        {
+          "elapsed_s": 5.722300124994945,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 5.724865459022112,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"enabled\": true, \"first_language\": \"zh\", \"explanation_language\": null, \"enabled_types\": [\"word\", \"expression\", \"grammar\", \"correction\"], \"_connection\": {\"state\": \"connected\", \"epoch\": 1}, \"_capture\": {\"capture_ready\": true, \"scene_names\": [\"Food & cooking\", \"Cleaning & hygiene\", \"Everyday conversation\"], \"reuse_for_seconds\": 120}}"
+                  }
+                ],
+                "structured_content": {
+                  "enabled": true,
+                  "first_language": "zh",
+                  "explanation_language": null,
+                  "enabled_types": [
+                    "word",
+                    "expression",
+                    "grammar",
+                    "correction"
+                  ],
+                  "_connection": {
+                    "state": "connected",
+                    "epoch": 1
+                  },
+                  "_capture": {
+                    "capture_ready": true,
+                    "scene_names": [
+                      "Food & cooking",
+                      "Cleaning & hygiene",
+                      "Everyday conversation"
+                    ],
+                    "reuse_for_seconds": 120
+                  }
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 12.307081125036348,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_2",
+              "type": "agent_message",
+              "text": "turn off：关闭；turn on：打开。常用于灯、电器等。\n"
+            }
+          }
+        },
+        {
+          "elapsed_s": 17.814719624991994,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "save_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "request_id": "auto-20261123-turn-on-off-6f82c9b4",
+                "source": "automatic",
+                "items": [
+                  {
+                    "kind": "expression",
+                    "language": "en",
+                    "title": "turn off",
+                    "sense_key": "turn_off.deactivate_device",
+                    "meaning": "关闭（电器、灯或设备）",
+                    "explanation": "表示让电器、灯或设备停止运行，与 turn on 相反。代词作宾语时放中间，如 turn it off。",
+                    "examples": [
+                      {
+                        "text": "Please turn off the light.",
+                        "translation": "请关灯。"
+                      },
+                      {
+                        "text": "Turn off the TV before you leave.",
+                        "translation": "离开前把电视关掉。"
+                      }
+                    ],
+                    "scenes": [
+                      "Everyday conversation"
+                    ]
+                  },
+                  {
+                    "kind": "expression",
+                    "language": "en",
+                    "title": "turn on",
+                    "sense_key": "turn_on.activate_device",
+                    "meaning": "打开（电器、灯或设备）",
+                    "explanation": "表示让电器、灯或设备开始运行，与 turn off 相反。代词作宾语时放中间，如 turn it on。",
+                    "examples": [
+                      {
+                        "text": "Please turn on the light.",
+                        "translation": "请开灯。"
+                      },
+                      {
+                        "text": "I turn on the computer every morning.",
+                        "translation": "我每天早上打开电脑。"
+                      }
+                    ],
+                    "scenes": [
+                      "Everyday conversation"
+                    ]
+                  }
+                ]
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 17.81597929203417,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "save_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "request_id": "auto-20261123-turn-on-off-6f82c9b4",
+                "source": "automatic",
+                "items": [
+                  {
+                    "kind": "expression",
+                    "language": "en",
+                    "title": "turn off",
+                    "sense_key": "turn_off.deactivate_device",
+                    "meaning": "关闭（电器、灯或设备）",
+                    "explanation": "表示让电器、灯或设备停止运行，与 turn on 相反。代词作宾语时放中间，如 turn it off。",
+                    "examples": [
+                      {
+                        "text": "Please turn off the light.",
+                        "translation": "请关灯。"
+                      },
+                      {
+                        "text": "Turn off the TV before you leave.",
+                        "translation": "离开前把电视关掉。"
+                      }
+                    ],
+                    "scenes": [
+                      "Everyday conversation"
+                    ]
+                  },
+                  {
+                    "kind": "expression",
+                    "language": "en",
+                    "title": "turn on",
+                    "sense_key": "turn_on.activate_device",
+                    "meaning": "打开（电器、灯或设备）",
+                    "explanation": "表示让电器、灯或设备开始运行，与 turn off 相反。代词作宾语时放中间，如 turn it on。",
+                    "examples": [
+                      {
+                        "text": "Please turn on the light.",
+                        "translation": "请开灯。"
+                      },
+                      {
+                        "text": "I turn on the computer every morning.",
+                        "translation": "我每天早上打开电脑。"
+                      }
+                    ],
+                    "scenes": [
+                      "Everyday conversation"
+                    ]
+                  }
+                ]
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"status\": \"processed\", \"replayed\": false, \"results\": [{\"index\": 0, \"status\": \"added\", \"id\": 1, \"encounter_count\": 1}]}"
+                  }
+                ],
+                "structured_content": {
+                  "status": "processed",
+                  "replayed": false,
+                  "results": [
+                    {
+                      "index": 0,
+                      "status": "added",
+                      "id": 1,
+                      "encounter_count": 1
+                    }
+                  ]
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 20.73088500002632,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_4",
+              "type": "agent_message",
+              "text": "**turn off**：关闭；**turn on**：打开。常用于灯、电器等。已保存学习点。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 20.742717500019353,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 73880,
+              "cached_input_tokens": 67200,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 715,
+              "reasoning_output_tokens": 240
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:38:38.270219Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:38:38.272828Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    },
+    {
+      "index": 5,
+      "question": "一根芹菜用英文怎么说",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 16.732814125018194,
+      "first_agent_message_s": 3.0921766660176218,
+      "final_response_s": 16.216793666011654,
+      "turn_started_s": 0.7823702080058865,
+      "active_turn_s": 15.950443917012308,
+      "tool_calls": [
+        {
+          "at_ns": 1795477145094062000,
+          "name": "get_settings",
+          "arguments": {
+            "for_capture": true
+          }
+        },
+        {
+          "at_ns": 1795477153912742000,
+          "name": "save_points",
+          "arguments": {
+            "expected_connection_epoch": 1,
+            "request_id": "auto-celery-stalk-20261123-f7d319a4",
+            "source": "automatic",
+            "items": [
+              {
+                "kind": "expression",
+                "language": "en",
+                "title": "a stalk of celery",
+                "sense_key": "celery.stalk.single_rib",
+                "meaning": "一根芹菜（单根芹菜茎）",
+                "explanation": "单根芹菜茎常用 a stalk of celery，也可用 a stick of celery；整棵芹菜可用 a head of celery。",
+                "examples": [
+                  {
+                    "text": "Chop one stalk of celery and add it to the soup.",
+                    "translation": "切碎一根芹菜，加入汤中。"
+                  },
+                  {
+                    "text": "She ate a stick of celery with hummus.",
+                    "translation": "她吃了一根蘸鹰嘴豆泥的芹菜。"
+                  }
+                ],
+                "scenes": [
+                  "Food & cooking",
+                  "Everyday conversation"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "tool_payload_bytes": 728,
+      "usage": {
+        "input_tokens": 73727,
+        "cached_input_tokens": 67072,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 529,
+        "reasoning_output_tokens": 128
+      },
+      "events": [
+        {
+          "elapsed_s": 0.22582437499659136,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac6-f08f-71b1-bac1-3653083199f5"
+          }
+        },
+        {
+          "elapsed_s": 0.7823702080058865,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 3.0921766660176218,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "我会先确认语言和记录偏好，再解答并保存这个表达。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 5.671663083019666,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 5.673582957999315,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"enabled\": true, \"first_language\": \"zh\", \"explanation_language\": null, \"enabled_types\": [\"word\", \"expression\", \"grammar\", \"correction\"], \"_connection\": {\"state\": \"connected\", \"epoch\": 1}, \"_capture\": {\"capture_ready\": true, \"scene_names\": [\"Food & cooking\", \"Cleaning & hygiene\", \"Everyday conversation\"], \"reuse_for_seconds\": 120}}"
+                  }
+                ],
+                "structured_content": {
+                  "enabled": true,
+                  "first_language": "zh",
+                  "explanation_language": null,
+                  "enabled_types": [
+                    "word",
+                    "expression",
+                    "grammar",
+                    "correction"
+                  ],
+                  "_connection": {
+                    "state": "connected",
+                    "epoch": 1
+                  },
+                  "_capture": {
+                    "capture_ready": true,
+                    "scene_names": [
+                      "Food & cooking",
+                      "Cleaning & hygiene",
+                      "Everyday conversation"
+                    ],
+                    "reuse_for_seconds": 120
+                  }
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 10.005188750044908,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_2",
+              "type": "agent_message",
+              "text": "一根芹菜通常说 a stalk of celery，也可说 a stick of celery。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 14.491218125040177,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "save_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "request_id": "auto-celery-stalk-20261123-f7d319a4",
+                "source": "automatic",
+                "items": [
+                  {
+                    "kind": "expression",
+                    "language": "en",
+                    "title": "a stalk of celery",
+                    "sense_key": "celery.stalk.single_rib",
+                    "meaning": "一根芹菜（单根芹菜茎）",
+                    "explanation": "单根芹菜茎常用 a stalk of celery，也可用 a stick of celery；整棵芹菜可用 a head of celery。",
+                    "examples": [
+                      {
+                        "text": "Chop one stalk of celery and add it to the soup.",
+                        "translation": "切碎一根芹菜，加入汤中。"
+                      },
+                      {
+                        "text": "She ate a stick of celery with hummus.",
+                        "translation": "她吃了一根蘸鹰嘴豆泥的芹菜。"
+                      }
+                    ],
+                    "scenes": [
+                      "Food & cooking",
+                      "Everyday conversation"
+                    ]
+                  }
+                ]
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 14.491847416036762,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "save_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "request_id": "auto-celery-stalk-20261123-f7d319a4",
+                "source": "automatic",
+                "items": [
+                  {
+                    "kind": "expression",
+                    "language": "en",
+                    "title": "a stalk of celery",
+                    "sense_key": "celery.stalk.single_rib",
+                    "meaning": "一根芹菜（单根芹菜茎）",
+                    "explanation": "单根芹菜茎常用 a stalk of celery，也可用 a stick of celery；整棵芹菜可用 a head of celery。",
+                    "examples": [
+                      {
+                        "text": "Chop one stalk of celery and add it to the soup.",
+                        "translation": "切碎一根芹菜，加入汤中。"
+                      },
+                      {
+                        "text": "She ate a stick of celery with hummus.",
+                        "translation": "她吃了一根蘸鹰嘴豆泥的芹菜。"
+                      }
+                    ],
+                    "scenes": [
+                      "Food & cooking",
+                      "Everyday conversation"
+                    ]
+                  }
+                ]
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"status\": \"processed\", \"replayed\": false, \"results\": [{\"index\": 0, \"status\": \"added\", \"id\": 1, \"encounter_count\": 1}]}"
+                  }
+                ],
+                "structured_content": {
+                  "status": "processed",
+                  "replayed": false,
+                  "results": [
+                    {
+                      "index": 0,
+                      "status": "added",
+                      "id": 1,
+                      "encounter_count": 1
+                    }
+                  ]
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 16.216793666011654,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_4",
+              "type": "agent_message",
+              "text": "一根芹菜说 **a stalk of celery**，也可说 **a stick of celery**。已保存该表达。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 16.23013683303725,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 73727,
+              "cached_input_tokens": 67072,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 529,
+              "reasoning_output_tokens": 128
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:38:59.606655Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:38:59.609776Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    }
+  ],
+  "summary": {
+    "wall_s": {
+      "samples": 6,
+      "mean_s": 16.571681229164824,
+      "p50_s": 16.29250889600371,
+      "p95_s": 21.30296937498497,
+      "min_s": 14.255745999980718,
+      "max_s": 21.30296937498497
+    },
+    "active_turn_s": {
+      "samples": 6,
+      "mean_s": 15.863691354151038,
+      "p50_s": 15.587632333481451,
+      "p95_s": 20.612084915977903,
+      "min_s": 13.606684957980178,
+      "max_s": 20.612084915977903
+    },
+    "first_agent_message_s": {
+      "samples": 6,
+      "mean_s": 3.2904275555047207,
+      "p50_s": 3.256061291496735,
+      "p95_s": 3.5721171670011245,
+      "min_s": 3.0921766660176218,
+      "max_s": 3.5721171670011245
+    },
+    "final_response_s": {
+      "samples": 6,
+      "mean_s": 15.9031185831797,
+      "p50_s": 15.48878216650337,
+      "p95_s": 20.73088500002632,
+      "min_s": 13.581859250029083,
+      "max_s": 20.73088500002632
+    }
+  }
+}

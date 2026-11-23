@@ -1,0 +1,129 @@
+{
+  "benchmark": "actual-codex-cli-controlled-prompt-and-tool-schema",
+  "mode": "legacy",
+  "model": "gpt-6.1-sol",
+  "reasoning_effort": "high",
+  "contract": "Apply the current rich capture contract: first call get_settings(for_capture=true) to read confirmed recording/language preferences. The returned scene catalog is enough; no extra reads. Then answer the learning question and save the observed learning point using save_points with a unique request_id and source=automatic. You must generate kind, target language, canonical title, stable sense_key, Chinese meaning, useful concise Chinese explanation, at least two distinct English example sentences with Chinese translations, and a suitable scenes list. For a correction keep the original in context and revision in corrected_sentence. Respect recording and enabled types. Wait for the confirmed save before reporting success.\n",
+  "contract_sha256": "558bc7e7a2a00965fc3b3b908a9f4e423460245052f32f64b678867fdc22a2c2",
+  "fixture_sha256": "8a7acfa6390bc52eb3e36ee2117866050e688dbbf17603dfaa5d87830bcc43c4",
+  "scope": "actual model work plus CLI/MCP overhead; fixture replies immediate, no real database or network persistence",
+  "not_measured": [
+    "production Codex app UI streaming",
+    "cloud database latency",
+    "backend enrichment completion"
+  ],
+  "results": [
+    {
+      "index": 0,
+      "question": "芹菜的英文咋说",
+      "success": false,
+      "exit_code": 0,
+      "wall_s": 9.834359542001039,
+      "first_agent_message_s": 3.395207833033055,
+      "turn_started_s": 0.7220304170041345,
+      "active_turn_s": 9.112329124996904,
+      "tool_calls": [],
+      "tool_payload_bytes": 0,
+      "usage": {
+        "input_tokens": 54719,
+        "cached_input_tokens": 48384,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 218,
+        "reasoning_output_tokens": 86
+      },
+      "events": [
+        {
+          "elapsed_s": 0.24209045799216256,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac5-095b-7730-8212-7a9d7ccd4146"
+          }
+        },
+        {
+          "elapsed_s": 0.7220304170041345,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 3.395207833033055,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "我会先读取你的记录和语言偏好，再回答并按设置保存。\n"
+            }
+          }
+        },
+        {
+          "elapsed_s": 5.892247500014491,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 5.893737583013717,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": null,
+              "error": {
+                "message": "MCP tool call requires approval, but approval policy is never"
+              },
+              "status": "failed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 9.168393832980655,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_2",
+              "type": "agent_message",
+              "text": "芹菜的英文是 **celery**。因记录工具权限受限，未能保存。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 9.181135750026442,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 54719,
+              "cached_input_tokens": 48384,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 218,
+              "reasoning_output_tokens": 86
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:36:54.903397Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:36:54.905617Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    }
+  ],
+  "summary": {}
+}

@@ -1,0 +1,1590 @@
+{
+  "benchmark": "actual-codex-cli-controlled-prompt-and-tool-schema",
+  "mode": "light",
+  "model": "gpt-6.1-sol",
+  "reasoning_effort": "high",
+  "contract": "Apply the lightweight capture contract: first call get_settings(for_capture=true) to read confirmed recording/language preferences. Then answer the learning question and call capture_points once with a unique request_id and source=automatic. Submit only the observed kind, target language, canonical title and necessary original context; for corrections include corrected_sentence if already provided in teaching. Do not generate definitions, explanations, examples, translations, scenes or sense keys for storage: the backend enriches them asynchronously. Respect recording and enabled types. Wait for confirmed capture before reporting the learning point recorded; do not claim enrichment is complete.\n",
+  "contract_sha256": "59669dd81d1a43fff9e71caa9979a91cb1cd69624979a012aec64fb89231aa6b",
+  "fixture_sha256": "93111bc3aefd0b3e33f3ef67083bd136aa5e872eb4a3861abffd640f0edc7fdc",
+  "scope": "actual model work plus CLI/MCP overhead; fixture replies immediate, no real database or network persistence",
+  "not_measured": [
+    "production Codex app UI streaming",
+    "cloud database latency",
+    "backend enrichment completion"
+  ],
+  "results": [
+    {
+      "index": 0,
+      "question": "芹菜的英文咋说",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 13.315771666995715,
+      "first_agent_message_s": 3.6981522500282153,
+      "final_response_s": 12.8417518340284,
+      "turn_started_s": 0.7782162500079721,
+      "active_turn_s": 12.537555416987743,
+      "tool_calls": [
+        {
+          "at_ns": 1795477179657441000,
+          "name": "get_settings",
+          "arguments": {
+            "for_capture": true
+          }
+        },
+        {
+          "at_ns": 1795477183994188000,
+          "name": "capture_points",
+          "arguments": {
+            "items": [
+              {
+                "kind": "word",
+                "language": "en",
+                "title": "celery",
+                "context": "芹菜的英文咋说"
+              }
+            ],
+            "request_id": "auto-celery-20261123-7d91b68a",
+            "source": "automatic",
+            "expected_connection_epoch": 1
+          }
+        }
+      ],
+      "tool_payload_bytes": 225,
+      "usage": {
+        "input_tokens": 73315,
+        "cached_input_tokens": 65024,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 251,
+        "reasoning_output_tokens": 12
+      },
+      "events": [
+        {
+          "elapsed_s": 0.20105983404209837,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac7-73e4-7813-afbb-3c1b4f054f1b"
+          }
+        },
+        {
+          "elapsed_s": 0.7782162500079721,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 3.6981522500282153,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "我先确认记录和语言偏好。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 6.570092625042889,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 6.57091654202668,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"enabled\": true, \"first_language\": \"zh\", \"explanation_language\": null, \"enabled_types\": [\"word\", \"expression\", \"grammar\", \"correction\"], \"_connection\": {\"state\": \"connected\", \"epoch\": 1}, \"_capture\": {\"capture_ready\": true, \"scene_names\": [\"Food & cooking\", \"Cleaning & hygiene\", \"Everyday conversation\"], \"reuse_for_seconds\": 120}}"
+                  }
+                ],
+                "structured_content": {
+                  "enabled": true,
+                  "first_language": "zh",
+                  "explanation_language": null,
+                  "enabled_types": [
+                    "word",
+                    "expression",
+                    "grammar",
+                    "correction"
+                  ],
+                  "_connection": {
+                    "state": "connected",
+                    "epoch": 1
+                  },
+                  "_capture": {
+                    "capture_ready": true,
+                    "scene_names": [
+                      "Food & cooking",
+                      "Cleaning & hygiene",
+                      "Everyday conversation"
+                    ],
+                    "reuse_for_seconds": 120
+                  }
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 9.143961042049341,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_2",
+              "type": "agent_message",
+              "text": "芹菜的英文是 **celery**。\n"
+            }
+          }
+        },
+        {
+          "elapsed_s": 10.906801209028345,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "capture_points",
+              "arguments": {
+                "items": [
+                  {
+                    "kind": "word",
+                    "language": "en",
+                    "title": "celery",
+                    "context": "芹菜的英文咋说"
+                  }
+                ],
+                "request_id": "auto-celery-20261123-7d91b68a",
+                "source": "automatic",
+                "expected_connection_epoch": 1
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 10.907899417041335,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "capture_points",
+              "arguments": {
+                "items": [
+                  {
+                    "kind": "word",
+                    "language": "en",
+                    "title": "celery",
+                    "context": "芹菜的英文咋说"
+                  }
+                ],
+                "request_id": "auto-celery-20261123-7d91b68a",
+                "source": "automatic",
+                "expected_connection_epoch": 1
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"status\": \"processed\", \"replayed\": false, \"results\": [{\"index\": 0, \"status\": \"added\", \"id\": 1, \"encounter_count\": 1, \"enrichment_state\": \"pending\"}]}"
+                  }
+                ],
+                "structured_content": {
+                  "status": "processed",
+                  "replayed": false,
+                  "results": [
+                    {
+                      "index": 0,
+                      "status": "added",
+                      "id": 1,
+                      "encounter_count": 1,
+                      "enrichment_state": "pending"
+                    }
+                  ]
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 12.8417518340284,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_4",
+              "type": "agent_message",
+              "text": "芹菜的英文是 **celery**。已记录该单词。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 12.842293750029057,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 73315,
+              "cached_input_tokens": 65024,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 251,
+              "reasoning_output_tokens": 12
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:39:33.248626Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:39:33.250772Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    },
+    {
+      "index": 1,
+      "question": "rinse 是什么意思",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 14.745875000022352,
+      "first_agent_message_s": 3.4369330420158803,
+      "final_response_s": 14.219941042014398,
+      "turn_started_s": 0.6532300420221873,
+      "active_turn_s": 14.092644958000164,
+      "tool_calls": [
+        {
+          "at_ns": 1795477192631594000,
+          "name": "get_settings",
+          "arguments": {
+            "for_capture": true
+          }
+        },
+        {
+          "at_ns": 1795477198894064000,
+          "name": "capture_points",
+          "arguments": {
+            "expected_connection_epoch": 1,
+            "items": [
+              {
+                "kind": "word",
+                "language": "en",
+                "title": "rinse",
+                "context": "rinse 是什么意思"
+              }
+            ],
+            "request_id": "auto-rinse-20261123-f8d32b1a",
+            "source": "automatic"
+          }
+        }
+      ],
+      "tool_payload_bytes": 223,
+      "usage": {
+        "input_tokens": 73425,
+        "cached_input_tokens": 70912,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 372,
+        "reasoning_output_tokens": 109
+      },
+      "events": [
+        {
+          "elapsed_s": 0.19285654200939462,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac7-a7fe-7933-9f75-d368b1a7ad0a"
+          }
+        },
+        {
+          "elapsed_s": 0.6532300420221873,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 3.4369330420158803,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "我先确认记录与语言偏好，再简要解释这个词。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 6.219251041999087,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 6.22546708403388,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"enabled\": true, \"first_language\": \"zh\", \"explanation_language\": null, \"enabled_types\": [\"word\", \"expression\", \"grammar\", \"correction\"], \"_connection\": {\"state\": \"connected\", \"epoch\": 1}, \"_capture\": {\"capture_ready\": true, \"scene_names\": [\"Food & cooking\", \"Cleaning & hygiene\", \"Everyday conversation\"], \"reuse_for_seconds\": 120}}"
+                  }
+                ],
+                "structured_content": {
+                  "enabled": true,
+                  "first_language": "zh",
+                  "explanation_language": null,
+                  "enabled_types": [
+                    "word",
+                    "expression",
+                    "grammar",
+                    "correction"
+                  ],
+                  "_connection": {
+                    "state": "connected",
+                    "epoch": 1
+                  },
+                  "_capture": {
+                    "capture_ready": true,
+                    "scene_names": [
+                      "Food & cooking",
+                      "Cleaning & hygiene",
+                      "Everyday conversation"
+                    ],
+                    "reuse_for_seconds": 120
+                  }
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 10.916830750007648,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_2",
+              "type": "agent_message",
+              "text": "rinse 意为“冲洗、漂洗”，也可作名词，表示“冲洗”。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 12.485902499989606,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "capture_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "items": [
+                  {
+                    "kind": "word",
+                    "language": "en",
+                    "title": "rinse",
+                    "context": "rinse 是什么意思"
+                  }
+                ],
+                "request_id": "auto-rinse-20261123-f8d32b1a",
+                "source": "automatic"
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 12.489553541992791,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "capture_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "items": [
+                  {
+                    "kind": "word",
+                    "language": "en",
+                    "title": "rinse",
+                    "context": "rinse 是什么意思"
+                  }
+                ],
+                "request_id": "auto-rinse-20261123-f8d32b1a",
+                "source": "automatic"
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"status\": \"processed\", \"replayed\": false, \"results\": [{\"index\": 0, \"status\": \"added\", \"id\": 1, \"encounter_count\": 1, \"enrichment_state\": \"pending\"}]}"
+                  }
+                ],
+                "structured_content": {
+                  "status": "processed",
+                  "replayed": false,
+                  "results": [
+                    {
+                      "index": 0,
+                      "status": "added",
+                      "id": 1,
+                      "encounter_count": 1,
+                      "enrichment_state": "pending"
+                    }
+                  ]
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 14.219941042014398,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_4",
+              "type": "agent_message",
+              "text": "rinse 意为“冲洗、漂洗”，也可作名词“冲洗”。已记录该词。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 14.2323014169815,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 73425,
+              "cached_input_tokens": 70912,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 372,
+              "reasoning_output_tokens": 109
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:39:46.564079Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:39:46.566366Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    },
+    {
+      "index": 2,
+      "question": "hold a grudge 怎么用",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 13.919599707995076,
+      "first_agent_message_s": 3.403801165986806,
+      "final_response_s": 13.342370707949158,
+      "turn_started_s": 0.8173767909756862,
+      "active_turn_s": 13.10222291701939,
+      "tool_calls": [
+        {
+          "at_ns": 1795477207187646000,
+          "name": "get_settings",
+          "arguments": {
+            "for_capture": true
+          }
+        },
+        {
+          "at_ns": 1795477212571172000,
+          "name": "capture_points",
+          "arguments": {
+            "expected_connection_epoch": 1,
+            "items": [
+              {
+                "kind": "expression",
+                "language": "en",
+                "title": "hold a grudge",
+                "context": "hold a grudge 怎么用"
+              }
+            ],
+            "request_id": "auto-20261123-6d92a74c-b830-4ecf-91f8-362b8a105e9d",
+            "source": "automatic"
+          }
+        }
+      ],
+      "tool_payload_bytes": 261,
+      "usage": {
+        "input_tokens": 73400,
+        "cached_input_tokens": 66816,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 359,
+        "reasoning_output_tokens": 53
+      },
+      "events": [
+        {
+          "elapsed_s": 0.18481904099462554,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac7-e194-7661-88b7-a6c2f68d3c27"
+          }
+        },
+        {
+          "elapsed_s": 0.8173767909756862,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 3.403801165986806,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "我先确认记录偏好，再说明用法。\n"
+            }
+          }
+        },
+        {
+          "elapsed_s": 6.0285500409663655,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 6.030088874977082,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"enabled\": true, \"first_language\": \"zh\", \"explanation_language\": null, \"enabled_types\": [\"word\", \"expression\", \"grammar\", \"correction\"], \"_connection\": {\"state\": \"connected\", \"epoch\": 1}, \"_capture\": {\"capture_ready\": true, \"scene_names\": [\"Food & cooking\", \"Cleaning & hygiene\", \"Everyday conversation\"], \"reuse_for_seconds\": 120}}"
+                  }
+                ],
+                "structured_content": {
+                  "enabled": true,
+                  "first_language": "zh",
+                  "explanation_language": null,
+                  "enabled_types": [
+                    "word",
+                    "expression",
+                    "grammar",
+                    "correction"
+                  ],
+                  "_connection": {
+                    "state": "connected",
+                    "epoch": 1
+                  },
+                  "_capture": {
+                    "capture_ready": true,
+                    "scene_names": [
+                      "Food & cooking",
+                      "Cleaning & hygiene",
+                      "Everyday conversation"
+                    ],
+                    "reuse_for_seconds": 120
+                  }
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 9.21430045797024,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_2",
+              "type": "agent_message",
+              "text": "hold a grudge 表示“记仇”，常用 hold a grudge against someone。\n例：Don't hold a grudge against him.\n"
+            }
+          }
+        },
+        {
+          "elapsed_s": 11.412382624985185,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "capture_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "items": [
+                  {
+                    "kind": "expression",
+                    "language": "en",
+                    "title": "hold a grudge",
+                    "context": "hold a grudge 怎么用"
+                  }
+                ],
+                "request_id": "auto-20261123-6d92a74c-b830-4ecf-91f8-362b8a105e9d",
+                "source": "automatic"
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 11.413493749976624,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "capture_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "items": [
+                  {
+                    "kind": "expression",
+                    "language": "en",
+                    "title": "hold a grudge",
+                    "context": "hold a grudge 怎么用"
+                  }
+                ],
+                "request_id": "auto-20261123-6d92a74c-b830-4ecf-91f8-362b8a105e9d",
+                "source": "automatic"
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"status\": \"processed\", \"replayed\": false, \"results\": [{\"index\": 0, \"status\": \"added\", \"id\": 1, \"encounter_count\": 1, \"enrichment_state\": \"pending\"}]}"
+                  }
+                ],
+                "structured_content": {
+                  "status": "processed",
+                  "replayed": false,
+                  "results": [
+                    {
+                      "index": 0,
+                      "status": "added",
+                      "id": 1,
+                      "encounter_count": 1,
+                      "enrichment_state": "pending"
+                    }
+                  ]
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 13.342370707949158,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_4",
+              "type": "agent_message",
+              "text": "hold a grudge 表示“记仇”，常用 hold a grudge against someone（对某人记仇）。\n例：Don't hold a grudge against him.\n已记录该表达。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 13.352373540983535,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 73400,
+              "cached_input_tokens": 66816,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 359,
+              "reasoning_output_tokens": 53
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:40:01.305387Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:40:01.307695Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    },
+    {
+      "index": 3,
+      "question": "I very like it 这样说自然吗",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 22.332587792014237,
+      "first_agent_message_s": 3.1923890420002863,
+      "final_response_s": 21.768702375004068,
+      "turn_started_s": 0.6836396669968963,
+      "active_turn_s": 21.64894812501734,
+      "tool_calls": [
+        {
+          "at_ns": 1795477221813834000,
+          "name": "get_settings",
+          "arguments": {
+            "for_capture": true
+          }
+        },
+        {
+          "at_ns": 1795477235223217000,
+          "name": "capture_points",
+          "arguments": {
+            "expected_connection_epoch": 1,
+            "items": [
+              {
+                "kind": "correction",
+                "language": "en",
+                "title": "I very like it",
+                "context": "I very like it 这样说自然吗",
+                "corrected_sentence": "I really like it."
+              }
+            ],
+            "request_id": "auto-20261123-like-7e39b1a4",
+            "source": "automatic"
+          }
+        }
+      ],
+      "tool_payload_bytes": 292,
+      "usage": {
+        "input_tokens": 73808,
+        "cached_input_tokens": 61568,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 802,
+        "reasoning_output_tokens": 493
+      },
+      "events": [
+        {
+          "elapsed_s": 0.19069004198536277,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac8-17fe-7110-af13-89b3de4acf35"
+          }
+        },
+        {
+          "elapsed_s": 0.6836396669968963,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 3.1923890420002863,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "我先确认你的记录和语言偏好，再说明自然的说法。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 6.7323168339789845,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 6.733555125014391,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"enabled\": true, \"first_language\": \"zh\", \"explanation_language\": null, \"enabled_types\": [\"word\", \"expression\", \"grammar\", \"correction\"], \"_connection\": {\"state\": \"connected\", \"epoch\": 1}, \"_capture\": {\"capture_ready\": true, \"scene_names\": [\"Food & cooking\", \"Cleaning & hygiene\", \"Everyday conversation\"], \"reuse_for_seconds\": 120}}"
+                  }
+                ],
+                "structured_content": {
+                  "enabled": true,
+                  "first_language": "zh",
+                  "explanation_language": null,
+                  "enabled_types": [
+                    "word",
+                    "expression",
+                    "grammar",
+                    "correction"
+                  ],
+                  "_connection": {
+                    "state": "connected",
+                    "epoch": 1
+                  },
+                  "_capture": {
+                    "capture_ready": true,
+                    "scene_names": [
+                      "Food & cooking",
+                      "Cleaning & hygiene",
+                      "Everyday conversation"
+                    ],
+                    "reuse_for_seconds": 120
+                  }
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 19.163359083991963,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_2",
+              "type": "agent_message",
+              "text": "不自然。应说：I really like it. 表示“很喜欢”时，用副词修饰动词要选对词。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 20.141875792003702,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "capture_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "items": [
+                  {
+                    "kind": "correction",
+                    "language": "en",
+                    "title": "I very like it",
+                    "context": "I very like it 这样说自然吗",
+                    "corrected_sentence": "I really like it."
+                  }
+                ],
+                "request_id": "auto-20261123-like-7e39b1a4",
+                "source": "automatic"
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 20.145610208972357,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "capture_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "items": [
+                  {
+                    "kind": "correction",
+                    "language": "en",
+                    "title": "I very like it",
+                    "context": "I very like it 这样说自然吗",
+                    "corrected_sentence": "I really like it."
+                  }
+                ],
+                "request_id": "auto-20261123-like-7e39b1a4",
+                "source": "automatic"
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"status\": \"processed\", \"replayed\": false, \"results\": [{\"index\": 0, \"status\": \"added\", \"id\": 1, \"encounter_count\": 1, \"enrichment_state\": \"pending\"}]}"
+                  }
+                ],
+                "structured_content": {
+                  "status": "processed",
+                  "replayed": false,
+                  "results": [
+                    {
+                      "index": 0,
+                      "status": "added",
+                      "id": 1,
+                      "encounter_count": 1,
+                      "enrichment_state": "pending"
+                    }
+                  ]
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 21.768702375004068,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_4",
+              "type": "agent_message",
+              "text": "原句不自然：very不能直接修饰like，改用really更自然。已记录此纠正。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 21.780437166977208,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 73808,
+              "cached_input_tokens": 61568,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 802,
+              "reasoning_output_tokens": 493
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:40:15.235643Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:40:15.238025Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    },
+    {
+      "index": 4,
+      "question": "turn off 和 turn on 分别什么意思",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 13.27086170797702,
+      "first_agent_message_s": 3.0640980830066837,
+      "final_response_s": 12.755932874977589,
+      "turn_started_s": 0.6572623329702765,
+      "active_turn_s": 12.613599375006743,
+      "tool_calls": [
+        {
+          "at_ns": 1795477242955245000,
+          "name": "get_settings",
+          "arguments": {
+            "for_capture": true
+          }
+        },
+        {
+          "at_ns": 1795477247962284000,
+          "name": "capture_points",
+          "arguments": {
+            "expected_connection_epoch": 1,
+            "items": [
+              {
+                "kind": "expression",
+                "language": "en",
+                "title": "turn off",
+                "context": "turn off 和 turn on 分别什么意思"
+              },
+              {
+                "kind": "expression",
+                "language": "en",
+                "title": "turn on",
+                "context": "turn off 和 turn on 分别什么意思"
+              }
+            ],
+            "request_id": "auto-20261123-turn-off-on-7c93e2a1",
+            "source": "automatic"
+          }
+        }
+      ],
+      "tool_payload_bytes": 372,
+      "usage": {
+        "input_tokens": 73412,
+        "cached_input_tokens": 61184,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 367,
+        "reasoning_output_tokens": 67
+      },
+      "events": [
+        {
+          "elapsed_s": 0.19298445800086483,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac8-6f3f-7273-86eb-a4001b8a03de"
+          }
+        },
+        {
+          "elapsed_s": 0.6572623329702765,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 3.0640980830066837,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "我先确认你的记录和语言偏好，再简要说明这两个短语。\n"
+            }
+          }
+        },
+        {
+          "elapsed_s": 5.53833799995482,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 5.541019915952347,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"enabled\": true, \"first_language\": \"zh\", \"explanation_language\": null, \"enabled_types\": [\"word\", \"expression\", \"grammar\", \"correction\"], \"_connection\": {\"state\": \"connected\", \"epoch\": 1}, \"_capture\": {\"capture_ready\": true, \"scene_names\": [\"Food & cooking\", \"Cleaning & hygiene\", \"Everyday conversation\"], \"reuse_for_seconds\": 120}}"
+                  }
+                ],
+                "structured_content": {
+                  "enabled": true,
+                  "first_language": "zh",
+                  "explanation_language": null,
+                  "enabled_types": [
+                    "word",
+                    "expression",
+                    "grammar",
+                    "correction"
+                  ],
+                  "_connection": {
+                    "state": "connected",
+                    "epoch": 1
+                  },
+                  "_capture": {
+                    "capture_ready": true,
+                    "scene_names": [
+                      "Food & cooking",
+                      "Cleaning & hygiene",
+                      "Everyday conversation"
+                    ],
+                    "reuse_for_seconds": 120
+                  }
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 8.118200499971863,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_2",
+              "type": "agent_message",
+              "text": "turn off：关闭（电灯、电器等）；turn on：打开（电灯、电器等）。\n"
+            }
+          }
+        },
+        {
+          "elapsed_s": 10.546679291001055,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "capture_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "items": [
+                  {
+                    "kind": "expression",
+                    "language": "en",
+                    "title": "turn off",
+                    "context": "turn off 和 turn on 分别什么意思"
+                  },
+                  {
+                    "kind": "expression",
+                    "language": "en",
+                    "title": "turn on",
+                    "context": "turn off 和 turn on 分别什么意思"
+                  }
+                ],
+                "request_id": "auto-20261123-turn-off-on-7c93e2a1",
+                "source": "automatic"
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 10.54752645798726,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "capture_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "items": [
+                  {
+                    "kind": "expression",
+                    "language": "en",
+                    "title": "turn off",
+                    "context": "turn off 和 turn on 分别什么意思"
+                  },
+                  {
+                    "kind": "expression",
+                    "language": "en",
+                    "title": "turn on",
+                    "context": "turn off 和 turn on 分别什么意思"
+                  }
+                ],
+                "request_id": "auto-20261123-turn-off-on-7c93e2a1",
+                "source": "automatic"
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"status\": \"processed\", \"replayed\": false, \"results\": [{\"index\": 0, \"status\": \"added\", \"id\": 1, \"encounter_count\": 1, \"enrichment_state\": \"pending\"}]}"
+                  }
+                ],
+                "structured_content": {
+                  "status": "processed",
+                  "replayed": false,
+                  "results": [
+                    {
+                      "index": 0,
+                      "status": "added",
+                      "id": 1,
+                      "encounter_count": 1,
+                      "enrichment_state": "pending"
+                    }
+                  ]
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 12.755932874977589,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_4",
+              "type": "agent_message",
+              "text": "turn off：关闭（灯、电器等）；turn on：打开（灯、电器等）。学习点已记录。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 12.767303749977145,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 73412,
+              "cached_input_tokens": 61184,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 367,
+              "reasoning_output_tokens": 67
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:40:37.573018Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:40:37.575611Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    },
+    {
+      "index": 5,
+      "question": "一根芹菜用英文怎么说",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 11.28833912499249,
+      "first_agent_message_s": 2.965829583001323,
+      "final_response_s": 10.748219833010808,
+      "turn_started_s": 0.6598327920073643,
+      "active_turn_s": 10.628506332985125,
+      "tool_calls": [
+        {
+          "at_ns": 1795477256248163000,
+          "name": "get_settings",
+          "arguments": {
+            "for_capture": true
+          }
+        },
+        {
+          "at_ns": 1795477259961634000,
+          "name": "capture_points",
+          "arguments": {
+            "expected_connection_epoch": 1,
+            "items": [
+              {
+                "kind": "expression",
+                "language": "en",
+                "title": "a stalk of celery",
+                "context": "一根芹菜用英文怎么说"
+              }
+            ],
+            "request_id": "celery-20261123-6a92d48e",
+            "source": "automatic"
+          }
+        }
+      ],
+      "tool_payload_bytes": 246,
+      "usage": {
+        "input_tokens": 61567,
+        "cached_input_tokens": 55040,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 266,
+        "reasoning_output_tokens": 19
+      },
+      "events": [
+        {
+          "elapsed_s": 0.1933397080283612,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac8-a31c-7ad0-abf7-67069404dafa"
+          }
+        },
+        {
+          "elapsed_s": 0.6598327920073643,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 2.965829583001323,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "我先确认记录和语言偏好，再回答。\n"
+            }
+          }
+        },
+        {
+          "elapsed_s": 5.554115167004056,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 5.557764291996136,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_1",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "get_settings",
+              "arguments": {
+                "for_capture": true
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"enabled\": true, \"first_language\": \"zh\", \"explanation_language\": null, \"enabled_types\": [\"word\", \"expression\", \"grammar\", \"correction\"], \"_connection\": {\"state\": \"connected\", \"epoch\": 1}, \"_capture\": {\"capture_ready\": true, \"scene_names\": [\"Food & cooking\", \"Cleaning & hygiene\", \"Everyday conversation\"], \"reuse_for_seconds\": 120}}"
+                  }
+                ],
+                "structured_content": {
+                  "enabled": true,
+                  "first_language": "zh",
+                  "explanation_language": null,
+                  "enabled_types": [
+                    "word",
+                    "expression",
+                    "grammar",
+                    "correction"
+                  ],
+                  "_connection": {
+                    "state": "connected",
+                    "epoch": 1
+                  },
+                  "_capture": {
+                    "capture_ready": true,
+                    "scene_names": [
+                      "Food & cooking",
+                      "Cleaning & hygiene",
+                      "Everyday conversation"
+                    ],
+                    "reuse_for_seconds": 120
+                  }
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 7.393217957986053,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_2",
+              "type": "agent_message",
+              "text": "“一根芹菜”可以说 a stalk of celery。\n"
+            }
+          }
+        },
+        {
+          "elapsed_s": 9.26905624999199,
+          "event": {
+            "type": "item.started",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "capture_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "items": [
+                  {
+                    "kind": "expression",
+                    "language": "en",
+                    "title": "a stalk of celery",
+                    "context": "一根芹菜用英文怎么说"
+                  }
+                ],
+                "request_id": "celery-20261123-6a92d48e",
+                "source": "automatic"
+              },
+              "result": null,
+              "error": null,
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "elapsed_s": 9.270268667023629,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_3",
+              "type": "mcp_tool_call",
+              "server": "sayrove_benchmark",
+              "tool": "capture_points",
+              "arguments": {
+                "expected_connection_epoch": 1,
+                "items": [
+                  {
+                    "kind": "expression",
+                    "language": "en",
+                    "title": "a stalk of celery",
+                    "context": "一根芹菜用英文怎么说"
+                  }
+                ],
+                "request_id": "celery-20261123-6a92d48e",
+                "source": "automatic"
+              },
+              "result": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"status\": \"processed\", \"replayed\": false, \"results\": [{\"index\": 0, \"status\": \"added\", \"id\": 1, \"encounter_count\": 1, \"enrichment_state\": \"pending\"}]}"
+                  }
+                ],
+                "structured_content": {
+                  "status": "processed",
+                  "replayed": false,
+                  "results": [
+                    {
+                      "index": 0,
+                      "status": "added",
+                      "id": 1,
+                      "encounter_count": 1,
+                      "enrichment_state": "pending"
+                    }
+                  ]
+                }
+              },
+              "error": null,
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "elapsed_s": 10.748219833010808,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_4",
+              "type": "agent_message",
+              "text": "“一根芹菜”是 **a stalk of celery**。已记录该表达。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 10.759455125022214,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 61567,
+              "cached_input_tokens": 55040,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 266,
+              "reasoning_output_tokens": 19
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:40:50.849358Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:40:50.851708Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    }
+  ],
+  "summary": {
+    "wall_s": {
+      "samples": 6,
+      "mean_s": 14.812172499999482,
+      "p50_s": 13.617685687495396,
+      "p95_s": 22.332587792014237,
+      "min_s": 11.28833912499249,
+      "max_s": 22.332587792014237
+    },
+    "active_turn_s": {
+      "samples": 6,
+      "mean_s": 14.103912854169417,
+      "p50_s": 12.857911146013066,
+      "p95_s": 21.64894812501734,
+      "min_s": 10.628506332985125,
+      "max_s": 21.64894812501734
+    },
+    "first_agent_message_s": {
+      "samples": 6,
+      "mean_s": 3.2935338610065323,
+      "p50_s": 3.298095103993546,
+      "p95_s": 3.6981522500282153,
+      "min_s": 2.965829583001323,
+      "max_s": 3.6981522500282153
+    },
+    "final_response_s": {
+      "samples": 6,
+      "mean_s": 14.279486444497403,
+      "p50_s": 13.09206127098878,
+      "p95_s": 21.768702375004068,
+      "min_s": 10.748219833010808,
+      "max_s": 21.768702375004068
+    }
+  }
+}

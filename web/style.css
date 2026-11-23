@@ -596,6 +596,7 @@ input[role="switch"]:checked::after {
 .entry-chevron { width: 7px; height: 7px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: translateY(-2px) rotate(45deg); transition: transform 200ms var(--ease); }
 summary[aria-expanded="true"] .entry-chevron { transform: translateY(2px) rotate(225deg); }
 .entry-preview { margin: 3px 0; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.entry-enrichment { display: block; margin: 4px 0; color: var(--muted); font-size: 12px; }
 summary[aria-expanded="true"] .entry-preview,
 summary[aria-expanded="true"] .entry-last-seen { display: none; }
 .entry-preview, .entry-note { text-align: start; text-indent: 0; text-spacing-trim: trim-start; font-family: "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-feature-settings: "halt" 1; }

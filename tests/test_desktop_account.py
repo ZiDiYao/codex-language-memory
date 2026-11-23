@@ -78,6 +78,7 @@ class MockCloud:
         self.imports = []
         self.import_status = 200
         self.requests = []
+        self.lightweight_capture = False
 
     async def __call__(self, request):
         url = str(request.url)
@@ -114,7 +115,7 @@ class MockCloud:
             if not request.headers.get("authorization"):
                 return httpx.Response(401, headers={"WWW-Authenticate": 'Bearer resource_metadata="' + account.PRM + '"'})
             if request.url.path.startswith("/v1/"):
-                tools = {"/v1/settings": "get_settings", "/v1/scenes": "list_scenes", "/v1/points": "find_points", "/v1/captures": "save_points"}
+                tools = {"/v1/settings": "get_settings", "/v1/scenes": "list_scenes", "/v1/points": "find_points", "/v1/captures": "save_points", "/v1/observations": "capture_points"}
                 if request.url.path in tools:
                     name = tools[request.url.path]
                     payload = request.headers["authorization"].split(".")[1]
@@ -128,7 +129,7 @@ class MockCloud:
                     if self.tool_error:
                         return httpx.Response(503, json={"error": "unavailable"})
                     if name == "get_settings":
-                        return httpx.Response(200, json={"enabled": True})
+                        return httpx.Response(200, json={"enabled": True, **({"_capabilities": {"lightweight_capture": True}} if self.lightweight_capture else {})})
                     if name == "list_scenes":
                         return httpx.Response(200, json={"scenes": [{"name": "Food & cooking", "count": 1}], "total": 1})
                     if name == "find_points":
@@ -168,15 +169,22 @@ class MockCloud:
 
 
 class DesktopAccountTests(unittest.TestCase):
-    def test_capture_context_coalesces_settings_and_scenes_without_mcp_handshakes(self):
+    def test_capture_context_reads_preferences_and_capability_without_scene_or_mcp_calls(self):
         self.login()
+        self.cloud.lightweight_capture = True
         before = len(self.cloud.requests)
         result = self.manager.capture_context(expected_epoch=self.manager.status()["epoch"])
         self.assertTrue(result["enabled"])
-        self.assertEqual(result["_capture"]["scene_names"], ["Food & cooking"])
+        self.assertEqual(result["_capture"]["scene_names"], [])
+        self.assertTrue(result["_capture"]["lightweight_capture"])
         self.assertIn("learning_profile", result["_capture"]["unsupported"])
-        self.assertCountEqual(self.cloud.requests[before:], [("GET", "/v1/settings"), ("GET", "/v1/scenes")])
+        self.assertEqual(self.cloud.requests[before:], [("GET", "/v1/settings")])
         self.assertLess(result["_timing"]["total_ms"], result["_timing"]["deadline_ms"])
+
+    def test_older_backend_does_not_advertise_unsupported_lightweight_capture(self):
+        self.login()
+        result = self.manager.capture_context(expected_epoch=self.manager.status()["epoch"])
+        self.assertFalse(result["_capture"]["lightweight_capture"])
 
     def test_hot_tools_reuse_validated_metadata_and_use_authenticated_rest(self):
         self.login()
@@ -189,6 +197,16 @@ class DesktopAccountTests(unittest.TestCase):
         self.assertEqual(self.cloud.calls[-1]["arguments"]["request_id"], "perf-idempotent")
         self.assertEqual(result["status"], "processed")
         self.assertEqual(result["_timing"]["deadline_ms"], 1500)
+
+    def test_lightweight_capture_uses_one_rest_write_with_original_payload_and_short_deadline(self):
+        self.login()
+        before = len(self.cloud.requests)
+        args = {"request_id": "raw-observation", "items": [{"kind": "word", "language": "en", "title": "celery", "context": "芹菜的英文咋说"}]}
+        result = self.manager.call_tool("capture_points", args, expected_epoch=self.manager.status()["epoch"])
+        self.assertEqual(self.cloud.requests[before:], [("POST", "/v1/observations")])
+        self.assertEqual(self.cloud.calls[-1], {"name": "capture_points", "arguments": args})
+        self.assertEqual(result["_timing"]["deadline_ms"], 1500)
+        self.assertTrue(self.manager._last_capture_timing["response_received"])
 
     def test_expired_metadata_is_revalidated_before_sending_credentials(self):
         self.login()

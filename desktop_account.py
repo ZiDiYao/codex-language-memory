@@ -832,7 +832,7 @@ class AccountManager:
         started = time.perf_counter()
         locked_at = metadata_at = finished_at = None
         successful = False
-        automatic = name == "save_points" and (arguments or {}).get("source", "automatic") == "automatic"
+        automatic = name in ("save_points", "capture_points") and (arguments or {}).get("source", "automatic") == "automatic"
         def timing():
             end = finished_at or time.perf_counter()
             return {"total_ms": round((end - started) * 1000), "deadline_ms": round(budget * 1000),
@@ -847,21 +847,21 @@ class AccountManager:
                     provider = await self._provider(epoch)
                     metadata_at = time.perf_counter()
                     if capture_context:
-                        settings, scenes = await asyncio.gather(
-                            self._rest(provider, "GET", "/v1/settings"),
-                            self._rest(provider, "GET", "/v1/scenes", params={"include_variants": True}))
-                        if "enabled" not in settings or not isinstance(scenes.get("scenes"), list):
+                        settings = await self._rest(provider, "GET", "/v1/settings")
+                        if "enabled" not in settings:
                             raise AccountError("invalid_cloud_response")
-                        names = [scene["name"] for scene in scenes["scenes"] if isinstance(scene, dict) and isinstance(scene.get("name"), str)]
-                        result = {**settings, "_capture": {"scene_names": names[:100], "scenes_truncated": len(names) > 100,
+                        capabilities = settings.get("_capabilities", {})
+                        result = {**settings, "_capture": {"scene_names": [], "scenes_truncated": False,
+                            "lightweight_capture": isinstance(capabilities, dict) and capabilities.get("lightweight_capture") is True,
                             "fetched_at": time.time(), "reuse_for_seconds": 60,
                             "automatic_timeout_ms": round(self.capture_timeout * 1000),
                             "last_capture_timing": self._last_capture_timing,
                             "unsupported": ["learning_profile", "learning_preferences", "point_history", "study_sessions", "exports"]}}
-                    elif path is None and name in ("get_settings", "list_scenes", "find_points", "save_points"):
-                        routes = {"get_settings": "/v1/settings", "list_scenes": "/v1/scenes", "find_points": "/v1/points", "save_points": "/v1/captures"}
-                        result = await self._rest(provider, "POST" if name == "save_points" else "GET", routes[name],
-                            body=arguments if name == "save_points" else None, params=None if name == "save_points" else arguments)
+                    elif path is None and name in ("get_settings", "list_scenes", "find_points", "save_points", "capture_points"):
+                        routes = {"get_settings": "/v1/settings", "list_scenes": "/v1/scenes", "find_points": "/v1/points", "save_points": "/v1/captures", "capture_points": "/v1/observations"}
+                        writing = name in ("save_points", "capture_points")
+                        result = await self._rest(provider, "POST" if writing else "GET", routes[name],
+                            body=arguments if writing else None, params=None if writing else arguments)
                     elif path is None:
                         result = await self._mcp(provider, name, arguments)
                     else:
@@ -924,7 +924,7 @@ class AccountManager:
         # remain bounded; an unsupported tool returns an explicit error, never SQLite.
         if not isinstance(name, str) or not name or len(name) > 100 or (args is not None and not isinstance(args, dict)):
             raise AccountError("unsupported_cloud_operation")
-        budget = {"budget": self.capture_timeout} if name == "save_points" and (args or {}).get("source", "automatic") == "automatic" else {}
+        budget = {"budget": self.capture_timeout} if name in ("save_points", "capture_points") and (args or {}).get("source", "automatic") == "automatic" else {}
         return self._call(name=name, arguments=args, expected_epoch=expected_epoch, **budget)
 
     def request_api(self, method, path, params=None, json=None, *, expected_epoch=None):

@@ -2,7 +2,7 @@ import { timestamp } from './database.js';
 import { encode, fingerprint, fingerprintAscii, normalized, serializeRecord, mergeSense } from './parity.js';
 import { uniqueScenes, inferScenes } from './scenes.js';
 import { validatePoint, validatePatch, validateReview, settingsWithDefaults,
-  validateSettingsPatch, validateRequestId, validateDatabaseText, ValidationError } from './schemas.js';
+  validateSettingsPatch, validateRequestId, validateDatabaseText, validateObservation, ValidationError } from './schemas.js';
 import { ALGORITHM, advance, memorySnapshot, recallRating } from './learning.js';
 import { importDesktopSnapshot } from './desktop-import.js';
 
@@ -127,9 +127,13 @@ export class Repository {
   }
 
   async record(client, point) {
-    return serializeRecord({ ...point, scenes: await this.labels(client, point.id),
+    const result = serializeRecord({ ...point, scenes: await this.labels(client, point.id),
       created_at: timestamp(point.created_at), last_seen_at: timestamp(point.last_seen_at),
       last_reviewed_at: timestamp(point.last_reviewed_at) });
+    const latest = (await client.query('SELECT state FROM lm_enrichment_jobs WHERE tenant_id=$1 AND point_id=$2 ORDER BY id DESC LIMIT 1',
+      [this.tenantId, point.id])).rows[0];
+    result.enrichment_state = point.note != null ? 'ready' : latest?.state ?? 'ready';
+    return result;
   }
 
   searchText(point) {
@@ -241,6 +245,80 @@ export class Repository {
         }
         await client.query('UPDATE lm_tenants SET content_version=content_version+1 WHERE id=$1', [this.tenantId]);
         results.push({ index, status: action, id: point.id, encounter_count: point.encounter_count });
+      }
+      await client.query('INSERT INTO lm_save_requests(tenant_id,request_id,fingerprint,results) VALUES($1,$2,$3,$4::jsonb)',
+        [this.tenantId, requestId, digest, json(results)]);
+      return { status: 'processed', replayed: false, results };
+    });
+  }
+
+  /** Minimal observations are durable before any model runs. Never invent study content. */
+  async observe(requestId, items, source = 'automatic') {
+    validateRequestId(requestId);
+    if (!['automatic', 'explicit'].includes(source) || !Array.isArray(items) || !items.length || items.length > 20)
+      throw new ValidationError();
+    const digest = fingerprintAscii({ format: 'observation-v1', source, items });
+    return this.transaction(true, async (client, tenant) => {
+      const receipt = (await client.query('SELECT * FROM lm_save_requests WHERE tenant_id=$1 AND request_id=$2',
+        [this.tenantId, requestId])).rows[0];
+      if (receipt) {
+        if (receipt.fingerprint !== digest) return { status: 'failed', error: 'request_id_conflict' };
+        const results = clone(receipt.results);
+        for (const result of results) if (result.id && !await this.point(client, result.id)) result.deleted = true;
+        return { status: 'processed', replayed: true, results };
+      }
+      const settings = settingsWithDefaults(tenant.settings);
+      if (!settings.enabled) return { status: 'paused', results: [] };
+      const results = [], seen = new Set(), occurredAt = now();
+      for (const [index, raw] of items.entries()) {
+        let input;
+        try { input = validateObservation(raw); }
+        catch { results.push({ index, status: 'failed', error: 'invalid_request' }); continue; }
+        if (!settings.enabled_types.includes(input.kind)) {
+          results.push({ index, status: 'skipped', reason: 'type_disabled' }); continue;
+        }
+        // The target is supplied by Codex. Backend normalization performs exact deduplication;
+        // model-generated content cannot rename that target or alter its language/type.
+        const identity = this.identity(input.kind, input.language, input.title, 'observed');
+        if (seen.has(identity)) { results.push({ index, status: 'failed', error: 'duplicate_in_batch' }); continue; }
+        seen.add(identity);
+        let point = (await client.query('SELECT * FROM lm_points WHERE tenant_id=$1 AND identity_key=$2',
+          [this.tenantId, identity])).rows[0];
+        // Older rich non-word captures have semantic keys. Reuse a single unambiguous
+        // normalized target rather than creating a second card for that same target.
+        if (!point && input.kind !== 'word') {
+          const matches = (await client.query(`SELECT * FROM lm_points WHERE tenant_id=$1 AND kind=$2 AND language=$3 AND title_key=$4 LIMIT 2`,
+            [this.tenantId, input.kind, input.language, normalized(input.title)])).rows;
+          if (matches.length === 1) point = matches[0];
+          else if (matches.length > 1) { results.push({ index, status: 'failed', error: 'ambiguous_identity' }); continue; }
+        }
+        let action;
+        if (!point) {
+          point = { ...input, identity_key: identity, title_key: normalized(input.title), sense_key: 'observed',
+            meaning: '', explanation: null, examples: [], additional_senses: [], note: null, scenes_custom: false,
+            created_at: occurredAt, last_seen_at: occurredAt, encounter_count: 1, repeat_priority: 0,
+            status: 'new', last_reviewed_at: null, last_review_result: null };
+          point.search_text = this.searchText(point);
+          point = await this.persistPoint(client, point, true);
+          action = 'added';
+        } else {
+          // Only actual captures change encounters. Enrichment does not call this method.
+          point.encounter_count++;
+          point.repeat_priority++;
+          point.last_seen_at = occurredAt;
+          point = await this.persistPoint(client, point);
+          action = 'merged';
+        }
+        await client.query(`INSERT INTO lm_encounters(tenant_id,point_id,request_id,occurred_at,context,source)
+          VALUES($1,$2,$3,$4,$5,$6)`, [this.tenantId, point.id, requestId, occurredAt, input.context, source]);
+        let state = 'ready';
+        if (point.note == null) {
+          await client.query(`INSERT INTO lm_enrichment_jobs(tenant_id,point_id,request_id,input)
+            VALUES($1,$2,$3,$4::jsonb)`, [this.tenantId, point.id, requestId, json(input)]);
+          state = 'pending';
+        }
+        await client.query('UPDATE lm_tenants SET content_version=content_version+1 WHERE id=$1', [this.tenantId]);
+        results.push({ index, status: action, id: point.id, encounter_count: point.encounter_count, enrichment_state: state });
       }
       await client.query('INSERT INTO lm_save_requests(tenant_id,request_id,fingerprint,results) VALUES($1,$2,$3,$4::jsonb)',
         [this.tenantId, requestId, digest, json(results)]);
@@ -451,7 +529,8 @@ export class Repository {
     return this.transaction(false, async (client) => {
       const rows = (await client.query(`SELECT p.*,m.card,m.due_at,m.rated_reviews FROM lm_points p
         LEFT JOIN lm_memory_states m ON m.tenant_id=$1 AND m.point_id=p.id WHERE ${clauses.join(' AND ')}`, values)).rows
-        .filter((point) => point.note == null || normalized(point.note));
+        .filter((point) => point.note != null ? Boolean(normalized(point.note))
+          : Boolean(point.explanation && new Set(point.examples.map(example => normalized(example.text))).size >= 2));
       const due = rows.filter((p) => p.due_at != null && timestamp(p.due_at) <= occurredAt);
       const upcoming = rows.filter((p) => p.due_at != null && timestamp(p.due_at) > occurredAt);
       const counts = { eligible: rows.length, due: due.length, unassessed: rows.filter((p) => p.card == null).length, upcoming: upcoming.length };

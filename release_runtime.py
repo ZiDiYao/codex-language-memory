@@ -22,7 +22,7 @@ def healthcheck(database):
 
     store = Store(database)
     tools = asyncio.run(create_server(store).list_tools())
-    if len(tools) != 24 or not {"list_scenes", "find_points", "save_points"}.issubset({tool.name for tool in tools}):
+    if len(tools) != 25 or not {"list_scenes", "find_points", "save_points", "capture_points"}.issubset({tool.name for tool in tools}):
         raise InstallError("Unexpected MCP tool set")
     from mcp_app import APP_FILE
     if not APP_FILE.is_file():

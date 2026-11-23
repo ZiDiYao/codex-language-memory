@@ -1,0 +1,22 @@
+{
+  "status": "passed",
+  "release": "0.2.0-beta.47",
+  "checks": [
+    "Extracted command installs a bundled runtime into an empty profile with spaces in its path",
+    "Repeated installation is idempotent",
+    "Frozen sidebar resource and app-only MCP transport work without Node or Python on PATH",
+    "Frozen scene catalog, overlapping memberships and combined scene/type/language filters work through MCP and the app bridge",
+    "Repeated words merge meanings, move to the top, count once per encounter and gain review priority without retry inflation",
+    "Guided study reads the latest attempt and excludes completed round items without writes",
+    "Frozen MCP filters by date and multiple types and excludes unselected content from exports",
+    "Frozen MCP exposes 25 tools and saves multilingual data, reviews, preferences, page assets and all five exports",
+    "Calendar assets and shared export history are available in the frozen page; receipts survive release switching",
+    "Upgrade backs up and preserves records, encounters, FSRS state and preferences while the previous process remains readable",
+    "A pending study question and assistance flag survive upgrade and runtime restart",
+    "Restarted upgraded MCP reads the same persistent state",
+    "Explicit binary rollback preserves current learning data",
+    "Uninstall disconnects only this integration; reinstall reconnects retained data",
+    "Unrelated Codex configuration and comments survive the entire lifecycle"
+  ],
+  "limits": "Isolated profile on the build Mac; not a separate clean Mac or a notarized download test. Upgrade fixture shares the current executable."
+}

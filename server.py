@@ -9,13 +9,21 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from store import (CaptureMode, Kind, Language, LearnerPreferences, Limit, Patch, RecordId, RequestId, Review, SceneName,
-                   Revision, SettingsPatch, Status, Store, Title, Text)
+                   Revision, SettingsPatch, Status, Store, StrictModel, Title, Text)
 from dashboard import Dashboard
 from study import StudySessions
 from exports import ExportError, ExportRequest, save_export
 from mcp_app import register_app
 
 ConnectionEpoch = Annotated[int, Field(ge=0, description="Current _connection.epoch from get_settings; required for cloud writes.")]
+
+
+class LearningObservation(StrictModel):
+    kind: Kind
+    language: Language
+    title: Title
+    context: Text | None = None
+    corrected_sentence: Text | None = None
 
 
 def create_server(store: Store) -> FastMCP:
@@ -48,7 +56,7 @@ def create_server(store: Store) -> FastMCP:
 
         A null first_language means the user has not confirmed it. Never infer it from the UI or learning language.
         A null explanation_language uses first_language unless a target-language preference overrides it.
-        Set for_capture=true for a short-timeout cloud capture context including scene names.
+        Set for_capture=true for short-timeout cloud preferences and capture capabilities.
         Reuse that context during the short learning exchange; do not fetch an unsupported cloud profile.
         """
         return store.capture_context() if for_capture and hasattr(store, "capture_context") else store.settings()
@@ -86,6 +94,28 @@ def create_server(store: Store) -> FastMCP:
     def set_recording(enabled: bool, expected_connection_epoch: ConnectionEpoch | None = None) -> dict[str, Any]:
         """Enable or pause new saves. Existing entries remain available."""
         return write_at_epoch(expected_connection_epoch, lambda: store.recording(enabled))
+
+    @server.tool(annotations=local_write)
+    def capture_points(
+        request_id: RequestId,
+        items: Annotated[list[LearningObservation], Field(min_length=1, max_length=20)],
+        source: CaptureMode = "automatic",
+        expected_connection_epoch: ConnectionEpoch | None = None,
+    ) -> dict[str, Any]:
+        """Record real learning gaps with minimal content; the backend enriches them asynchronously.
+
+        Submit only kind, language, title and relevant original context (plus an already
+        given correction if applicable). Do not generate meanings, sense keys, scenes or
+        examples for storage, or search before an ordinary capture. The backend deduplicates.
+        Use only when get_settings(for_capture=true) advertises lightweight_capture.
+        Retry uncertain results with the same request_id and exact items. A confirmed
+        added/merged result records the encounter; pending content is still being organized.
+        Never capture a review as a new encounter or claim queued enrichment is complete.
+        """
+        if not hasattr(store, "capture"):
+            return {"status": "failed", "error": "lightweight_capture_unavailable"}
+        payload = [item.model_dump(exclude_none=True) for item in items]
+        return write_at_epoch(expected_connection_epoch, lambda: store.capture(request_id, payload, source))
 
     @server.tool(annotations=local_write)
     def save_points(

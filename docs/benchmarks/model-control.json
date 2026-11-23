@@ -1,0 +1,429 @@
+{
+  "benchmark": "actual-codex-cli-controlled-prompt-and-tool-schema",
+  "mode": "control",
+  "model": "gpt-6.1-sol",
+  "reasoning_effort": "high",
+  "contract": "No learning plugin is connected. Answer directly without saving.\n",
+  "contract_sha256": "c39da0db27144587284c36b933dca211493628a961683f1ad0e80e93b5b06761",
+  "fixture_sha256": "93111bc3aefd0b3e33f3ef67083bd136aa5e872eb4a3861abffd640f0edc7fdc",
+  "scope": "actual model work plus CLI/MCP overhead; fixture replies immediate, no real database or network persistence",
+  "not_measured": [
+    "production Codex app UI streaming",
+    "cloud database latency",
+    "backend enrichment completion"
+  ],
+  "results": [
+    {
+      "index": 0,
+      "question": "芹菜的英文咋说",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 4.587899082980584,
+      "first_agent_message_s": 4.23456512496341,
+      "final_response_s": 4.23456512496341,
+      "turn_started_s": 0.8047172499937005,
+      "active_turn_s": 3.783181832986884,
+      "tool_calls": [],
+      "tool_payload_bytes": 0,
+      "usage": {
+        "input_tokens": 17873,
+        "cached_input_tokens": 12288,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 80,
+        "reasoning_output_tokens": 54
+      },
+      "events": [
+        {
+          "elapsed_s": 0.22221237496705726,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac8-f0ab-7bd1-9b03-69b75a673e59"
+          }
+        },
+        {
+          "elapsed_s": 0.8047172499937005,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 4.23456512496341,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "芹菜的英文是 **celery**，读作 /ˈseləri/。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 4.244260207982734,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 17873,
+              "cached_input_tokens": 12288,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 80,
+              "reasoning_output_tokens": 54
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:41:10.705276Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:41:10.707756Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    },
+    {
+      "index": 1,
+      "question": "rinse 是什么意思",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 4.427858458948322,
+      "first_agent_message_s": 4.07830529200146,
+      "final_response_s": 4.07830529200146,
+      "turn_started_s": 0.651387708960101,
+      "active_turn_s": 3.7764707499882206,
+      "tool_calls": [],
+      "tool_payload_bytes": 0,
+      "usage": {
+        "input_tokens": 17869,
+        "cached_input_tokens": 12288,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 82,
+        "reasoning_output_tokens": 40
+      },
+      "events": [
+        {
+          "elapsed_s": 0.2106318339938298,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac9-0285-70f0-ad9b-4802bf3630c0"
+          }
+        },
+        {
+          "elapsed_s": 0.651387708960101,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 4.07830529200146,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "rinse 意为“冲洗、漂洗”，也可指“漱口”。\n例：Rinse your mouth with water.（用水漱口。）"
+            }
+          }
+        },
+        {
+          "elapsed_s": 4.08883679198334,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 17869,
+              "cached_input_tokens": 12288,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 82,
+              "reasoning_output_tokens": 40
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:41:15.275397Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:41:15.277484Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    },
+    {
+      "index": 2,
+      "question": "hold a grudge 怎么用",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 7.839291375014,
+      "first_agent_message_s": 7.253682916983962,
+      "final_response_s": 7.253682916983962,
+      "turn_started_s": 0.8082701669773087,
+      "active_turn_s": 7.031021208036691,
+      "tool_calls": [],
+      "tool_payload_bytes": 0,
+      "usage": {
+        "input_tokens": 17872,
+        "cached_input_tokens": 12288,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 230,
+        "reasoning_output_tokens": 171
+      },
+      "events": [
+        {
+          "elapsed_s": 0.1850616669980809,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac9-13b6-79b1-a0cd-5a2a2b0b30e0"
+          }
+        },
+        {
+          "elapsed_s": 0.8082701669773087,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 7.253682916983962,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "**hold a grudge** 表示“记恨、怀恨在心”，常用 **hold a grudge against sb**（记恨某人）。\n\nShe still holds a grudge against me.\n她还在记恨我。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 7.260908291966189,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 17872,
+              "cached_input_tokens": 12288,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 230,
+              "reasoning_output_tokens": 171
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:41:19.676260Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:41:19.678546Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    },
+    {
+      "index": 3,
+      "question": "I very like it 这样说自然吗",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 5.370654792001005,
+      "first_agent_message_s": 5.031859832990449,
+      "final_response_s": 5.031859832990449,
+      "turn_started_s": 0.8663795830216259,
+      "active_turn_s": 4.504275208979379,
+      "tool_calls": [],
+      "tool_payload_bytes": 0,
+      "usage": {
+        "input_tokens": 17875,
+        "cached_input_tokens": 16768,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 71,
+        "reasoning_output_tokens": 37
+      },
+      "events": [
+        {
+          "elapsed_s": 0.18375941703561693,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac9-3263-7421-b3d8-9a8691e0d9bb"
+          }
+        },
+        {
+          "elapsed_s": 0.8663795830216259,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 5.031859832990449,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "不太自然。very 不能直接修饰动词 like，要用 really：I really like it.（我很喜欢它。）"
+            }
+          }
+        },
+        {
+          "elapsed_s": 5.039431374985725,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 17875,
+              "cached_input_tokens": 16768,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 71,
+              "reasoning_output_tokens": 37
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:41:27.528338Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:41:27.530350Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    },
+    {
+      "index": 4,
+      "question": "turn off 和 turn on 分别什么意思",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 14.487383125000633,
+      "first_agent_message_s": 12.43314229202224,
+      "final_response_s": 12.43314229202224,
+      "turn_started_s": 0.6867719590081833,
+      "active_turn_s": 13.80061116599245,
+      "tool_calls": [],
+      "tool_payload_bytes": 0,
+      "usage": {
+        "input_tokens": 14931,
+        "cached_input_tokens": 12288,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 166,
+        "reasoning_output_tokens": 127
+      },
+      "events": [
+        {
+          "elapsed_s": 0.13982420903630555,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac9-4735-7f20-a88a-425f3b5e8de1"
+          }
+        },
+        {
+          "elapsed_s": 0.6867719590081833,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 12.43314229202224,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "**turn off**：关闭；**turn on**：打开。常用于灯、电器等。\n\n例：Turn on the light.（把灯打开。）"
+            }
+          }
+        },
+        {
+          "elapsed_s": 12.446684209047817,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 14931,
+              "cached_input_tokens": 12288,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 166,
+              "reasoning_output_tokens": 127
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:41:32.859060Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:41:32.861099Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    },
+    {
+      "index": 5,
+      "question": "一根芹菜用英文怎么说",
+      "success": true,
+      "exit_code": 0,
+      "wall_s": 4.95591662498191,
+      "first_agent_message_s": 4.464283999986947,
+      "final_response_s": 4.464283999986947,
+      "turn_started_s": 1.0524615420144983,
+      "active_turn_s": 3.9034550829674117,
+      "tool_calls": [],
+      "tool_payload_bytes": 0,
+      "usage": {
+        "input_tokens": 17875,
+        "cached_input_tokens": 12288,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 69,
+        "reasoning_output_tokens": 48
+      },
+      "events": [
+        {
+          "elapsed_s": 0.18557966698426753,
+          "event": {
+            "type": "thread.started",
+            "thread_id": "01a20ac9-7ff8-7550-9757-cb8647cb49b5"
+          }
+        },
+        {
+          "elapsed_s": 1.0524615420144983,
+          "event": {
+            "type": "turn.started"
+          }
+        },
+        {
+          "elapsed_s": 4.464283999986947,
+          "event": {
+            "type": "item.completed",
+            "item": {
+              "id": "item_0",
+              "type": "agent_message",
+              "text": "“一根芹菜”英文说 **a stalk of celery**。"
+            }
+          }
+        },
+        {
+          "elapsed_s": 4.5425032079801895,
+          "event": {
+            "type": "turn.completed",
+            "usage": {
+              "input_tokens": 17875,
+              "cached_input_tokens": 12288,
+              "cache_write_input_tokens": 0,
+              "output_tokens": 69,
+              "reasoning_output_tokens": 48
+            }
+          }
+        }
+      ],
+      "stderr_warning_lines": [
+        "2026-11-23T23:41:47.390117Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back",
+        "2026-11-23T23:41:47.392212Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back"
+      ]
+    }
+  ],
+  "summary": {
+    "wall_s": {
+      "samples": 6,
+      "mean_s": 6.944833909821075,
+      "p50_s": 5.163285708491458,
+      "p95_s": 14.487383125000633,
+      "min_s": 4.427858458948322,
+      "max_s": 14.487383125000633
+    },
+    "active_turn_s": {
+      "samples": 6,
+      "mean_s": 6.133169208158506,
+      "p50_s": 4.203865145973396,
+      "p95_s": 13.80061116599245,
+      "min_s": 3.7764707499882206,
+      "max_s": 13.80061116599245
+    },
+    "first_agent_message_s": {
+      "samples": 6,
+      "mean_s": 6.249306576491411,
+      "p50_s": 4.748071916488698,
+      "p95_s": 12.43314229202224,
+      "min_s": 4.07830529200146,
+      "max_s": 12.43314229202224
+    },
+    "final_response_s": {
+      "samples": 6,
+      "mean_s": 6.249306576491411,
+      "p50_s": 4.748071916488698,
+      "p95_s": 12.43314229202224,
+      "min_s": 4.07830529200146,
+      "max_s": 12.43314229202224
+    }
+  }
+}

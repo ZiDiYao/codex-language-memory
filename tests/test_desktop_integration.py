@@ -79,7 +79,7 @@ class IntegrationAccount:
             return {"status": "updated", "record": copy.deepcopy(self.record)}
         elif name == "delete_point":
             return {"status": "deleted", "id": arguments["record_id"]}
-        elif name == "save_points":
+        elif name in ("save_points", "capture_points"):
             return {"status": "processed", "replayed": False, "results": [{"status": "added", "id": 900}]}
         elif name == "record_review":
             return {"status": "reviewed", "scheduled": False, "replayed": False}
@@ -146,8 +146,8 @@ class DesktopProtocolIntegrationTests(unittest.IsolatedAsyncioTestCase):
             factory.assert_called_once_with(state_path=path.with_name("desktop-account.json"))
             self.assertFalse(path.exists(), "production cloud client must not create a local learning database")
             tools = {tool.name: tool for tool in await server.list_tools()}
-            self.assertEqual(len(tools), 24)
-            for name in ("save_points", "update_point", "delete_point", "update_settings", "set_recording", "record_review"):
+            self.assertEqual(len(tools), 25)
+            for name in ("save_points", "capture_points", "update_point", "delete_point", "update_settings", "set_recording", "record_review"):
                 self.assertIn("expected_connection_epoch", tools[name].inputSchema["properties"])
             self.assertIn("memory_app_request", tools)
             self.assertNotIn("account_login", tools, "account controls stay in the local UI")
@@ -155,6 +155,7 @@ class DesktopProtocolIntegrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_all_cloud_mutations_require_current_connection_epoch(self):
         operations = {
             "save_points": {"request_id": "isolated-save", "items": [POINT]},
+            "capture_points": {"request_id": "isolated-capture", "items": [{"kind": "word", "language": "en", "title": "celery"}]},
             "update_point": {"record_id": 900, "patch": {"note": "Cloud edit"}},
             "delete_point": {"record_id": 900}, "update_settings": {"patch": {"ui_language": "fr"}},
             "set_recording": {"enabled": False},
@@ -167,10 +168,20 @@ class DesktopProtocolIntegrationTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(self.account.calls, [])
         for name, arguments in operations.items():
             await self.call(name, {**arguments, "expected_connection_epoch": 7})
-        self.assertEqual(len(self.account.calls), 6)
+        self.assertEqual(len(self.account.calls), 7)
         for _name, arguments, epoch in self.account.calls:
             self.assertEqual(epoch, 7)
             self.assertNotIn("expected_connection_epoch", arguments, "desktop guard is never sent as a remote MCP argument")
+
+    async def test_lightweight_protocol_validates_minimal_observation_and_rejects_rich_fields(self):
+        item = {"kind": "word", "language": "en", "title": "celery", "context": "芹菜的英文咋说"}
+        result = await self.call("capture_points", {"request_id": "minimal-capture", "items": [item], "expected_connection_epoch": 7})
+        self.assertEqual(result["status"], "processed")
+        self.assertEqual(self.account.calls[-1], ("capture_points", {"request_id": "minimal-capture", "items": [item], "source": "automatic"}, 7))
+        for invalid in ({**item, "meaning": "芹菜"}, {**item, "title": ""}, {**item, "language": "invalid language"}):
+            with self.assertRaises(ToolError):
+                await self.call("capture_points", {"request_id": "invalid-capture", "items": [invalid], "expected_connection_epoch": 7})
+        self.assertEqual(len(self.account.calls), 1)
 
     async def test_conversation_and_page_read_and_edit_the_same_cloud_record(self):
         self.assertEqual((await self.call("get_settings"))["_connection"]["epoch"], 7)

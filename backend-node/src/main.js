@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import { createApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { createPool, checkSchema } from "./database.js";
+import { createOpenAIEnricher, startEnrichmentWorker } from "./enrichment.js";
 import { Repository } from "./repository.js";
 
 export async function start(environment = process.env) {
@@ -19,6 +20,8 @@ export async function start(environment = process.env) {
     await pool.end();
     throw new Error("Cloud service startup failed");
   }
+  const worker = startEnrichmentWorker({ pool,
+    provider: createOpenAIEnricher({ apiKey: config.enrichmentApiKey, model: config.enrichmentModel }) });
   let closing;
   function close() {
     closing ??= (async () => {
@@ -26,7 +29,7 @@ export async function start(environment = process.env) {
       const forceClose = setTimeout(() => server.closeAllConnections(), 5000);
       forceClose.unref();
       try { await new Promise((resolve) => server.close(resolve)); }
-      finally { clearTimeout(forceClose); await pool.end(); }
+      finally { clearTimeout(forceClose); await worker.close(); await pool.end(); }
     })();
     return closing;
   }

@@ -43,9 +43,18 @@ export async function migrate(pool, { baseOnly = false } = {}) {
         migrated = true;
       } else {
         const revisions = (await client.query('SELECT revision FROM lm_node_migrations')).rows;
-        if (revisions.length !== 1 || revisions[0].revision !== NODE_SCHEMA_REVISION
+        if (revisions.length !== 1 || !['0002_desktop_imports', NODE_SCHEMA_REVISION].includes(revisions[0].revision)
             || (await client.query("SELECT to_regclass('lm_desktop_imports') AS name")).rows[0].name == null)
           throw new Error('Unsupported Node extension revision');
+      }
+      const head = (await client.query('SELECT revision FROM lm_node_migrations')).rows[0]?.revision;
+      if (head === '0002_desktop_imports') {
+        if ((await client.query("SELECT to_regclass('lm_enrichment_jobs') AS name")).rows[0].name != null)
+          throw new Error('Unversioned enrichment table');
+        await client.query(await readFile(new URL('../migrations/0003_lightweight_capture.sql', import.meta.url), 'utf8'));
+        migrated = true;
+      } else if ((await client.query("SELECT to_regclass('lm_enrichment_jobs') AS name")).rows[0].name == null) {
+        throw new Error('Missing enrichment table');
       }
     }
     await client.query('COMMIT');
