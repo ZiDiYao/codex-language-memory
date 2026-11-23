@@ -3,6 +3,7 @@ import { messages } from "./i18n.js";
 import { applyCloudMessages, detectCloudLocale } from "./cloud-i18n.js";
 import { auth0Options, CloudSession, completeCloudCallback } from "./cloud-auth.js";
 import { createCloudTransport, validateCloudConfig } from "./cloud-transport.js";
+import { createCloudProfile, loginRedirectOptions } from "./cloud-profile.js";
 
 const $ = (selector) => document.querySelector(selector);
 const locale = detectCloudLocale(navigator.languages || [navigator.language]);
@@ -35,8 +36,12 @@ let client;
 let session;
 let runtime;
 let navigating = false;
+const profile = createCloudProfile({
+  trigger: $("#cloud-profile-open"), panel: $("#cloud-profile"), closeButton: $("#cloud-profile-close"),
+  primary: $("#cloud-profile-name"), secondary: $("#cloud-profile-email"),
+});
 
-async function login() {
+async function login(mode = "login") {
   if (!client || navigating) return;
   navigating = true;
   document.querySelectorAll("[data-cloud-login]").forEach((button) => { button.disabled = true; });
@@ -44,7 +49,7 @@ async function login() {
   try {
     // A new document after the callback clears every previous account's UI state.
     // Existing beforeunload protection warns if an expired session has a draft.
-    await client.loginWithRedirect({ appState: { returnTo: "/" } });
+    await client.loginWithRedirect(loginRedirectOptions(mode));
   } catch {
     status("cloudAuthFailure");
     if (!$("main").hidden) sessionMessage("cloudAuthFailure");
@@ -53,9 +58,10 @@ async function login() {
     document.querySelectorAll("[data-cloud-login]").forEach((button) => { button.disabled = false; });
   }
 }
-document.querySelectorAll("[data-cloud-login]").forEach((button) => button.addEventListener("click", login));
+document.querySelectorAll("[data-cloud-login]").forEach((button) => button.addEventListener("click", () => login(button.dataset.cloudLogin)));
 $("#cloud-logout").addEventListener("click", async () => {
   if (!session || navigating) return;
+  profile.close();
   navigating = true;
   $("#cloud-logout").disabled = true;
   try {
@@ -85,6 +91,7 @@ async function initialize() {
     document.querySelectorAll("[data-cloud-login]").forEach((button) => { button.disabled = false; });
     if (!(await client.isAuthenticated())) { status("cloudLoginHelp"); return; }
     await session.getToken();
+    profile.setUser(await client.getUser());
     runtime = {
       ...createCloudTransport({ apiBaseUrl: config.apiBaseUrl, session }),
       beforeAccountChange: async () => true,
