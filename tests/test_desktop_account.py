@@ -2,6 +2,8 @@
 import asyncio
 import base64
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
+from datetime import timedelta
 import json
 import logging
 from pathlib import Path
@@ -10,6 +12,7 @@ import threading
 import time
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
@@ -168,6 +171,45 @@ class DesktopAccountTests(unittest.TestCase):
         value = self.credentials.read()
         value["expires_at"] = time.time() - 20
         self.credentials.write(value)
+
+    def test_interactive_mcp_session_uses_login_deadline_and_rpc_uses_request_deadline(self):
+        self.manager.login_timeout, self.manager.request_timeout = 300, 30
+        deadlines, calls = [], []
+        client, read, write = object(), object(), object()
+
+        @asynccontextmanager
+        async def fake_client(provider):
+            yield client
+
+        @asynccontextmanager
+        async def fake_transport(url, *, http_client):
+            self.assertEqual(url, account.RESOURCE)
+            self.assertIs(http_client, client)
+            yield read, write, lambda: None
+
+        class Session:
+            def __init__(self, receive, send, *, read_timeout_seconds):
+                if receive is not read or send is not write:
+                    raise AssertionError("incorrect transport streams")
+                deadlines.append(read_timeout_seconds)
+            async def __aenter__(self): return self
+            async def __aexit__(self, *args): pass
+            async def initialize(self): calls.append("initialize")
+            async def call_tool(self, name, arguments):
+                calls.append((name, arguments))
+                return SimpleNamespace(isError=False, structuredContent={"enabled": True})
+
+        async def check():
+            self.assertEqual(await self.manager._mcp(SimpleNamespace(interactive=True)), {})
+            self.assertEqual(await self.manager._mcp(SimpleNamespace(interactive=False), "get_settings", {}),
+                             {"enabled": True})
+
+        with patch.object(self.manager, "_client", fake_client), \
+             patch.object(account, "streamable_http_client", fake_transport), \
+             patch.object(account, "ClientSession", Session):
+            asyncio.run(check())
+        self.assertEqual(deadlines, [timedelta(seconds=300), timedelta(seconds=30)])
+        self.assertEqual(calls, ["initialize", "initialize", ("get_settings", {})])
 
     def test_default_local_login_exact_resource_dcr_scopes_and_no_secret_file(self):
         self.assertEqual(self.manager.status()["mode"], "local")

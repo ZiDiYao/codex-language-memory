@@ -607,7 +607,8 @@ class AccountManager:
     async def _mcp(self, provider, name=None, arguments=None):
         async with self._client(provider) as client:
             async with streamable_http_client(RESOURCE, http_client=client) as (read, write, _):
-                async with ClientSession(read, write, read_timeout_seconds=timedelta(seconds=self.request_timeout)) as session:
+                timeout = self.login_timeout if provider.interactive else self.request_timeout
+                async with ClientSession(read, write, read_timeout_seconds=timedelta(seconds=timeout)) as session:
                     await session.initialize()
                     if name is None:
                         return {}
