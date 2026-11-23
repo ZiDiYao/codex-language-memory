@@ -190,12 +190,14 @@ a:focus-visible {
 input[role="searchbox"] {
   width: 100%;
   min-width: 0;
+  min-height: 44px;
   border: 1px solid var(--line);
   background: var(--surface);
   border-radius: 8px;
-  padding: 11px 12px 11px 40px;
+  padding: 11px 48px 11px 40px;
   transition: background 140ms var(--ease), border-color 140ms var(--ease);
 }
+.search-clear { position: absolute; top: 0; right: 0; display: grid; place-items: center; width: 44px; height: 100%; padding: 0; border: 0; background: transparent; color: var(--muted); }
 input::placeholder {
   color: var(--muted);
 }
@@ -365,6 +367,10 @@ dialog {
   background: var(--bg);
   color: var(--text);
   box-shadow: var(--shadow);
+}
+dialog.profile-dialog,
+#settings-dialog {
+  width: min(800px, calc(100vw - 32px));
 }
 dialog::backdrop {
   background: #0007;

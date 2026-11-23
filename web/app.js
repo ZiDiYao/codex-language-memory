@@ -697,9 +697,21 @@ $("#search-form").addEventListener("submit", (event) => {
   loadRecords(true);
 });
 let searchTimer;
+function renderSearchClear() {
+  $("#search-clear").hidden = !$("#search").value;
+}
+renderSearchClear();
 $("#search").addEventListener("input", () => {
+  renderSearchClear();
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => loadRecords(true), 250);
+});
+$("#search-clear").addEventListener("click", () => {
+  clearTimeout(searchTimer);
+  $("#search").value = "";
+  renderSearchClear();
+  $("#search").focus({ preventScroll: true });
+  loadRecords(true);
 });
 $("#retry-load").addEventListener("click", () => {
   loadRecords(true);
@@ -788,6 +800,7 @@ if (localAccount) {
       sceneCatalog = [];
       selectedLanguage = selectedKind = selectedScene = "";
       $("#search").value = "";
+      renderSearchClear();
       $("#settings-fields").disabled = true;
       localePicker.button.disabled = true;
       renderCatalog(); renderKinds(); renderScenes();

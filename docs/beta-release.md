@@ -102,7 +102,7 @@ npm run build
 .venv/bin/python -m unittest discover -s tests -v
 node --test tests/*.mjs
 .venv/bin/python scripts/build_beta.py
-.venv/bin/python scripts/test_beta.py dist/language-memory-0.2.0-beta.39-macos-arm64.zip
+.venv/bin/python scripts/test_beta.py dist/language-memory-0.2.0-beta.40-macos-arm64.zip
 ```
 
 Change `VERSION` for the next Beta. The builder copies that version into the packaged
@@ -119,7 +119,8 @@ and replace its entire `_internal/web` tree; then repackage. Compare every
 non-web runtime file/symlink, executable SHA256, CDHash and designated requirement
 against the base, verify the signature, and run the extracted package acceptance
 suite. Never edit the active installation or reuse a core after Python/dependency
-changes. The controlled Beta 39 build follows this path from Beta 38.
+changes. The controlled Beta 39 build follows this path from Beta 38; Beta 40 preserves
+the same core through the verified Beta 39 package.
 
 `scripts/test_beta.py` extracts the actual archive and executes its command files in a
 temporary profile whose paths contain spaces. Runtime PATH excludes developer tools.
