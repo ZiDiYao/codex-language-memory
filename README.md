@@ -14,6 +14,10 @@ English, Chinese, Japanese, Korean, French and Spanish.
 
 ## Install the desktop Beta
 
+Beta 43 brings the export calendar into view when expanded, scrolling only inside
+its dialog and respecting reduced-motion preferences. This updates the retained
+date control; cloud export remains unavailable in this release.
+
 Beta 42 adds a brief result transition to desktop filter changes, including when
 the visible records are identical. Unchanged cards retain their editors and state;
 background refreshes remain still, and reduced-motion preferences are respected.

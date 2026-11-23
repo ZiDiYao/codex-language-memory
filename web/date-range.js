@@ -65,12 +65,31 @@ export class DateRange {
     this.from = this.through = ""; this.endpoint = "start"; this.month = localDate(); this.render();
   }
 
-  open() {
+  async open() {
     this.expanded = true;
     this.month = this.from || localDate();
     this.endpoint = this.from && !this.through ? "end" : "start";
     this.trigger.setAttribute("aria-expanded", "true");
-    this.render(); reveal(this.panel);
+    this.render();
+    if (!(await reveal(this.panel)) || !this.expanded) return;
+    this.scrollCalendarIntoView();
+  }
+
+  scrollCalendarIntoView() {
+    const dialog = this.host.closest("dialog");
+    if (!dialog?.open) return;
+    const bounds = dialog.getBoundingClientRect();
+    const top = bounds.top + dialog.clientTop + 16;
+    const bottom = bounds.top + dialog.clientTop + dialog.clientHeight - 16;
+    const panel = this.panel.getBoundingClientRect();
+    if (panel.top >= top && panel.bottom <= bottom) return;
+    const range = (this.host.closest(".export-date-range") || this.host).getBoundingClientRect();
+    // Keep the range label and trigger visible when they fit; scroll only the dialog.
+    const target = range.height <= bottom - top ? range.top : panel.top;
+    dialog.scrollBy({
+      top: target - top,
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
   }
 
   close(focus = false) {
