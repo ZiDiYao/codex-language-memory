@@ -14,7 +14,8 @@ English, Chinese, Japanese, Korean, French and Spanish.
 
 ## Install the desktop Beta
 
-Beta 40 uses cloud accounts exclusively. Profile and learning preferences use
+Beta 41 uses cloud accounts exclusively. The header uses an icon-only Profile
+button, optically balanced with Settings while retaining accessible labels. Profile and learning preferences use
 800px desktop dialogs that fit smaller screens. Dialogs dismiss through outside
 clicks or Escape, with an accessible Close action for keyboard and screen-reader
 users. A search clear button appears only while a query is present. Profile is a personal account dialog with
