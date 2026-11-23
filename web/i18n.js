@@ -54,7 +54,7 @@ export const messages = {
     explanationLanguage: "Explanation language",
     useFirstLanguage: "Use my first language",
     explanationLanguageHelp: "Applies to meanings, grammar notes and example translations. Original examples stay in the language you are learning. Ask Codex to rewrite existing records in another language.",
-    appTitle: "Language memory",
+    appTitle: "Sayrove",
     subtitle: "Learn with Codex. Pick up where you left off.",
     uiLanguage: "Interface language",
     records: "Knowledge",
@@ -213,7 +213,7 @@ export const messages = {
     explanationLanguage: "解释语言",
     useFirstLanguage: "使用我的第一语言",
     explanationLanguageHelp: "用于释义、语法解释和例句翻译。原始例句保留学习语言。需要更改已有记录的解释语言时，可以让 Codex 改写。",
-    appTitle: "语言记忆",
+    appTitle: "拾语",
     subtitle: "在 Codex 中积累，按语言继续学习。",
     uiLanguage: "界面语言",
     records: "知识点",
@@ -368,7 +368,7 @@ export const messages = {
     explanationLanguage: "説明の言語",
     useFirstLanguage: "第一言語を使う",
     explanationLanguageHelp: "意味、文法の説明、例文の翻訳に使います。例文の原文は学習言語のままです。既存の記録の書き換えは Codex に依頼できます。",
-    appTitle: "言語学習メモリー",
+    appTitle: "Sayrove",
     subtitle: "Codex と学び、言語ごとに続きを学習。",
     uiLanguage: "表示言語",
     records: "学習ノート",
@@ -529,7 +529,7 @@ export const messages = {
     explanationLanguage: "설명 언어",
     useFirstLanguage: "제1언어 사용",
     explanationLanguageHelp: "뜻, 문법 설명, 예문 번역에 적용됩니다. 원문 예문은 학습 언어로 유지됩니다. 기존 기록을 다른 언어로 바꾸려면 Codex에 요청하세요.",
-    appTitle: "언어 학습 기억",
+    appTitle: "Sayrove",
     subtitle: "Codex와 함께 배우고 언어별로 이어서 학습하세요.",
     uiLanguage: "화면 언어",
     records: "학습 노트",
@@ -689,7 +689,7 @@ export const messages = {
     useFirstLanguage: "Utiliser ma langue première",
     explanationLanguageHelp: "S’applique aux définitions, notes de grammaire et traductions. Les exemples restent dans la langue étudiée. Demandez à Codex de réécrire les fiches existantes dans une autre langue.",
     nativeName: "Français",
-    appTitle: "Mémoire linguistique",
+    appTitle: "Sayrove",
     subtitle: "Apprenez avec Codex. Reprenez là où vous en étiez.",
     uiLanguage: "Langue de l’interface",
     records: "Connaissances",
@@ -849,7 +849,7 @@ export const messages = {
     useFirstLanguage: "Usar mi primera lengua",
     explanationLanguageHelp: "Se aplica a definiciones, notas gramaticales y traducciones. Los ejemplos originales conservan el idioma estudiado. Pide a Codex que reescriba los registros existentes en otro idioma.",
     nativeName: "Español",
-    appTitle: "Memoria de idiomas",
+    appTitle: "Sayrove",
     subtitle: "Aprende con Codex. Continúa donde lo dejaste.",
     uiLanguage: "Idioma de la interfaz",
     records: "Conocimientos",
@@ -953,3 +953,25 @@ export const messages = {
     allLoaded: "Se cargaron los {count} registros",
   },
 };
+
+const accountMessages = {
+  en: ["Profile", "Local records", "Cloud records", "Your notes are stored on this Mac. Sign in to use your cloud library.", "Signed in. Your cloud library is available here and on the web.", "Opening sign-in in your browser…", "Sign in to view your cloud records, or choose local records.", "Sign in", "Sign out", "Use local records", "Continue in browser", "Could not connect. Try again.", "Save or copy your unsaved drafts before switching accounts.", "Use Continue in browser to open the sign-in page.", "Your account changed. Copy any unsaved drafts, then reopen this page."],
+  zh: ["账户", "本地记录", "云端记录", "笔记保存在这台 Mac 上。登录后可使用云端学习库。", "已登录。你可以在这里和网页查看云端学习库。", "正在浏览器中打开登录页面…", "登录以查看云端记录，或选择使用本地记录。", "登录", "退出登录", "使用本地记录", "在浏览器中继续", "暂时无法连接，请重试。", "切换账户前，请先保存或复制未保存的草稿。", "点击“在浏览器中继续”打开登录页面。", "账户已变化。请复制未保存的草稿，再重新打开此页面。"],
+  ja: ["アカウント", "ローカルの記録", "クラウドの記録", "ノートはこのMacに保存されています。ログインするとクラウドのノートを使えます。", "ログイン中です。クラウドのノートをここでもWebでも確認できます。", "ブラウザーでログイン画面を開いています…", "ログインしてクラウドの記録を見るか、ローカルの記録を選んでください。", "ログイン", "ログアウト", "ローカルの記録を使う", "ブラウザーで続ける", "接続できませんでした。もう一度お試しください。", "アカウントを切り替える前に、下書きを保存またはコピーしてください。", "「ブラウザーで続ける」でログイン画面を開いてください。", "アカウントが変わりました。未保存の下書きをコピーしてから、このページを開き直してください。"],
+  ko: ["프로필", "로컬 기록", "클라우드 기록", "노트는 이 Mac에 저장됩니다. 로그인하면 클라우드 학습 노트를 사용할 수 있습니다.", "로그인되었습니다. 여기와 웹에서 클라우드 노트를 볼 수 있습니다.", "브라우저에서 로그인 화면을 여는 중…", "클라우드 기록을 보려면 로그인하거나 로컬 기록을 선택하세요.", "로그인", "로그아웃", "로컬 기록 사용", "브라우저에서 계속", "연결할 수 없습니다. 다시 시도하세요.", "계정을 전환하기 전에 저장하지 않은 초안을 저장하거나 복사하세요.", "브라우저에서 계속을 눌러 로그인 화면을 여세요.", "계정이 변경되었습니다. 저장하지 않은 초안을 복사한 후 이 페이지를 다시 여세요."],
+  fr: ["Profil", "Notes locales", "Notes du cloud", "Vos notes sont stockées sur ce Mac. Connectez-vous pour utiliser votre bibliothèque cloud.", "Connecté. Votre bibliothèque cloud est disponible ici et sur le Web.", "Ouverture de la connexion dans le navigateur…", "Connectez-vous pour voir vos notes du cloud ou choisissez les notes locales.", "Se connecter", "Se déconnecter", "Utiliser les notes locales", "Continuer dans le navigateur", "Connexion impossible. Réessayez.", "Enregistrez ou copiez vos brouillons avant de changer de compte.", "Utilisez Continuer dans le navigateur pour ouvrir la connexion.", "Votre compte a changé. Copiez vos brouillons non enregistrés, puis rouvrez cette page."],
+  es: ["Perfil", "Notas locales", "Notas en la nube", "Tus notas se guardan en este Mac. Inicia sesión para usar tu biblioteca en la nube.", "Sesión iniciada. Tu biblioteca en la nube está disponible aquí y en la web.", "Abriendo el inicio de sesión en el navegador…", "Inicia sesión para ver tus notas en la nube o elige las notas locales.", "Iniciar sesión", "Cerrar sesión", "Usar notas locales", "Continuar en el navegador", "No se pudo conectar. Inténtalo de nuevo.", "Guarda o copia los borradores antes de cambiar de cuenta.", "Usa Continuar en el navegador para abrir el inicio de sesión.", "Tu cuenta cambió. Copia los borradores sin guardar y vuelve a abrir esta página."],
+};
+const keys = ["accountProfile", "accountLocal", "accountCloud", "accountLocalHelp", "accountConnectedHelp", "accountConnecting", "accountSignedOutHelp", "accountLogin", "accountLogout", "accountUseLocal", "accountContinue", "accountFailure", "accountUnsaved", "accountOpenHelp", "accountChanged"];
+function applyLocalMessages() {
+  for (const [locale, values] of Object.entries(accountMessages)) {
+    Object.assign(messages[locale], Object.fromEntries(keys.map((key, index) => [key, values[index]])));
+    messages[locale].cloud_not_connected = messages[locale].accountSignedOutHelp;
+    messages[locale].account_changed = messages[locale].accountChanged;
+    messages[locale].accountSuperseded = messages[locale].accountChanged;
+    messages[locale].cloud_feature_unavailable = messages[locale].unavailable;
+    messages[locale].accountSignedOut = { en: "Signed out", zh: "未登录", ja: "ログアウト中", ko: "로그아웃됨", fr: "Déconnecté", es: "Sesión cerrada" }[locale];
+  }
+}
+
+applyLocalMessages();

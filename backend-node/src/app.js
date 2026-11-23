@@ -3,6 +3,12 @@ import { handleMcpRequest } from "./mcp.js";
 import { parse, ValidationError } from "./schemas.js";
 
 export const MAX_BODY = 1024 * 1024;
+const REST_METHODS = Object.freeze({
+  "/v1/settings": ["GET", "PATCH"], "/v1/points": ["GET"], "/v1/captures": ["POST"],
+  "/v1/scenes": ["GET"], "/v1/review-queue": ["GET"], "/v1/reviews": ["POST"],
+  "/v1/languages": ["GET"], "/v1/changes": ["GET"],
+});
+const restMethods = (path) => REST_METHODS[path] ?? (/^\/v1\/points\/\d+$/.test(path) ? ["GET", "PATCH", "DELETE"] : null);
 
 export class APIError extends Error {
   constructor(status, code) { super(code); this.status = status; this.code = code; }
@@ -29,7 +35,28 @@ function validateAuthority(request, config, path) {
   const railwayHealth = health && request.method === "GET" && received.hostname === "healthcheck.railway.app";
   if (received.host !== publicUrl.host && !loopbackHealth && !railwayHealth) throw new APIError(403, "invalid_host");
   const origin = request.headers.origin;
-  if (origin !== undefined && origin !== publicUrl.origin) throw new APIError(403, "invalid_origin");
+  if (origin !== undefined && origin !== publicUrl.origin
+      && !(restMethods(path) && (config.webAllowedOrigins ?? []).includes(origin)))
+    throw new APIError(403, "invalid_origin");
+}
+
+function preflight(request, response, path) {
+  if (typeof request.headers.origin !== "string") throw new APIError(403, "invalid_origin");
+  const methods = restMethods(path);
+  if (!methods) throw new APIError(404, "not_found");
+  const requestedMethod = request.headers["access-control-request-method"];
+  if (typeof requestedMethod !== "string" || !methods.includes(requestedMethod))
+    throw new APIError(405, "method_not_allowed");
+  const rawHeaders = request.headers["access-control-request-headers"];
+  const headers = rawHeaders === undefined ? [] : typeof rawHeaders === "string"
+    ? rawHeaders.split(",").map((header) => header.trim().toLowerCase()) : [""];
+  if (new Set(headers).size !== headers.length || headers.some((header) => !["authorization", "content-type"].includes(header)))
+    throw new APIError(400, "invalid_preflight_headers");
+  response.setHeader("Vary", "Origin, Access-Control-Request-Method, Access-Control-Request-Headers");
+  response.writeHead(204, { "Content-Length": "0", "Cache-Control": "no-store",
+    "Access-Control-Allow-Methods": methods.join(", "),
+    "Access-Control-Allow-Headers": "Authorization, Content-Type" });
+  response.end();
 }
 
 async function readJson(request) {
@@ -87,7 +114,15 @@ export function createApp({ config, repositoryFactory, verifyToken, readiness, l
         throw new APIError(400, "invalid_request");
       const url = new URL(request.url, config.publicUrl);
       const path = url.pathname;
+      if (path.startsWith("/v1/")) response.setHeader("Vary", "Origin");
       validateAuthority(request, config, path);
+      if (restMethods(path)) {
+        // Set these before authentication and validation so trusted browser
+        // callers can read safe errors too. Bearer requests need no cookies.
+        if (request.headers.origin !== undefined) response.setHeader("Access-Control-Allow-Origin", request.headers.origin);
+        if (request.method === "OPTIONS") return preflight(request, response, path);
+      }
+      else if (path.startsWith("/v1/") && request.method === "OPTIONS") return preflight(request, response, path);
       if (request.method === "GET" && path === "/healthz") return send(response, 200, { status: "ok" });
       if (request.method === "GET" && path === "/readyz") {
         let ready = false;
@@ -113,6 +148,10 @@ export function createApp({ config, repositoryFactory, verifyToken, readiness, l
       let result;
       if (path === "/v1/settings" && request.method === "GET") result = await call("settings");
       else if (path === "/v1/settings" && request.method === "PATCH") result = await call("settings", parse("settingsPatch", await readJson(request)));
+      else if (["/v1/languages", "/v1/changes"].includes(path) && request.method === "GET") {
+        if (url.search) throw new APIError(422, "invalid_request");
+        result = await call(path === "/v1/languages" ? "languages" : "versions");
+      }
       else if (path === "/v1/points" && request.method === "GET") result = await call("query", queryArguments(url.searchParams, "query"));
       else if (path === "/v1/captures" && request.method === "POST") {
         const args = parse("capture", await readJson(request));
@@ -131,7 +170,7 @@ export function createApp({ config, repositoryFactory, verifyToken, readiness, l
       else if (path === "/v1/reviews" && request.method === "POST") {
         const args = parse("reviewAttempt", await readJson(request));
         result = await call("record_review", args.record_id, args.request_id, args.review);
-      } else if (["/v1/settings", "/v1/points", "/v1/captures", "/v1/scenes", "/v1/review-queue", "/v1/reviews"].includes(path))
+      } else if (restMethods(path))
         throw new APIError(405, "method_not_allowed");
       else throw new APIError(404, "not_found");
       return send(response, resultStatus(result), result);

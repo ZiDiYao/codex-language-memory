@@ -1,8 +1,9 @@
 # Auth0 setup for the Node MCP backend
 
 Configuration updated on 2026-11-22 using the selected Railway endpoint and the
-created Auth0 tenant `language-memory.ca.auth0.com`. This documents public
-configuration, not a verified Codex browser login or completed OAuth connection.
+created Auth0 tenant `language-memory.ca.auth0.com`. The provider/resource OAuth
+flow has passed the native-client checks below; the actual Codex client connection
+remains unverified.
 The backend remains an authenticated resource server. Auth0 provides login,
 consent, OAuth authorization-code exchange and tokens; no authorization server or
 authentication bypass is added to this repository.
@@ -135,7 +136,25 @@ that client; a new strict registration is needed. Check the actual client's
 creation mode rather than weakening token checks to compensate. See
 [Auth0's legacy strict-mode guidance](https://support.auth0.com/center/s/article/enable-strict-dcr-mode-for-tenant).
 
-## Verify before reporting OAuth as live
+## Verified provider/resource flow
+
+On 2026-11-22, a native public DCR client completed a real learner's browser login
+with S256 PKCE and the standard `resource` parameter, without an `audience`
+override. The issued access token had the expected issuer, API audience and
+`memory:read memory:write offline_access` scopes.
+
+MCP initialization, tool listing and `get_settings` succeeded against the deployed
+backend. A refresh-token exchange then succeeded, preserved the account subject,
+and passed the same read-only MCP calls again. The deployed backend performed
+signature and authorization validation; the probe's local JWT decode was only
+used for a narrow claim check. No learning records were written; reading settings
+can initialize the real account's default preferences.
+
+This verifies Auth0 with the deployed resource server. Installation, authorization
+and reconnection in the actual Codex client, plus plugin publication, remain
+separate acceptance steps.
+
+## Verify the actual host connection
 
 1. Retrieve
    `https://language-memory.ca.auth0.com/.well-known/openid-configuration`.

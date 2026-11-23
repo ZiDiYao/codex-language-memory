@@ -1,10 +1,33 @@
-# Codex Language Memory
+# Sayrove · 拾语
+
+Sayrove is a personal language-learning library for everyday words, expressions,
+grammar and corrections. The public Web entry is
+[sayrove.up.railway.app](https://sayrove.up.railway.app), with the same account-scoped
+PostgreSQL records as the hosted MCP service. See [Web setup](docs/web-deployment.md).
 
 A local language-learning memory for Codex. Keep learning in your existing conversation: ask about a word, compare grammar, translate an expression, or correct a sentence. Codex extracts useful learning points and saves them through a small SQLite-backed MCP server.
 
 Recording is automatic for all languages and enabled by default on new installations. The optional local page lets you browse records and change preferences. It uses neutral colors, follows the system theme, and supports English, Chinese, Japanese, Korean, French, and Spanish.
 
 ## Install the local Beta
+
+Beta 36 brings the Sayrove / 拾语 branding and responsive layout to the desktop
+plugin. Open **Profile → Sign in** to use the same cloud account and learning
+records as [Sayrove Web](https://sayrove.up.railway.app). Desktop conversation
+tools and the learning page follow the same selected source. OAuth uses the
+system browser and PKCE; the desktop does not collect a password. Its tokens
+are kept in the macOS Keychain.
+
+Local SQLite records remain on this device. Signing in does not upload them.
+**Use local records** explicitly switches back to them. **Sign out** disconnects
+the desktop cloud session and leaves cloud operations paused until another sign-in
+or an explicit local selection. Cloud mode supports captures, notes, scenes,
+settings and actual reviews; persistent study rounds, learning-profile/history
+tools and file export remain local-only in this release. Local pronunciation
+is available for cloud records through the desktop's installed voices.
+
+After installing, restart Codex and use a new chat to load the updated runtime
+and Skill. Already-running chats can retain the previous plugin process.
 
 Download the **Apple Silicon Mac** ZIP from [GitHub Releases](https://github.com/ZiDiYao/codex-language-memory/releases), extract it, and double-click **Install.command**. Restart Codex and start a new conversation. No Python installation, API key or manual path configuration is needed. The downloaded folder can be deleted after installation.
 
@@ -45,10 +68,11 @@ retained [Python implementation](docs/remote-backend.md). Both use the same
 PostgreSQL schema and account identities. Existing local learning data is not
 uploaded or migrated automatically.
 
-This first cloud milestone does not include the desktop UI, document exports or
-pronunciation. It is not a published plugin or a complete OAuth authorization
-server. See [setup, provider requirements, tests and release boundaries](docs/remote-backend.md)
-and the [configured Language Memory remote package](packaging/remote/README.md).
+The Web library supports authenticated browsing, scene/type filters and editing.
+Document exports and local pronunciation remain in the desktop version. This is
+not a published directory plugin; Auth0 provides authorization. See
+[setup, provider requirements, tests and release boundaries](docs/remote-backend.md)
+and the [configured Sayrove remote package](packaging/remote/README.md).
 That package targets `https://language-memory-api.up.railway.app/mcp` with DCR
 authorization through Auth0. Provider configuration and actual Codex OAuth
 acceptance remain distinct from deployment health; see [Auth0 setup](docs/auth0-setup.md).

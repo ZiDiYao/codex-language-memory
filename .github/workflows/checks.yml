@@ -18,6 +18,7 @@ jobs:
       - run: python -m pip install -r requirements-cloud-dev.txt
       - run: npm ci --ignore-scripts
       - run: npm run build
+      - run: npm run build:web
       - run: python -m unittest discover -s tests -v
       - run: node --test tests/*.mjs
       - run: git diff --check

@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 from pydantic import ValidationError
 
 from dashboard_actions import dispatch
+from desktop_actions import connection_error
 from exports import ExportError, ExportRequest, build_export, record_export
 from store import Store
 
@@ -32,6 +33,7 @@ ASSETS = {
     "picker.js": ("picker.js", "text/javascript; charset=utf-8"),
     "i18n.js": ("i18n.js", "text/javascript; charset=utf-8"),
     "style.css": ("style.css", "text/css; charset=utf-8"),
+    "local-profile.js": ("local-profile.js", "text/javascript; charset=utf-8"),
 }
 
 
@@ -94,8 +96,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except ExportError as error:
             self.respond(400, {"error": str(error)})
             return
-        except (ValueError, TypeError, KeyError, ValidationError):
-            self.respond(400, {"error": "invalid_request"})
+        except (ValueError, TypeError, KeyError, ValidationError) as error:
+            failure = connection_error(error)
+            self.respond(*failure) if failure else self.respond(400, {"error": "invalid_request"})
             return
         except sqlite3.Error:
             self.respond(503, {"error": "database_unavailable"})

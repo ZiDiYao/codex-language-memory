@@ -7,10 +7,18 @@ import { RecordFeed } from "./record-feed.js";
 import { languageSelection } from "./history-model.js";
 import { sceneSelection, sceneLabel } from "./scene-model.js";
 import { ExportDialog } from "./export-dialog.js";
-import { request, saveDownload } from "./transport.js";
+import { request, saveDownload, capabilities, openExternal, setAccountEpoch } from "./transport.js";
+import { createLocalProfile, accountCanRead } from "./local-profile.js";
 
 const $ = (selector) => document.querySelector(selector);
 const pageSize = 20;
+const available = capabilities();
+const runtime = globalThis.languageMemoryRuntime;
+const localAccount = !runtime && $("#local-profile-open");
+let localProfile;
+let accountPaused = false;
+let accountDraftBlocked = false;
+let sourceRevision = 0;
 let locale = "en";
 let settings;
 let catalog = { languages: [], counts: {}, kinds: {}, by_language: {} };
@@ -71,7 +79,7 @@ let sceneCatalogVersion = 0;
 let switchingFilters = false;
 const historyFeed = new RecordFeed({
   fetchPage: (args) => api("points/query", args),
-  canCommit: ({ preserve, filtersKey }) => filtersKey === JSON.stringify(filters()) &&
+  canCommit: ({ preserve, filtersKey }) => !accountPaused && filtersKey === JSON.stringify(filters()) &&
     !hasDirtyEditors() && !(preserve && historyIsInteracting()),
   onStart: beginHistoryLoad,
   onCommit: renderRecords,
@@ -133,10 +141,11 @@ const explanationLanguagePicker = new Picker($("#explanation-language"), {
   label: "Explanation language",
   onChange: (explanation_language) => saveSettings({ explanation_language: explanation_language || null }),
 });
-const exportDialog = new ExportDialog($("#export-dialog"), {
+const exportDialog = available.export ? new ExportDialog($("#export-dialog"), {
   t, api, languageName, download, flushEditors, feedback, errorKey,
   getFilters: filters, getCatalog: () => catalog, getLocale: () => locale,
-});
+}) : null;
+$("#export-open").hidden = !available.export;
 
 function renderLanguagePreferences() {
   const codes = [...new Set(["en", "zh", "ja", "ko", "fr", "es", ...catalog.languages,
@@ -239,6 +248,7 @@ async function flushEditors() {
   }
   return true;
 }
+if (runtime) runtime.beforeAccountChange = flushEditors;
 function applyLocale() {
   document.documentElement.lang = locale;
   document.title = t("appTitle");
@@ -267,7 +277,8 @@ function applyLocale() {
   renderScenes();
   renderLanguagePreferences();
   refreshEditorLocales();
-  exportDialog.relabel();
+  exportDialog?.relabel();
+  localProfile?.relabel();
 }
 function refreshEditorLocales() {
   for (const editor of editors.values()) {
@@ -298,8 +309,13 @@ function feedback(selector, key, error = false) {
   node.classList.toggle("error", error);
 }
 async function api(action, arguments_ = {}) {
+  if (accountDraftBlocked && !action.startsWith("account/")) throw new Error("account_changed");
+  const source = sourceRevision;
   const response = await request("api", { action, arguments: arguments_ });
   const data = await response.json();
+  if (!action.startsWith("account/") && source !== sourceRevision) throw new Error("accountSuperseded");
+  if (!action.startsWith("account/") && (data.error === "cloud_not_connected" || data.error === "account_changed"))
+    localProfile?.session.refresh();
   if (!response.ok)
     throw new Error(
       messages[locale][data.error]
@@ -318,6 +334,7 @@ function errorKey(error) {
   return messages[locale][error.message] ? error.message : "unavailable";
 }
 function showError(error) {
+  if (error.message === "accountSuperseded") return;
   notice(errorKey(error), true);
 }
 function filters() {
@@ -374,7 +391,8 @@ function card(record, expanded = false) {
   mastery.append(...statusButtons);
   const preview = element("p", undefined, "entry-preview");
   const lastSeen = translated("small", "lastSeen", { date: record.last_seen_at }, "entry-last-seen");
-  heading.append(title, listenButton, mastery, element("span", undefined, "entry-chevron"));
+  if (!available.speech) heading.classList.add("without-speech");
+  heading.append(title, ...(available.speech ? [listenButton] : []), mastery, element("span", undefined, "entry-chevron"));
   summary.append(heading, preview, lastSeen);
   function renderSummary(point) {
     const fullTitle = point.note_title || t("untitledNote");
@@ -393,6 +411,7 @@ function card(record, expanded = false) {
     t, api, languageName, uiLocale: locale, card: details,
     onChange: (updated) => { displayed.set(updated.id, updated); renderSummary(updated); },
     onDeleted: async (deleted) => {
+      editors.get(deleted.id)?.dispose();
       editors.delete(deleted.id);
       displayed.delete(deleted.id);
       details.remove();
@@ -450,6 +469,7 @@ function captureHistoryView(reset, preserve) {
   };
 }
 function clearRecords() {
+  for (const editor of editors.values()) editor.dispose();
   displayed.clear();
   editors.clear();
   $("#records").replaceChildren();
@@ -461,7 +481,9 @@ function renderRecords(data, { reset, preserve, expanded, anchorId, anchorTop, f
     for (const [id, previous] of displayed) {
       const next = incoming.get(id);
       if (next && JSON.stringify(previous) === JSON.stringify(next)) continue;
-      editors.get(id)?.card.remove();
+      const editor = editors.get(id);
+      editor?.dispose();
+      editor?.card.remove();
       editors.delete(id);
       displayed.delete(id);
     }
@@ -511,14 +533,14 @@ function finishHistoryLoad() {
   if (!historyFeed.failed) requestAnimationFrame(maybeLoadMore);
 }
 function maybeLoadMore() {
-  if (ready && JSON.stringify(filters()) === committedFiltersKey &&
+  if (ready && !accountPaused && JSON.stringify(filters()) === committedFiltersKey &&
       !historyFeed.loading && !historyFeed.failed && historyFeed.hasMore &&
       $("#load-sentinel").getBoundingClientRect().top < window.innerHeight + 250) {
     loadRecords();
   }
 }
 async function loadRecords(reset = false, preserve = false) {
-  if (!ready) return false;
+  if (!ready || accountPaused) return false;
   if (reset && !preserve && !(await flushEditors())) return false;
   if (preserve && (hasDirtyEditors() || historyIsInteracting())) return false;
   return historyFeed.load({
@@ -539,14 +561,17 @@ async function loadSettings() {
   applyLocale();
 }
 function saveSettings(patch) {
+  const source = sourceRevision;
   ++settingsRevision;
   if (pendingSettingWrites === 0) settingsWriteError = null;
   ++pendingSettingWrites;
   feedback(".settings-feedback", "saving");
   settingsWrites = settingsWrites.then(async () => {
     try {
+      if (source !== sourceRevision) throw new Error("accountSuperseded");
       settings = await api("settings/update", patch);
     } catch (error) {
+      if (source !== sourceRevision) return;
       settingsWriteError = error;
       try {
         settings = await api("settings/read");
@@ -555,7 +580,7 @@ function saveSettings(patch) {
       }
     } finally {
       --pendingSettingWrites;
-      if (pendingSettingWrites === 0) {
+      if (pendingSettingWrites === 0 && source === sourceRevision && settings) {
         locale = settings.ui_language;
         renderSettings();
         applyLocale();
@@ -569,7 +594,7 @@ function saveSettings(patch) {
   });
 }
 async function synchronize() {
-  if (!ready || syncing || historyFeed.loading || document.visibilityState === "hidden")
+  if (!ready || accountPaused || runtime?.isPaused?.() || syncing || historyFeed.loading || document.visibilityState === "hidden")
     return;
   syncing = true;
   try {
@@ -641,7 +666,7 @@ $("#settings-open").addEventListener("click", async () => {
     feedback(".settings-feedback", errorKey(error), true);
   }
 });
-$("#export-open").addEventListener("click", () => exportDialog.open());
+$("#export-open").addEventListener("click", () => { if (available.export) exportDialog?.open(); });
 document
   .querySelectorAll(".dialog-close")
   .forEach((button) =>
@@ -689,7 +714,7 @@ document.addEventListener("visibilitychange", synchronize);
 window.addEventListener("focus", synchronize);
 setInterval(synchronize, 3000);
 applyLocale();
-async function initialize() {
+async function initialize(promptSettings = true) {
   try {
     [settings, catalog, versions] = await Promise.all([
       api("settings/read"),
@@ -703,9 +728,86 @@ async function initialize() {
     ready = true;
     await loadScenes();
     await loadRecords(true);
-    if (!settings.first_language) openDialog($("#settings-dialog"));
+    if (promptSettings && !settings.first_language) openDialog($("#settings-dialog"));
   } catch (error) {
     showError(error);
   }
 }
-initialize();
+if (localAccount) {
+  localProfile = createLocalProfile({
+    root: document, t, openDialog, closeDialog, openExternal,
+    call: (action) => api(action),
+    beforeChange: async () => {
+      if (accountDraftBlocked || !(await flushEditors())) return false;
+      await settingsWrites;
+      return !settingsWriteError;
+    },
+    onPause(paused) {
+      const next = paused || accountDraftBlocked;
+      if (next && !accountPaused) {
+        ++sourceRevision;
+        ++sceneCatalogVersion;
+        ++historyFeed.version;
+        historyFeed.loading = false;
+        clearTimeout(searchTimer);
+        resetSpeechButton();
+      }
+      accountPaused = next;
+      $("#records-panel").inert = next && !accountDraftBlocked;
+      $("#settings-open").disabled = next;
+      $("#export-open").disabled = next;
+      if (accountDraftBlocked) {
+        $("#records-panel").querySelectorAll("button, input").forEach((node) => { node.disabled = true; });
+        $("#records-panel").querySelectorAll("textarea").forEach((node) => { node.readOnly = true; });
+      }
+    },
+    async onSourceChange(status, previous) {
+      setAccountEpoch(status.epoch);
+      if (previous && hasDirtyEditors()) {
+        accountDraftBlocked = true;
+        localProfile.session.notify();
+        const node = $("#local-account-notice");
+        node.dataset.i18n = "accountChanged";
+        node.textContent = t("accountChanged");
+        node.hidden = false;
+        return;
+      }
+      ++sourceRevision;
+      ready = false;
+      ++historyFeed.version;
+      historyFeed.loading = false;
+      historyFeed.failed = false;
+      historyFeed.cursor = null;
+      committedFiltersKey = null;
+      clearRecords();
+      $("#records").removeAttribute("aria-busy");
+      settings = undefined;
+      settingsWriteError = null;
+      versions = undefined;
+      catalog = { languages: [], counts: {}, kinds: {}, by_language: {} };
+      sceneCatalog = [];
+      selectedLanguage = selectedKind = selectedScene = "";
+      $("#search").value = "";
+      $("#settings-fields").disabled = true;
+      localePicker.button.disabled = true;
+      renderCatalog(); renderKinds(); renderScenes();
+      Object.assign(available, { export: status.mode === "local", speech: true }, status.capabilities);
+      $("#export-open").hidden = !available.export;
+      if ($("#settings-dialog").open) closeDialog($("#settings-dialog"));
+      if ($("#export-dialog").open) closeDialog($("#export-dialog"));
+      const node = $("#local-account-notice");
+      node.hidden = accountCanRead(status);
+      node.dataset.i18n = status.state === "connecting" ? "accountConnecting" : "accountSignedOutHelp";
+      node.textContent = t(node.dataset.i18n);
+      const badge = $("#recording-badge");
+      badge.dataset.i18n = status.state === "connecting" ? "connecting" : "accountSignedOut";
+      badge.textContent = t(badge.dataset.i18n);
+      $("#load-sentinel").hidden = !accountCanRead(status);
+      if (accountCanRead(status)) await initialize(!previous && status.mode === "local");
+    },
+  });
+  localProfile.session.notify();
+  localProfile.session.refresh();
+  window.addEventListener("focus", () => localProfile.session.refresh());
+  window.addEventListener("pagehide", () => localProfile.session.dispose());
+} else initialize();

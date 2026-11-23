@@ -1,0 +1,4 @@
+/* Align the cloud session notice with the shared local/Web library gutters. */
+html[data-cloud="true"] .cloud-session {
+  width: calc(100% - 2 * var(--library-gutter));
+}

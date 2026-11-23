@@ -145,7 +145,7 @@ async def exercise(archive):
             checks.append("Guided study reads the latest attempt and excludes completed round items without writes")
             page = await call(session, "open_memory_page")
             with urlopen(page["url"]) as response:
-                assert "Language memory" in response.read().decode()
+                assert "Sayrove" in response.read().decode()
             for asset in ("entry-editor.js", "history-model.js", "scene-model.js", "export-dialog.js", "export-model.js", "date-range.js"):
                 with urlopen(page["url"] + asset) as response:
                     assert response.status == 200 and response.read()

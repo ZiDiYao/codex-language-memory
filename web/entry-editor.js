@@ -32,6 +32,39 @@ export class EntryEditor {
     input.style.height = `${Math.max(input.scrollHeight, 32)}px`;
   }
 
+  dispose() {
+    this.noteObserver?.disconnect();
+    this.noteObserver = undefined;
+    if (this.resizeFrame !== undefined) cancelAnimationFrame(this.resizeFrame);
+    this.resizeFrame = undefined;
+    this.observedNote = undefined;
+  }
+
+  queueNoteResize(input) {
+    if (this.resizeFrame !== undefined) cancelAnimationFrame(this.resizeFrame);
+    this.resizeFrame = requestAnimationFrame(() => {
+      this.resizeFrame = undefined;
+      if (this.observedNote === input && input.isConnected) this.resize(input);
+    });
+  }
+
+  observeNote(input) {
+    this.observedNote = input;
+    this.queueNoteResize(input);
+    if (typeof ResizeObserver !== "function") return;
+    let width;
+    this.noteObserver = new ResizeObserver(([entry]) => {
+      if (!entry || this.observedNote !== input) return;
+      const nextWidth = entry.contentRect.width;
+      if (nextWidth === width) return;
+      width = nextWidth;
+      // Height writes trigger observer notifications too; only width can reflow
+      // existing text. Skip collapsed notes until they become visible again.
+      if (width > 0) this.queueNoteResize(input);
+    });
+    this.noteObserver.observe(input);
+  }
+
   note(value) {
     const input = document.createElement("textarea");
     input.className = "entry-note";
@@ -48,7 +81,7 @@ export class EntryEditor {
     });
     input.addEventListener("input", () => { this.resize(input); this.queue({ note: input.value }); });
     input.addEventListener("blur", () => this.flush());
-    requestAnimationFrame(() => this.resize(input));
+    this.observeNote(input);
     return input;
   }
 
@@ -166,6 +199,7 @@ export class EntryEditor {
   }
 
   render() {
+    this.dispose();
     const record = this.record;
     const article = document.createElement("article");
     article.className = "entry-editor";

@@ -99,7 +99,7 @@ def connect_extension(locations, *, runner=run_codex):
     }}}
     atomic_write(source / "mcp.json", json.dumps(mcp, indent=2).encode())
     atomic_write(catalog, json.dumps({
-        "name": MARKETPLACE, "interface": {"displayName": "Language Memory Beta"},
+        "name": MARKETPLACE, "interface": {"displayName": "Sayrove Beta"},
         "plugins": [{"name": "language-memory", "source": {"source": "local", "path": "./extension"},
                      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
                      "category": "Productivity"}],

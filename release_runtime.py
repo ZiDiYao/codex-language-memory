@@ -12,7 +12,7 @@ from pathlib import Path
 
 from installer import InstallError, Locations, install, rollback, status, uninstall
 from extension import connect_extension, extension_status, remove_extension
-from server import create_server
+from server import create_server, create_desktop_server
 from store import Review, Store
 
 
@@ -58,7 +58,7 @@ def serve(database):
     # duplicate for the frozen bootstrap's final flush, without logging to stdout.
     output_descriptor = os.dup(sys.stdout.fileno())
     try:
-        create_server(Store(database.resolve())).run(transport="stdio")
+        create_desktop_server(database.resolve()).run(transport="stdio")
     finally:
         if sys.stdout.closed:
             sys.stdout = sys.__stdout__ = os.fdopen(output_descriptor, "w", encoding="utf-8")

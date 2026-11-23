@@ -49,3 +49,13 @@ test("host errors and malformed replies cannot masquerade as saved changes", asy
     await assert.rejects(host.request("api", { action: "settings/update", arguments: { ui_language: "en" } }));
   }
 });
+
+test("native sign-in links use the host SDK and preserve declined-link errors", async () => {
+  const links = [];
+  let declined = false;
+  const host = createHostTransport({ openLink: async ({ url }) => { links.push(url); return { isError: declined }; } });
+  await host.openExternal("https://language-memory.ca.auth0.com/authorize?state=test");
+  declined = true;
+  await assert.rejects(host.openExternal("https://language-memory.ca.auth0.com/authorize?state=test"));
+  assert.equal(links.length, 2);
+});

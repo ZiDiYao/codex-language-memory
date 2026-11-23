@@ -12,6 +12,7 @@ from mcp.types import Icon, ToolAnnotations
 from pydantic import ValidationError
 
 from dashboard_actions import dispatch
+from desktop_actions import connection_error
 from exports import ExportError, ExportRequest, build_export, export_scope
 
 APP_URI = "ui://language-memory/sidebar-v1.html"
@@ -45,8 +46,9 @@ class AppTransport:
             return handlers[route](payload)
         except ExportError as error:
             return {"status": 400, "data": {"error": str(error)}}
-        except (ValueError, TypeError, KeyError, ValidationError):
-            return {"status": 400, "data": {"error": "invalid_request"}}
+        except (ValueError, TypeError, KeyError, ValidationError) as error:
+            failure = connection_error(error)
+            return {"status": failure[0], "data": failure[1]} if failure else {"status": 400, "data": {"error": "invalid_request"}}
         except sqlite3.Error:
             return {"status": 503, "data": {"error": "database_unavailable"}}
 
@@ -87,28 +89,28 @@ class AppTransport:
 def register_app(server, store):
     transport = AppTransport(store)
 
-    @server.resource(APP_URI, name="Language memory", mime_type="text/html;profile=mcp-app", meta={
+    @server.resource(APP_URI, name="Sayrove", mime_type="text/html;profile=mcp-app", meta={
         "ui": {"prefersBorder": False, "csp": {"connectDomains": [], "resourceDomains": []}},
         "openai/ui": {"preferredDisplayMode": "fullscreen", "availableDisplayModes": ["fullscreen"]},
     })
     def app_resource() -> str:
         return APP_FILE.read_text(encoding="utf-8")
 
-    @server.tool(name="open_memory_app", title="Language memory",
+    @server.tool(name="open_memory_app", title="Sayrove",
                  annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=False),
                  icons=[Icon(src=ICON, mimeType="image/svg+xml", sizes=["any"])], meta={
                      "ui": {"resourceUri": APP_URI},
                      "openai/ui": {"entrypoints": [{"type": "global"}]},
                  })
     def open_memory_app() -> dict[str, Any]:
-        """Open Language memory inside the host: browse notes, edit and change settings.
+        """Open Sayrove inside the host: browse notes, edit and change settings.
         Uses the same local database as conversational tools. Hosts without MCP Apps can
         use open_memory_page instead. Opening the app does not record a learning encounter.
         """
         return {"ready": True}
 
-    @server.tool(name="memory_app_request", title="Language memory page actions",
-                 annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False),
+    @server.tool(name="memory_app_request", title="Sayrove page actions",
+                 annotations=ToolAnnotations(destructiveHint=False, openWorldHint=getattr(store, "account", None) is not None),
                  meta={"ui": {"visibility": ["app"]}})
     def memory_app_request(route: Literal["api", "export", "export_complete"],
                            payload: dict[str, Any]) -> dict[str, Any]:

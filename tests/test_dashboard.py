@@ -87,7 +87,7 @@ class PageTests(unittest.TestCase):
     def test_page_settings_and_records_share_mcp_store(self):
         with urlopen(self.url) as response:
             self.assertEqual(response.status, 200)
-            self.assertIn("Language memory", response.read().decode())
+            self.assertIn("Sayrove", response.read().decode())
         for asset in ("app.js", "record-feed.js", "style.css"):
             with urlopen(self.url + asset) as response:
                 self.assertEqual(response.status, 200)
