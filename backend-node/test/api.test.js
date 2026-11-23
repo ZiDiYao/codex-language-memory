@@ -6,6 +6,7 @@ import { CompactSign, exportJWK, generateKeyPair, SignJWT } from "jose";
 import { createApp } from "../src/app.js";
 import { createTokenVerifier } from "../src/auth.js";
 import { loadConfig } from "../src/config.js";
+import { DESKTOP_TABLES, validateDesktopSnapshot } from "../src/desktop-import.js";
 
 const keyPair = await generateKeyPair("RS256", { extractable: true });
 const publicJwk = { ...await exportJWK(keyPair.publicKey), kid: "api-test-key", alg: "RS256", use: "sig" };
@@ -240,6 +241,53 @@ test("Languages and changes routes use only the verified tenant and reject anony
   await call("/v1/settings", { method: "PATCH", body: { enabled: false } });
   assert.equal((await call("/v1/changes")).body.preferences, 1);
   assert.equal((await call("/v1/changes", { subject: "bob" })).body.preferences, 0);
+});
+
+test("desktop import requires verified memory:write, scopes the tenant, and bounds only this route at 8 MiB", async (t) => {
+  const calls = [], receipts = new Map();
+  const origin = "https://web.example";
+  const service = await fixture(t, { webAllowedOrigins: origin, repositoryFactory: (principal) => ({
+    async import_desktop(body) {
+      const validated = validateDesktopSnapshot(body);
+      calls.push({ subject: principal.subject, source: validated.sourceId });
+      const key = principal.subject + ":" + validated.sourceId;
+      const previous = receipts.get(key);
+      if (previous && previous !== validated.payloadSha) return { status: "failed", error: "import_source_conflict", source_id: validated.sourceId };
+      receipts.set(key, validated.payloadSha);
+      return { status: previous ? "already_imported" : "imported", source_id: validated.sourceId, payload_sha: validated.payloadSha };
+    },
+  }) });
+  const snapshot = { schema_version: 1, source_id: randomUUID(), tables: Object.fromEntries(DESKTOP_TABLES.map(name => [name, []])) };
+  assert.equal((await service.call("/v1/desktop-imports", { method: "POST", authorization: "", body: snapshot })).status, 401);
+  assert.equal((await service.call("/v1/desktop-imports", { method: "POST", body: snapshot,
+    authorization: `Bearer ${await service.token("alice", { scope: "memory:read" })}` })).status, 403);
+  assert.equal(calls.length, 0);
+  const imported = await service.call("/v1/desktop-imports", { method: "POST", body: snapshot,
+    authorization: `Bearer ${await service.token("alice", { scope: "memory:write" })}`, headers: { Origin: origin } });
+  assert.equal(imported.status, 200);
+  assert.equal(imported.body.status, "imported");
+  assert.equal(imported.headers.get("access-control-allow-origin"), origin);
+  assert.equal((await service.call("/v1/desktop-imports", { method: "POST", body: snapshot })).body.status, "already_imported");
+  assert.equal((await service.call("/v1/desktop-imports", { method: "POST", body: snapshot, subject: "bob" })).body.status, "imported");
+  assert.deepEqual(calls.map(call => call.subject), ["alice", "alice", "bob"]);
+  const changed = structuredClone(snapshot); changed.tables.settings = [{ id: 1, recording: 0 }];
+  const conflict = await service.call("/v1/desktop-imports", { method: "POST", body: changed });
+  assert.equal(conflict.status, 409); assert.equal(conflict.body.error, "import_source_conflict");
+  assert.equal((await service.call("/v1/desktop-imports", { method: "POST", body: { ...snapshot, user_id: "bob" } })).status, 422);
+  assert.equal((await service.call("/v1/desktop-imports?user_id=bob", { method: "POST", body: snapshot })).status, 422);
+  assert.equal((await service.call("/v1/desktop-imports")).status, 405);
+  const large = structuredClone(snapshot); large.source_id = randomUUID();
+  large.tables.export_receipts = Array.from({ length: 15 }, (_, index) => ({ scope: "archive-" + index,
+    data: JSON.stringify({ archived_learning_metadata: "x".repeat(90000) }) }));
+  assert.ok(Buffer.byteLength(JSON.stringify(large)) > 1024 * 1024);
+  assert.equal((await service.call("/v1/desktop-imports", { method: "POST", body: large })).status, 200);
+  assert.equal((await service.call("/v1/desktop-imports", { method: "POST", body: { padding: "x".repeat(8 * 1024 * 1024) } })).status, 413);
+  const preflight = await service.call("/v1/desktop-imports", { method: "OPTIONS", authorization: "", headers: {
+    Origin: origin, "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "Authorization, Content-Type",
+  } });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get("access-control-allow-methods"), "POST");
+  assert.equal(preflight.headers.get("access-control-allow-credentials"), null);
 });
 
 test("real JWKS/RSA authentication, metadata, health and scope enforcement", async (t) => {

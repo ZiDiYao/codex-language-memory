@@ -1,8 +1,4 @@
-"""Route desktop data operations to the selected local store or cloud account.
-
-Selecting a cloud account never imports, copies, or falls back to local records.
-The account manager owns authentication, refresh, and remote transport security.
-"""
+"""Cloud desktop facade; legacy SQLite routing is available only to explicit fixtures."""
 
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -33,9 +29,11 @@ def _remote_id(value):
 class RoutingStore:
     """Store-compatible facade shared by the desktop dashboard and MCP tools."""
 
-    def __init__(self, local_store: Store, account_manager):
+    def __init__(self, local_store: Store | None, account_manager, *, cloud_only=True, migration=None):
         self._local = local_store
         self._account = account_manager
+        self._cloud_only = cloud_only
+        self._migration = migration
         self._expectation = ContextVar("sayrove_store_epoch", default=None)
 
     @property
@@ -47,6 +45,8 @@ class RoutingStore:
         if (not isinstance(state, dict) or state.get("mode") not in ("local", "cloud")
                 or state.get("state") not in ("signed_out", "connecting", "connected", "error")
                 or type(state.get("epoch")) is not int or state["epoch"] < 0):
+            raise CloudAccountUnavailable()
+        if self._cloud_only and state["mode"] != "cloud":
             raise CloudAccountUnavailable()
         expectation = self._expectation.get()
         if expectation is not None:
@@ -156,6 +156,8 @@ class RoutingStore:
             value = getattr(self._local, method)(*arguments, **(keywords or {}))
         else:
             self._connected(snapshot)
+            if self._migration is not None:
+                self._migration.ensure(self._account, expected_epoch=snapshot["epoch"])
             value = cloud(snapshot["epoch"])
         self._unchanged(snapshot)
         if metadata:

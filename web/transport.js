@@ -42,7 +42,7 @@ export async function saveDownload(response) {
 }
 
 export function capabilities() {
-  return { export: true, speech: true, ...globalThis.languageMemoryRuntime?.capabilities };
+  return { export: false, speech: true, ...globalThis.languageMemoryRuntime?.capabilities };
 }
 
 export async function openExternal(url) {

@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "language-memory",
-  "version": "0.2.0-beta.36",
-  "description": "Local language-learning memory and adaptive review for Codex.",
+  "version": "0.2.0-beta.37",
+  "description": "Sayrove cloud language-learning memory and review.",
   "author": {"name": "ZiDiYao"},
   "repository": "https://github.com/ZiDiYao/codex-language-memory",
   "extensions": {

@@ -53,12 +53,18 @@ def healthcheck(database):
         dashboard.close()
 
 
-def serve(database):
+def serve(database, sandbox_root=None):
     # The SDK's UTF-8 wrapper can close shared stdout on shutdown. Keep a
     # duplicate for the frozen bootstrap's final flush, without logging to stdout.
     output_descriptor = os.dup(sys.stdout.fileno())
     try:
-        create_desktop_server(database.resolve()).run(transport="stdio")
+        if sandbox_root is not None:
+            # Frozen acceptance fixtures exercise the retained legacy engine in
+            # an explicit isolated sandbox, never the installed user's data.
+            database.resolve().relative_to(sandbox_root.resolve())
+            create_server(Store(database.resolve())).run(transport="stdio")
+        else:
+            create_desktop_server(database.resolve()).run(transport="stdio")
     finally:
         if sys.stdout.closed:
             sys.stdout = sys.__stdout__ = os.fdopen(output_descriptor, "w", encoding="utf-8")
@@ -72,7 +78,12 @@ def check_runtime(database):
 
 
 def migrate(database):
-    Store(database.resolve())
+    # Cloud releases retain an existing legacy file unchanged for import/backup.
+    # A fresh installation must not create a parallel local learning database.
+    if database.exists():
+        with sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True) as connection:
+            if connection.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+                raise InstallError("Legacy database integrity check failed")
     return {"status": "ready"}
 
 
@@ -152,7 +163,7 @@ def main():
     locations = Locations.default(args.sandbox_root)
     database = args.db or Path(os.getenv("LANGUAGE_MEMORY_DB", str(locations.database))).expanduser()
     operations = {
-        "serve": lambda: serve(database),
+        "serve": lambda: serve(database, args.sandbox_root),
         "healthcheck": lambda: check_runtime(database),
         "migrate": lambda: migrate(database),
         "install": lambda: install_package(args.package, locations),

@@ -1,4 +1,4 @@
-LANGUAGE MEMORY — LOCAL BETA
+SAYROVE — DESKTOP BETA
 
 For Apple Silicon Macs (M1 or later). Codex desktop or CLI is required.
 Python, pip, Git, a separate AI API key and manual path configuration are not required.
@@ -7,8 +7,9 @@ INSTALL OR UPDATE
 1. Extract the complete ZIP; keep its contents together.
 2. Double-click Install.command. It also upgrades an existing installation.
 3. Wait for the success message, then restart Codex and start a new conversation.
-4. Ask: "What does approach mean in 'The new approach worked'?"
-   Then: "Open the language learning page."
+4. Open the language learning page. In Profile, choose Sign in and connect your account.
+5. Existing learning records import once into that account. The website and plugin
+   then use the same cloud library. Mac Keychain retains the login credentials.
 
 This Beta is not Developer ID signed or notarized. macOS may block the downloaded
 command or runtime. Use Apple's normal Privacy & Security / Open Anyway flow only
@@ -35,12 +36,13 @@ These command files can be run from any extracted release folder. No folder path
 needs to be typed. Close and reopen this folder after downloading a new release.
 
 DATA AND PRIVACY
-Learning records stay in ~/.local/share/codex-language-memory/memory.sqlite3 by
-default. Installed code is under ~/Library/Application Support/Codex Language Memory.
-Backups are stored next to the database, in backups/. Existing custom database
-locations are retained. Do not delete that directory if you want to keep your records.
-Relevant records retrieved by tools enter your Codex conversation and are subject to
-its normal data handling. The plugin adds no telemetry or hosted learning backend.
+Active learning records are stored in your signed-in cloud account. The desktop
+never switches to local records when signed out or offline. Existing SQLite files
+and migration copies remain only as backups in the existing data directory.
+The first import is account-bound and safe to retry; changing accounts later does
+not copy that backup again. OAuth tokens are kept in macOS Keychain, not the database.
+Installed code is under ~/Library/Application Support/Codex Language Memory.
+Relevant records retrieved by tools enter your conversation under its normal data handling.
 
 Only this plugin's MCP entry and Skill link are changed. Other Codex configuration
 and credentials are preserved. An unrelated server or skill with the same name

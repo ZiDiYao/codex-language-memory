@@ -1,12 +1,14 @@
 import { AuthenticationError, authenticate, createTokenVerifier } from "./auth.js";
 import { handleMcpRequest } from "./mcp.js";
 import { parse, ValidationError } from "./schemas.js";
+import { MAX_DESKTOP_IMPORT_BODY } from "./desktop-import.js";
 
 export const MAX_BODY = 1024 * 1024;
 const REST_METHODS = Object.freeze({
   "/v1/settings": ["GET", "PATCH"], "/v1/points": ["GET"], "/v1/captures": ["POST"],
   "/v1/scenes": ["GET"], "/v1/review-queue": ["GET"], "/v1/reviews": ["POST"],
   "/v1/languages": ["GET"], "/v1/changes": ["GET"],
+  "/v1/desktop-imports": ["POST"],
 });
 const restMethods = (path) => REST_METHODS[path] ?? (/^\/v1\/points\/\d+$/.test(path) ? ["GET", "PATCH", "DELETE"] : null);
 
@@ -59,17 +61,17 @@ function preflight(request, response, path) {
   response.end();
 }
 
-async function readJson(request) {
+async function readJson(request, maxBody = MAX_BODY) {
   if ((request.headers["content-type"] ?? "").split(";", 1)[0].trim().toLowerCase() !== "application/json")
     throw new APIError(415, "json_required");
   const declared = request.headers["content-length"];
-  if (declared && Number(declared) > MAX_BODY) throw new APIError(413, "request_too_large");
+  if (declared && Number(declared) > maxBody) throw new APIError(413, "request_too_large");
   const chunks = [];
   let size = 0;
   try {
     for await (const chunk of request.iterator({ destroyOnReturn: false })) {
       size += chunk.length;
-      if (size > MAX_BODY) { request.resume(); throw new APIError(413, "request_too_large"); }
+      if (size > maxBody) { request.resume(); throw new APIError(413, "request_too_large"); }
       chunks.push(chunk);
     }
   } catch (error) { if (error instanceof APIError) throw error; throw new APIError(400, "invalid_request"); }
@@ -99,13 +101,15 @@ function queryArguments(search, model) {
 
 function resultStatus(result) {
   if (result?.status === "not_found") return 404;
-  if (result?.status === "failed") return ["edit_conflict", "identity_conflict", "request_id_conflict"].includes(result.error) ? 409 : 400;
+  if (result?.status === "failed") return ["edit_conflict", "identity_conflict", "request_id_conflict", "import_source_conflict"].includes(result.error) ? 409 : 400;
   return 200;
 }
 
 /** Native Node HTTP handler; authentication is shared by every data operation. */
 export function createApp({ config, repositoryFactory, verifyToken, readiness, logger = console }) {
   const verify = verifyToken ?? createTokenVerifier(config);
+  const importConfig = { ...config, requiredScopes: ["memory:write"] };
+  const verifyImport = verifyToken ?? createTokenVerifier(importConfig);
   const metadata = { resource: config.resourceUrl, authorization_servers: [config.authIssuer],
     scopes_supported: [...config.requiredScopes], bearer_methods_supported: ["header"] };
   return async function handler(request, response) {
@@ -131,7 +135,8 @@ export function createApp({ config, repositoryFactory, verifyToken, readiness, l
       }
       if (request.method === "GET" && path === "/.well-known/oauth-protected-resource/mcp") return send(response, 200, metadata);
       if (path !== "/mcp" && !path.startsWith("/v1/")) throw new APIError(404, "not_found");
-      const principal = await authenticate(request, config, verify);
+      const principal = path === "/v1/desktop-imports"
+        ? await authenticate(request, importConfig, verifyImport) : await authenticate(request, config, verify);
       if (path === "/mcp") {
         // No shared MCP server, session map, global principal or user-controlled user_id.
         const body = request.method === "POST" ? await readJson(request) : undefined;
@@ -146,7 +151,11 @@ export function createApp({ config, repositoryFactory, verifyToken, readiness, l
         }
       }
       let result;
-      if (path === "/v1/settings" && request.method === "GET") result = await call("settings");
+      if (path === "/v1/desktop-imports" && request.method === "POST") {
+        if (url.search) throw new APIError(422, "invalid_request");
+        result = await call("import_desktop", await readJson(request, MAX_DESKTOP_IMPORT_BODY));
+      }
+      else if (path === "/v1/settings" && request.method === "GET") result = await call("settings");
       else if (path === "/v1/settings" && request.method === "PATCH") result = await call("settings", parse("settingsPatch", await readJson(request)));
       else if (["/v1/languages", "/v1/changes"].includes(path) && request.method === "GET") {
         if (url.search) throw new APIError(422, "invalid_request");

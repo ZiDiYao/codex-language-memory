@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { accountCanRead, accountStatus, authorizationUrl, createLocalProfile, LocalAccountSession } from "../web/local-profile.js";
 import { request, setAccountEpoch } from "../web/transport.js";
 
-const local = { mode: "local", state: "signed_out", epoch: 0, capabilities: { export: true, speech: true } };
+const initial = { mode: "cloud", state: "signed_out", epoch: 0, capabilities: { export: false, speech: true } };
 const connected = { mode: "cloud", state: "connected", epoch: 2, capabilities: { export: false, speech: true } };
 const signedOut = { ...connected, state: "signed_out", epoch: 3 };
 const authUrl = "https://language-memory.ca.auth0.com/authorize?state=opaque-test-state&code_challenge=opaque-test-challenge";
@@ -11,7 +11,7 @@ const deferred = () => { let resolve; const promise = new Promise((done) => { re
 function setup(overrides = {}) {
   const events = [];
   const session = new LocalAccountSession({
-    call: async () => local,
+    call: async () => initial,
     beforeChange: async () => { events.push("flush"); return true; },
     onPause: (paused) => events.push(["pause", !!paused]),
     onSourceChange: async (status) => events.push(["source", status.mode, status.state, status.epoch]),
@@ -56,20 +56,20 @@ test("account switching waits for saved drafts, rejects duplicate clicks, and ne
   const flush = deferred();
   const calls = [];
   const { session, events } = setup({ beforeChange: () => flush.promise, call: async (action) => { calls.push(action); return connected; } });
-  await session.accept(local);
+  await session.accept(initial);
   const first = session.change("account/connect");
-  assert.equal(await session.change("account/use-local"), false);
+  assert.equal(await session.change("account/disconnect"), false);
   assert.deepEqual(calls, []);
   flush.resolve(false);
   assert.equal(await first, false);
   assert.deepEqual(calls, []);
-  assert.equal(session.status.mode, "local");
+  assert.equal(session.status.mode, "cloud");
   assert.ok(events.some((event) => event[0] === "error" && event[1] === "accountUnsaved"));
 });
 
 test("sign-in opens only the backend authorization page and signing out keeps the cloud source selected", async () => {
   const calls = [];
-  const responses = [local, { ...connected, epoch: 1, state: "connecting", authorization_url: authUrl }, connected, signedOut, { ...local, epoch: 4 }];
+  const responses = [initial, { ...connected, epoch: 1, state: "connecting", authorization_url: authUrl }, connected, signedOut];
   const { session, events } = setup({ call: async (action) => { calls.push(action); return responses.shift(); } });
   await session.refresh();
   await session.change("account/connect");
@@ -81,9 +81,7 @@ test("sign-in opens only the backend authorization page and signing out keeps th
   assert.equal(session.status.mode, "cloud");
   assert.equal(accountCanRead(session.status), false);
   assert.equal(session.status.capabilities.export, false);
-  await session.change("account/use-local");
-  assert.equal(session.status.mode, "local");
-  assert.deepEqual(calls, ["account/status", "account/connect", "account/status", "account/disconnect", "account/use-local"]);
+  assert.deepEqual(calls, ["account/status", "account/connect", "account/status", "account/disconnect"]);
 });
 
 test("an old status response cannot restore records from the account that was just signed out", async () => {
@@ -99,11 +97,26 @@ test("an old status response cannot restore records from the account that was ju
   assert.deepEqual(events.filter((event) => event[0] === "source").at(-1), ["source", "cloud", "signed_out", 3]);
 });
 
+test("legacy local-ready states cannot unlock the library or fall back after cloud sign-out", async () => {
+  const calls = [];
+  const { session, events } = setup({ call: async (action) => { calls.push(action); return { mode: "local", state: "connected", epoch: 1 }; } });
+  assert.equal(accountCanRead({ mode: "local", state: "connected" }), false);
+  assert.throws(() => accountStatus({ mode: "local", state: "connected", epoch: 1 }));
+  await session.refresh();
+  assert.equal(session.status, null);
+  assert.equal(events.filter((event) => event[0] === "source").length, 0);
+  assert.ok(events.some((event) => event[0] === "error" && event[1] === "accountFailure"));
+  await session.accept(signedOut);
+  assert.equal(await session.change("account/use-local"), false);
+  assert.deepEqual(calls, ["account/status"]);
+  assert.equal(accountCanRead(session.status), false);
+});
+
 test("authorization URLs reject other origins, unsafe schemes, credentials, fragments and unexpected provider endpoints", () => {
   assert.equal(authorizationUrl(authUrl), authUrl);
   for (const url of ["javascript:alert(1)", "http://language-memory.ca.auth0.com/authorize", "https://language-memory.ca.auth0.com.evil.example/authorize", "https://user:secret@language-memory.ca.auth0.com/authorize", "https://language-memory.ca.auth0.com/authorize#secret", "https://language-memory.ca.auth0.com/oauth/token"])
     assert.throws(() => authorizationUrl(url));
-  const status = accountStatus({ ...local, can_connect: false, access_token: "never-expose", sub: "private-account-id" });
+  const status = accountStatus({ ...initial, can_connect: false, access_token: "never-expose", sub: "private-account-id" });
   assert.equal(status.can_connect, false);
   assert.equal(status.access_token, undefined);
   assert.equal(status.sub, undefined);
@@ -122,7 +135,7 @@ test("disposing a page suppresses a late account response and cancels status pol
   assert.ok(canceled > 0);
 });
 
-test("local data requests bind the observed account epoch while account actions and the web runtime keep their own contract", async () => {
+test("desktop data requests bind the observed account epoch while account actions and the web runtime keep their own contract", async () => {
   const previousHost = globalThis.languageMemoryHost;
   const previousRuntime = globalThis.languageMemoryRuntime;
   const calls = [];
@@ -144,19 +157,26 @@ test("local data requests bind the observed account epoch while account actions 
   }
 });
 
-test("the default ready local store offers Sign in while legacy stores that cannot connect hide it", async () => {
+test("signed-out cloud profiles offer Sign in, connected profiles offer Sign out, and no local-library action is bound", async () => {
   const nodes = new Map();
   const node = (selector) => {
+    assert.notEqual(selector, "#local-profile-local");
     if (!nodes.has(selector)) nodes.set(selector, { hidden: false, addEventListener() {}, querySelectorAll: () => [], setAttribute() {}, focus() {} });
     return nodes.get(selector);
   };
   const profile = createLocalProfile({ root: { querySelector: node }, t: (key) => key,
-    openDialog() {}, closeDialog() {}, call: async () => local, beforeChange: async () => true,
+    openDialog() {}, closeDialog() {}, call: async () => initial, beforeChange: async () => true,
     onPause() {}, onSourceChange: async () => {}, openExternal: async () => {}, schedule: () => 1, cancel() {} });
-  await profile.session.accept({ ...local, state: "connected", can_connect: true });
+  await profile.session.accept({ ...initial, can_connect: true });
   assert.equal(node("#local-profile-connect").hidden, false);
   assert.equal(node("#local-profile-disconnect").hidden, true);
-  assert.equal(node("#local-profile-mode").textContent, "accountLocal");
-  await profile.session.accept({ ...local, state: "connected", can_connect: false });
+  assert.equal(node("#local-profile-mode").textContent, "accountCloud");
+  assert.equal(node("#local-profile-status").textContent, "accountSignedOutHelp");
+  assert.equal(node("#local-profile-footer").hidden, true);
+  await profile.session.accept(connected);
+  assert.equal(node("#local-profile-connect").hidden, true);
+  assert.equal(node("#local-profile-disconnect").hidden, false);
+  assert.equal(node("#local-profile-footer").hidden, false);
+  await profile.session.accept({ ...initial, can_connect: false });
   assert.equal(node("#local-profile-connect").hidden, true);
 });

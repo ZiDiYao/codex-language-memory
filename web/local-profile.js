@@ -1,4 +1,4 @@
-/** Local account state contains no tokens or identity claims. */
+/** Desktop cloud account state contains no tokens or identity claims. */
 export function authorizationUrl(value) {
   const url = new URL(value);
   if (url.origin !== "https://language-memory.ca.auth0.com" || url.pathname !== "/authorize" ||
@@ -8,7 +8,7 @@ export function authorizationUrl(value) {
 
 export function accountStatus(value) {
   const status = value?.status && typeof value.status === "object" ? value.status : value;
-  if (!status || !["local", "cloud"].includes(status.mode) ||
+  if (!status || status.mode !== "cloud" ||
       !["signed_out", "connecting", "connected", "error"].includes(status.state)) throw new Error("unavailable");
   let authorization_url = null;
   if (typeof status.authorization_url === "string") {
@@ -19,7 +19,7 @@ export function accountStatus(value) {
 }
 
 export function accountCanRead(status) {
-  return !!status && status.state !== "connecting" && (status.mode === "local" || status.state === "connected");
+  return status?.mode === "cloud" && status.state === "connected";
 }
 
 function sourceKey(status) {
@@ -67,7 +67,7 @@ export class LocalAccountSession {
     finally { if (version === this.requestVersion) this.queue(); }
   }
   async change(action) {
-    if (this.pending || this.stopped) return false;
+    if (this.pending || this.stopped || !["account/connect", "account/disconnect"].includes(action)) return false;
     this.pending = true;
     ++this.requestVersion;
     this.cancel(this.timer);
@@ -98,15 +98,14 @@ export function createLocalProfile({ root, t, openDialog, closeDialog, ...option
   const panel = $("dialog");
   let feedbackKey = null;
   const render = (status, pending = false) => {
-    const local = status?.mode === "local";
-    const connected = !local && status?.state === "connected";
+    const connected = accountCanRead(status);
     const connecting = status?.state === "connecting";
-    $("mode").textContent = t(local ? "accountLocal" : "accountCloud");
+    $("mode").textContent = t("accountCloud");
     $("status").textContent = t(!status ? "connecting" : connecting ? "accountConnecting" :
-      local ? "accountLocalHelp" : connected ? "accountConnectedHelp" : status.state === "error" ? "accountFailure" : "accountSignedOutHelp");
+      connected ? "accountConnectedHelp" : status.state === "error" ? "accountFailure" : "accountSignedOutHelp");
     $("connect").hidden = !status || status.can_connect === false || connected || connecting;
-    $("disconnect").hidden = local || (!connected && !connecting);
-    $("local").hidden = local && !connecting;
+    $("disconnect").hidden = !connected && !connecting;
+    $("footer").hidden = !connected && !connecting;
     $("authorize").hidden = !connecting || !status.authorization_url;
     for (const button of panel.querySelectorAll("[data-account-action]")) button.disabled = pending;
     $("feedback").textContent = feedbackKey ? t(feedbackKey) : "";
@@ -116,7 +115,7 @@ export function createLocalProfile({ root, t, openDialog, closeDialog, ...option
   trigger.addEventListener("click", () => { feedbackKey = null; render(session.status, session.pending); openDialog(panel); trigger.setAttribute("aria-expanded", "true"); session.refresh(); });
   $("close").addEventListener("click", () => closeDialog(panel));
   panel.addEventListener("close", () => { trigger.setAttribute("aria-expanded", "false"); trigger.focus({ preventScroll: true }); });
-  for (const [id, action] of [["connect", "account/connect"], ["disconnect", "account/disconnect"], ["local", "account/use-local"]])
+  for (const [id, action] of [["connect", "account/connect"], ["disconnect", "account/disconnect"]])
     $(id).addEventListener("click", () => { feedbackKey = null; session.change(action); });
   $("authorize").addEventListener("click", () => session.authorize());
   return { session, relabel: () => render(session.status, session.pending) };

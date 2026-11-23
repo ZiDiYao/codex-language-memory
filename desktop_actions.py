@@ -4,7 +4,6 @@ ACCOUNT_ACTIONS = {
     "account/status": "status",
     "account/connect": "begin_login",
     "account/disconnect": "disconnect",
-    "account/use-local": "use_local",
 }
 
 
@@ -32,9 +31,9 @@ def connection_error(error):
     """Keep stable account errors usable without exposing transport/provider details."""
     code = getattr(error, "code", None)
     authentication = {"cloud_not_connected", "authentication_required"}
-    conflict = {"account_changed", "connection_epoch_required", "account_busy"}
-    unavailable = {"cloud_unavailable", "credential_store_unavailable", "account_state_unavailable", "invalid_cloud_response"}
-    invalid = {"cloud_feature_unavailable", "unsupported_cloud_operation", "cloud_request_failed", "cloud_tool_failed"}
+    conflict = {"account_changed", "connection_epoch_required", "account_busy", "cloud_import_account_mismatch"}
+    unavailable = {"cloud_unavailable", "credential_store_unavailable", "account_state_unavailable", "invalid_cloud_response", "cloud_import_unavailable"}
+    invalid = {"cloud_feature_unavailable", "unsupported_cloud_operation", "cloud_request_failed", "cloud_tool_failed", "cloud_import_too_large"}
     if code not in authentication | conflict | unavailable | invalid:
         return None
     return (401 if code in authentication else 409 if code in conflict else 503 if code in unavailable else 400,

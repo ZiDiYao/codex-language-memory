@@ -1,0 +1,13 @@
+# Desktop evidence import
+
+`POST /v1/desktop-imports` accepts a bearer token for the existing API audience with `memory:write`. The tenant comes only from the verified issuer and subject. This route alone accepts up to 8 MiB; normal REST and MCP requests retain their 1 MiB limit.
+
+The envelope is `{schema_version: 1, source_id: UUID, tables: {...}}`. The eleven fixed table names are exported as `DESKTOP_TABLES`; each value is an array of raw SQLite row objects. Columns are validated against closed row schemas. SQLite TEXT JSON stays a string in the archived snapshot. Credentials, arbitrary table names, SQL, file-upload paths and client-selected tenant fields are not accepted as control parameters.
+
+The server hashes canonical JSON and commits the receipt, complete tenant-bound snapshot archive, point ID mapping and imported evidence in one tenant write transaction. A retry with the same source and payload returns `already_imported`. A changed payload with that source returns HTTP 409 `import_source_conflict`. Successful responses contain `source_id`, `payload_sha`, counts, ID maps and conflict IDs; they do not echo learning text.
+
+New points retain original notes, scenes, captured senses, dates, encounter counters, mastery and supported FSRS state. This operation does not call `save_points`, record a new encounter, train a review or change mastery automatically. Existing cloud edits, manual scene selections and memory cards win identity collisions; the local versions remain recoverable in the original archive. Exact existing encounters and review evidence are deduplicated. Counters combine conservatively. Unsupported memory algorithms/cards remain archived and are reported in `conflicts`. Settings are adopted only when the cloud account has no points and its current settings are defaults. Study sessions, preferences and export receipts remain in the archive until their cloud features are implemented.
+
+Run `npm run migrate` before starting the upgraded Node service. It upgrades both an empty database and an existing shared base schema under the schema advisory lock. The shared Python Alembic head remains `0001_remote_storage`; Node-owned additions are tracked separately at `0002_desktop_imports` in `lm_node_migrations`. Python CRUD remains compatible. Alembic's exact metadata check applies to the shared base before Node additions; it will report the two Node-owned tables as additional tables afterward. The interoperability suite explicitly checks the base and then verifies Python CRUD against the extended database.
+
+Import validation and integration tests use isolated fixtures and temporary schemas. Never use a production database as `TEST_DATABASE_URL`.

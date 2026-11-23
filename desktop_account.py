@@ -21,6 +21,7 @@ import secrets
 import tempfile
 import threading
 import time
+import uuid
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
@@ -61,8 +62,9 @@ for _sdk_logger in ("mcp.client.auth.oauth2", "mcp.client.streamable_http", "mcp
 
 
 class _StateFile:
-    def __init__(self, path):
+    def __init__(self, path, *, cloud_only=True):
         self.path = Path(path)
+        self.cloud_only = cloud_only
 
     @contextmanager
     def locked(self):
@@ -82,8 +84,13 @@ class _StateFile:
                 except (ValueError, OSError):
                     raise AccountError("account_state_unavailable") from None
             else:
-                state = {"mode": "local", "state": "connected", "epoch": 0}
+                state = {"mode": "cloud" if self.cloud_only else "local",
+                         "state": "signed_out" if self.cloud_only else "connected", "epoch": 0}
             before = dict(state)
+            if self.cloud_only and state["mode"] == "local":
+                state.update(mode="cloud", state="signed_out", epoch=state["epoch"] + 1)
+                state.pop("error", None)
+                state.pop("login_deadline", None)
             yield state
             if state != before or not self.path.exists():
                 fd, temporary = tempfile.mkstemp(prefix=".account-", dir=self.path.parent)
@@ -417,9 +424,36 @@ def _account_error(error):
     return AccountError("cloud_unavailable")
 
 
+def _import_payload(value):
+    """Capture a bounded JSON object before handing it to the account worker."""
+    tables = {"knowledge", "settings", "capture_preferences", "encounters", "review_events", "memory_states",
+              "learner_preferences", "export_receipts", "study_sessions", "study_items", "study_answers"}
+    if (not isinstance(value, dict) or set(value) != {"schema_version", "source_id", "tables"}
+            or type(value.get("schema_version")) is not int or value["schema_version"] != 1
+            or not isinstance(value.get("source_id"), str)
+            or not isinstance(value.get("tables"), dict) or set(value["tables"]) != tables
+            or any(not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows)
+                   for rows in value["tables"].values())):
+        raise AccountError("unsupported_cloud_operation")
+    try:
+        if str(uuid.UUID(value["source_id"])) != value["source_id"]:
+            raise ValueError()
+        encoded = json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+        if len(encoded.encode("utf-8")) > 8 * 1024 * 1024:
+            raise ValueError()
+        return json.loads(encoded)
+    except (ValueError, TypeError, UnicodeError):
+        raise AccountError("unsupported_cloud_operation") from None
+
+
 class AccountManager:
-    def __init__(self, *, state_path=None, credentials=None, http_transport=None, login_timeout=300, request_timeout=30):
-        self.state = _StateFile(state_path or Path.home() / "Library/Application Support/Codex Language Memory/account-state.json")
+    def __init__(self, *, state_path=None, credentials=None, http_transport=None, login_timeout=300, request_timeout=30,
+                 cloud_only=True):
+        if type(cloud_only) is not bool:
+            raise ValueError("cloud_only must be a boolean")
+        self.cloud_only = cloud_only
+        self.state = _StateFile(state_path or Path.home() / "Library/Application Support/Codex Language Memory/account-state.json",
+                                cloud_only=cloud_only)
         # Separate profiles can have the same numeric epoch. Bind their Keychain
         # items to the canonical state path, so neither reads nor deletes another
         # profile's account while same-profile MCP processes still share refresh.
@@ -480,6 +514,8 @@ class AccountManager:
             raise AccountError("account_changed")
 
     def _change(self, mode, state):
+        if self.cloud_only and mode != "cloud":
+            raise AccountError("unsupported_cloud_operation")
         with self._lock:
             revoke = None
             with self.state.locked() as stored:
@@ -547,8 +583,32 @@ class AccountManager:
         return self.status()
 
     def use_local(self):
+        # Kept solely for explicit legacy fixtures; production never exposes a
+        # local storage mode and cannot silently fall back after sign-out.
+        if self.cloud_only:
+            raise AccountError("unsupported_cloud_operation")
         self._change("local", "connected")
         return self.status()
+
+    def account_fingerprint(self, *, expected_epoch=None):
+        """Internal receipt binding, never included in public account status."""
+        with self.state.locked() as state:
+            if expected_epoch is not None and state["epoch"] != expected_epoch:
+                raise AccountError("account_changed")
+            if state["mode"] != "cloud" or state["state"] != "connected":
+                raise AccountError("authentication_required")
+            value = self.credentials.read()
+            if value.get("epoch") != state["epoch"]:
+                raise AccountError("authentication_required")
+            try:
+                fingerprint, _ = _token_identity(OAuthToken.model_validate(value.get("tokens")))
+                client = value.get("client", {})
+                if (value.get("identity") != fingerprint or client.get("issuer") != ISSUER
+                        or client.get("token_endpoint_auth_method") != "none"):
+                    raise ValueError()
+            except Exception:
+                raise AccountError("authentication_required") from None
+            return fingerprint
 
     def begin_login(self):
         with self._lock:
@@ -660,7 +720,7 @@ class AccountManager:
             await callback.close()
             _account_context.reset(token)
 
-    async def _remote(self, epoch, *, name=None, arguments=None, path=None, params=None):
+    async def _remote(self, epoch, *, name=None, arguments=None, path=None, params=None, method="GET", body=None):
         token = _account_context.set(True)
         try:
             async with asyncio.timeout(self.request_timeout):
@@ -671,12 +731,14 @@ class AccountManager:
                         result = await self._mcp(provider, name, arguments)
                     else:
                         async with self._client(provider) as client:
-                            response = await client.get(API_ORIGIN + path, params=params)
+                            response = await client.request(method, API_ORIGIN + path, params=params,
+                                                            **({"json": body} if body is not None else {}))
                             if response.status_code in (401, 403):
                                 raise AccountError("authentication_required")
                             if response.status_code >= 500:
                                 raise AccountError("cloud_unavailable")
-                            if response.status_code not in (200, 404):
+                            accepted = (200, 201, 400, 404, 409, 413, 422) if path == "/v1/desktop-imports" else (200, 404)
+                            if response.status_code not in accepted:
                                 raise AccountError("cloud_request_failed")
                             result = response.json()
                             if not isinstance(result, dict):
@@ -719,6 +781,8 @@ class AccountManager:
 
     def request_api(self, method, path, params=None, json=None, *, expected_epoch=None):
         import re
+        if method == "POST" and path == "/v1/desktop-imports" and not params:
+            return self._call(path=path, method=method, body=_import_payload(json), expected_epoch=expected_epoch)
         valid = path in ("/v1/changes", "/v1/languages", "/v1/settings") if isinstance(path, str) else False
         if isinstance(path, str) and re.fullmatch(r"/v1/points/[1-9][0-9]{0,15}", path):
             valid = int(path.rsplit("/", 1)[1]) <= 9007199254740991

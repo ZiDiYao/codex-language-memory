@@ -171,7 +171,7 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             params = StdioServerParameters(
                 command=sys.executable,
-                args=[str(APP / "server.py")],
+                args=[str(APP / "release_runtime.py"), "serve", "--sandbox-root", directory],
                 cwd=directory,
                 env={**os.environ, "LANGUAGE_MEMORY_DB": str(Path(directory) / "mcp.sqlite3")},
             )

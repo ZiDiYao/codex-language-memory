@@ -41,8 +41,14 @@ Intel Mac, Windows and Linux binary packages are not included in this Beta.
 - Codex: one `mcp_servers.language_memory` entry in its user `config.toml`.
   A configured `CODEX_HOME` is respected. Unrelated settings and comments are preserved.
 - Skill: `~/.agents/skills/language-memory` points to the installed release through `current`.
-- Data: `~/.local/share/codex-language-memory/memory.sqlite3`, or the existing absolute
-  `LANGUAGE_MEMORY_DB` from this integration's MCP configuration.
+- Active learning data: the signed-in account on the hosted PostgreSQL service.
+- Legacy migration source/backup: `~/.local/share/codex-language-memory/memory.sqlite3`,
+  or the existing absolute `LANGUAGE_MEMORY_DB`. Beta 37 never routes learning operations to it.
+- Account metadata: `desktop-account.json` and a token-free `desktop-cloud-import-<path-hash>.json` receipt
+  beside that backup. OAuth credentials are held in the macOS Keychain.
+- First sign-in imports an immutable learning-only snapshot transactionally and idempotently.
+  A completed receipt prevents reimport into a later account. Pending imports are bound
+  to their original account. Original legacy data remains backed up and archived in the cloud.
 - Database backups: `backups/` beside the database, with private file permissions.
 - Configuration backups: the install directory's `backups/`, also private.
 
@@ -70,7 +76,7 @@ native Plugins directory, run **Connect Extension.command** after installation.
 It uses the installed Codex CLI to add a personal local marketplace and verifies
 that `language-memory@language-memory-local` is installed and enabled before removing
 the duplicate direct MCP and Skill registration. No public listing is created.
-The plugin points at the managed `current` runtime and the same database.
+The plugin points at the managed `current` runtime and the same cloud account.
 
 Once connected, future Install.command and Roll Back.command runs refresh the native
 plugin's cached Skill automatically. If refresh fails, the direct MCP installation
@@ -92,7 +98,7 @@ npm run build
 .venv/bin/python -m unittest discover -s tests -v
 node --test tests/*.mjs
 .venv/bin/python scripts/build_beta.py
-.venv/bin/python scripts/test_beta.py dist/language-memory-0.2.0-beta.36-macos-arm64.zip
+.venv/bin/python scripts/test_beta.py dist/language-memory-0.2.0-beta.37-macos-arm64.zip
 ```
 
 Change `VERSION` for the next Beta. The builder copies that version into the packaged
@@ -116,6 +122,9 @@ the native bundle test must also run on the build Mac before uploading a release
 For diagnostics, the bundled executable supports `status --json`. The hidden
 `--sandbox-root` option redirects installation, configuration, Skill and default data
 paths to an isolated test profile; it does not change HOME or CODEX_HOME.
+For `serve`, this explicit sandbox flag exercises the retained legacy SQLite engine
+for offline fixture acceptance. Installed production launch arguments do not include it.
+Cloud authentication, import and routing have separate isolated tests.
 
 After tests pass, create a GitHub prerelease for the matching commit and upload the
 ZIP, SHA256SUMS.txt and test report. Keep release visibility consistent with repository

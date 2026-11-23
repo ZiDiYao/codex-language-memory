@@ -144,7 +144,7 @@ class DesktopProtocolIntegrationTests(unittest.IsolatedAsyncioTestCase):
             with patch("desktop_account.AccountManager", return_value=self.account) as factory:
                 server = create_desktop_server(path)
             factory.assert_called_once_with(state_path=path.with_name("desktop-account.json"))
-            self.assertTrue(path.is_file())
+            self.assertFalse(path.exists(), "production cloud client must not create a local learning database")
             tools = {tool.name: tool for tool in await server.list_tools()}
             self.assertEqual(len(tools), 24)
             for name in ("save_points", "update_point", "delete_point", "update_settings", "set_recording", "record_review"):
@@ -211,7 +211,7 @@ class DesktopProtocolIntegrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_local_legacy_mcp_writes_still_work_without_cloud_epoch(self):
         with tempfile.TemporaryDirectory() as directory:
             local = Store(Path(directory) / "memory.sqlite3")
-            self.server = create_server(RoutingStore(local, IntegrationAccount("local", "connected")))
+            self.server = create_server(RoutingStore(local, IntegrationAccount("local", "connected"), cloud_only=False))
             saved = await self.call("save_points", {"request_id": "legacy-local-save", "items": [POINT]})
             self.assertEqual(saved["results"][0]["status"], "added")
             await self.call("set_recording", {"enabled": False})
@@ -224,7 +224,7 @@ class DesktopActionIntegrationTests(unittest.TestCase):
         self.store = RoutingStore(NoSQLite(), self.account)
 
     def test_account_actions_are_ui_only_strict_and_strip_secret_fields(self):
-        for action in ("account/status", "account/connect", "account/disconnect", "account/use-local"):
+        for action in ("account/status", "account/connect", "account/disconnect"):
             result = dispatch(self.store, {"action": action, "arguments": {}})
             self.assertTrue(result["can_connect"])
             rendered = json.dumps(result)
@@ -233,7 +233,9 @@ class DesktopActionIntegrationTests(unittest.TestCase):
             for invalid in (None, [], {"url": "https://untrusted.example"}, {"token": "not-accepted"}):
                 with self.assertRaises(ValueError):
                     account_action(self.store, action, invalid)
-        self.assertEqual(self.account.controls, ["connect", "disconnect", "use-local"])
+        self.assertEqual(self.account.controls, ["connect", "disconnect"])
+        with self.assertRaises(ValueError):
+            dispatch(self.store, {"action": "account/use-local", "arguments": {}})
 
     def test_plain_store_account_status_has_no_login_or_keychain_side_effect(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -253,6 +255,19 @@ class DesktopActionIntegrationTests(unittest.TestCase):
         self.account.state = "signed_out"
         self.assertEqual(dashboard_post(self.store, {"action": "points/query", "arguments": {}, "expected_epoch": 7}),
                          (401, {"error": "cloud_not_connected"}))
+        self.assertEqual(self.account.calls, [])
+
+    def test_ui_cloud_mutations_without_epoch_are_rejected_before_any_remote_call(self):
+        for action, arguments in (
+            ("points/update", {"record_id": 900, "patch": {"note": "Unbound old request"}}),
+            ("points/delete", {"record_id": 900}), ("settings/update", {"ui_language": "zh"}),
+        ):
+            payload = {"action": action, "arguments": arguments}
+            with self.subTest(action=action):
+                self.assertEqual(AppTransport(self.store).request("api", payload),
+                                 {"status": 400, "data": {"error": "invalid_request"}} if action == "points/delete"
+                                 else {"status": 409, "data": {"error": "connection_epoch_required"}})
+                self.assertEqual(dashboard_post(self.store, payload), (409, {"error": "connection_epoch_required"}))
         self.assertEqual(self.account.calls, [])
 
     def test_local_speech_reads_current_cloud_point_without_running_real_speech(self):

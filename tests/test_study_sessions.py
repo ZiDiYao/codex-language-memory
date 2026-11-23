@@ -143,7 +143,7 @@ class StudyMCPTests(unittest.TestCase):
 
     async def exercise(self):
         with tempfile.TemporaryDirectory() as directory:
-            params = StdioServerParameters(command=sys.executable, args=[str(APP / "server.py")],
+            params = StdioServerParameters(command=sys.executable, args=[str(APP / "release_runtime.py"), "serve", "--sandbox-root", directory],
                                            env={**os.environ, "LANGUAGE_MEMORY_DB": str(Path(directory) / "mcp.sqlite3")}, cwd=directory)
             async def call(client, name, args=None):
                 response = await client.call_tool(name, args)

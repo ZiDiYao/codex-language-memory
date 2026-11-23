@@ -75,6 +75,8 @@ class MockCloud:
         self.revoke_failure = False
         self.revoke_redirect = False
         self.unexpected_urls = []
+        self.imports = []
+        self.import_status = 200
 
     async def __call__(self, request):
         url = str(request.url)
@@ -110,6 +112,10 @@ class MockCloud:
             if not request.headers.get("authorization"):
                 return httpx.Response(401, headers={"WWW-Authenticate": 'Bearer resource_metadata="' + account.PRM + '"'})
             if request.url.path.startswith("/v1/"):
+                if request.url.path == "/v1/desktop-imports":
+                    self.imports.append({"method": request.method, "body": json.loads(request.content)})
+                    return httpx.Response(self.import_status, json={"status": "imported" if self.import_status == 200 else "failed",
+                        "error": None if self.import_status == 200 else "import_source_conflict"})
                 if request.url.path == "/v1/points/999":
                     return httpx.Response(404, json={"status": "not_found"})
                 return httpx.Response(200, json={"content": 3, "preferences": 2})
@@ -152,7 +158,8 @@ class DesktopAccountTests(unittest.TestCase):
 
     def new_manager(self):
         manager = account.AccountManager(state_path=self.state_path, credentials=self.credentials,
-                                         http_transport=self.transport, request_timeout=3, login_timeout=3)
+                                         http_transport=self.transport, request_timeout=3, login_timeout=3,
+                                         cloud_only=False)
         self.addCleanup(manager.close)
         return manager
 
@@ -235,6 +242,74 @@ class DesktopAccountTests(unittest.TestCase):
             self.assertNotIn("mock-public-client", text)
             self.assertNotIn("access_token", text)
             self.assertEqual(file.stat().st_mode & 0o077, 0)
+
+    def test_production_defaults_to_cloud_signed_out_and_migrates_legacy_local_once(self):
+        fresh = account.AccountManager(state_path=Path(self.temporary.name) / "fresh.json", credentials=self.credentials)
+        self.addCleanup(fresh.close)
+        self.assertEqual((fresh.status()["mode"], fresh.status()["state"], fresh.status()["epoch"]),
+                         ("cloud", "signed_out", 0))
+        legacy_epoch = self.manager.status()["epoch"]
+        upgraded = account.AccountManager(state_path=self.state_path, credentials=self.credentials)
+        self.addCleanup(upgraded.close)
+        self.assertEqual((upgraded.status()["mode"], upgraded.status()["state"], upgraded.status()["epoch"]),
+                         ("cloud", "signed_out", legacy_epoch + 1))
+        with self.assertRaises(account.AccountError) as raised:
+            upgraded.use_local()
+        self.assertEqual(raised.exception.code, "unsupported_cloud_operation")
+        self.assertEqual(upgraded.status()["epoch"], legacy_epoch + 1)
+        again = account.AccountManager(state_path=self.state_path, credentials=self.credentials)
+        self.addCleanup(again.close)
+        self.assertEqual(again.status()["epoch"], legacy_epoch + 1)
+        self.assertFalse(again.status()["capabilities"]["export"])
+        self.assertEqual(self.keyring.items, {}, "mode conversion must not access or create credentials")
+
+    def test_account_fingerprint_is_internal_stable_and_bound_to_expected_epoch(self):
+        self.login()
+        epoch = self.manager.status()["epoch"]
+        fingerprint = self.manager.account_fingerprint(expected_epoch=epoch)
+        self.assertRegex(fingerprint, r"^[0-9a-f]{64}$")
+        self.assertNotIn(fingerprint, json.dumps(self.manager.status()))
+        upgraded = account.AccountManager(state_path=self.state_path, credentials=self.credentials,
+                                         http_transport=self.transport, request_timeout=3)
+        self.addCleanup(upgraded.close)
+        self.assertEqual(upgraded.status()["state"], "connected", "existing cloud login must survive upgrade")
+        self.assertEqual(upgraded.account_fingerprint(expected_epoch=epoch), fingerprint)
+        self.expire()
+        self.manager.call_tool("get_settings")
+        self.assertEqual(self.manager.account_fingerprint(expected_epoch=epoch), fingerprint)
+        self.manager.disconnect()
+        with self.assertRaises(account.AccountError) as raised:
+            self.manager.account_fingerprint(expected_epoch=epoch)
+        self.assertEqual(raised.exception.code, "account_changed")
+        self.cloud.subject = "second-account"
+        self.login()
+        self.assertNotEqual(self.manager.account_fingerprint(), fingerprint)
+
+    def test_desktop_import_is_authenticated_exact_post_and_conflicts_remain_business_results(self):
+        payload = {"schema_version": 1, "source_id": "c60abe6f-7dd4-4b39-9ebf-08262dd0a2a5", "tables": {
+            name: [] for name in ("knowledge", "settings", "capture_preferences", "encounters", "review_events",
+                                  "memory_states", "learner_preferences", "export_receipts", "study_sessions",
+                                  "study_items", "study_answers")}}
+        with self.assertRaises(account.AccountError):
+            self.manager.request_api("POST", "/v1/desktop-imports", json=payload)
+        self.login()
+        epoch = self.manager.status()["epoch"]
+        result = self.manager.request_api("POST", "/v1/desktop-imports", json=payload, expected_epoch=epoch)
+        self.assertEqual(result["status"], "imported")
+        self.assertEqual(self.cloud.imports, [{"method": "POST", "body": payload}])
+        self.cloud.import_status = 409
+        self.assertEqual(self.manager.request_api("POST", "/v1/desktop-imports", json=payload)["error"], "import_source_conflict")
+        for method, path, body in [("GET", "/v1/desktop-imports", None), ("POST", "/v1/settings", payload),
+                                   ("POST", "/v1/desktop-imports?user_id=x", payload),
+                                   ("POST", "/v1/desktop-imports", {**payload, "user_id": "x"}),
+                                   ("POST", "/v1/desktop-imports", {**payload, "source_id": "not-a-uuid"})]:
+            with self.assertRaises(account.AccountError):
+                self.manager.request_api(method, path, json=body)
+        self.manager.disconnect()
+        with self.assertRaises(account.AccountError) as raised:
+            self.manager.request_api("POST", "/v1/desktop-imports", json=payload, expected_epoch=epoch)
+        self.assertEqual(raised.exception.code, "account_changed")
+        self.assertEqual(len(self.cloud.imports), 2)
 
     def test_refresh_after_process_restart_uses_absolute_expiry_and_existing_dcr_client(self):
         self.login()
