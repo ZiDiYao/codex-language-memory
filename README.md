@@ -1,4 +1,9 @@
-# Codex Language Memory
+# Sayrove · 拾语
+
+Sayrove is a personal language-learning library for everyday words, expressions,
+grammar and corrections. The public Web entry is
+[sayrove.up.railway.app](https://sayrove.up.railway.app), with the same account-scoped
+PostgreSQL records as the hosted MCP service. See [Web setup](docs/web-deployment.md).
 
 A local language-learning memory for Codex. Keep learning in your existing conversation: ask about a word, compare grammar, translate an expression, or correct a sentence. Codex extracts useful learning points and saves them through a small SQLite-backed MCP server.
 
@@ -45,10 +50,11 @@ retained [Python implementation](docs/remote-backend.md). Both use the same
 PostgreSQL schema and account identities. Existing local learning data is not
 uploaded or migrated automatically.
 
-This first cloud milestone does not include the desktop UI, document exports or
-pronunciation. It is not a published plugin or a complete OAuth authorization
-server. See [setup, provider requirements, tests and release boundaries](docs/remote-backend.md)
-and the [configured Language Memory remote package](packaging/remote/README.md).
+The Web library supports authenticated browsing, scene/type filters and editing.
+Document exports and local pronunciation remain in the desktop version. This is
+not a published directory plugin; Auth0 provides authorization. See
+[setup, provider requirements, tests and release boundaries](docs/remote-backend.md)
+and the [configured Sayrove remote package](packaging/remote/README.md).
 That package targets `https://language-memory-api.up.railway.app/mcp` with DCR
 authorization through Auth0. Provider configuration and actual Codex OAuth
 acceptance remain distinct from deployment health; see [Auth0 setup](docs/auth0-setup.md).

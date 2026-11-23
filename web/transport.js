@@ -1,6 +1,7 @@
 // Share the existing UI between a loopback browser page and a native MCP App.
 export async function request(route, payload) {
   try {
+    if (globalThis.languageMemoryRuntime) return await globalThis.languageMemoryRuntime.request(route, payload);
     if (globalThis.languageMemoryHost) return await globalThis.languageMemoryHost.request(route, payload);
     return await fetch(route, {
       method: "POST",
@@ -8,12 +9,14 @@ export async function request(route, payload) {
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(route === "export" ? 60000 : 15000),
     });
-  } catch {
+  } catch (error) {
+    if (globalThis.languageMemoryRuntime && error instanceof Error) throw error;
     throw new Error("disconnected");
   }
 }
 
 export async function saveDownload(response) {
+  if (globalThis.languageMemoryRuntime?.capabilities?.export === false) throw new Error("unavailable");
   const filename = response.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/)?.[1] || "language-memory";
   const blob = await response.blob();
   if (globalThis.languageMemoryHost) {
@@ -27,4 +30,8 @@ export async function saveDownload(response) {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+export function capabilities() {
+  return { export: true, speech: true, ...globalThis.languageMemoryRuntime?.capabilities };
 }

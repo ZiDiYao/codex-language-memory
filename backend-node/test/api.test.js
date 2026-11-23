@@ -67,6 +67,7 @@ function isolatedStorage() {
         return { scenes: [...counts].map(([name, count]) => ({ name, count })), total: state.records.size };
       },
       async languages() { return { languages: [...new Set([...state.records.values()].map((record) => record.language))] }; },
+      async versions() { return { content: state.records.size, preferences: state.settings.enabled ? 0 : 1 }; },
       async review(filters) { return this.query(filters); },
       async record_review(id, request_id) {
         if (!state.records.has(id)) return { status: "not_found" };
@@ -78,7 +79,7 @@ function isolatedStorage() {
   };
 }
 
-async function fixture(t, { repositoryFactory = isolatedStorage(), readiness = async () => true } = {}) {
+async function fixture(t, { repositoryFactory = isolatedStorage(), readiness = async () => true, webAllowedOrigins = "" } = {}) {
   let jwksRequests = 0;
   const jwks = createServer((request, response) => {
     jwksRequests++;
@@ -92,7 +93,8 @@ async function fixture(t, { repositoryFactory = isolatedStorage(), readiness = a
   const base = await listen(service);
   t.after(() => close(service));
   const config = loadConfig({ DATABASE_URL: "postgresql://unused/transport-tests", PUBLIC_URL: base,
-    AUTH_ISSUER: issuer, AUTH_AUDIENCE: base + "/mcp", AUTH_JWKS_URL: issuer + "jwks.json", CLOUD_ALLOW_INSECURE_LOCAL: "true" });
+    AUTH_ISSUER: issuer, AUTH_AUDIENCE: base + "/mcp", AUTH_JWKS_URL: issuer + "jwks.json", CLOUD_ALLOW_INSECURE_LOCAL: "true",
+    WEB_ALLOWED_ORIGINS: webAllowedOrigins });
   const logs = [];
   handler = createApp({ config, repositoryFactory, readiness, logger: { error: (code) => logs.push(code) } });
   async function token(subject = "alice", overrides = {}, { privateKey = keyPair.privateKey, header = {} } = {}) {
@@ -104,7 +106,8 @@ async function fixture(t, { repositoryFactory = isolatedStorage(), readiness = a
     const response = await fetch(base + path, { method, headers: { Authorization: authorization ?? `Bearer ${await token(subject)}`,
       ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...headers },
     body: body === undefined ? undefined : JSON.stringify(body) });
-    return { status: response.status, headers: response.headers, body: await response.json() };
+    const text = await response.text();
+    return { status: response.status, headers: response.headers, body: text ? JSON.parse(text) : null };
   }
   async function rpc(name = "tools/list", params = {}, subject = "alice") {
     return call("/mcp", { subject, method: "POST", headers: { Accept: "application/json, text/event-stream", "MCP-Protocol-Version": "2025-03-26" },
@@ -122,6 +125,121 @@ test("cloud configuration rejects missing/HTTP/non-PostgreSQL settings without a
   assert.throws(() => loadConfig({ ...env, DATABASE_URL: "sqlite:///memory.db" }), /PostgreSQL/);
   assert.throws(() => loadConfig({ ...env, AUTH_REQUIRED_SCOPES: "" }), /scope/);
   assert.throws(() => loadConfig({ ...env, CLOUD_ALLOW_INSECURE_LOCAL: "true", AUTH_ISSUER: "http://untrusted.example" }), /HTTPS/);
+});
+
+test("Web origin configuration accepts only explicit origins and defaults to no external browser access", () => {
+  const env = { DATABASE_URL: "postgresql://unused/db", PUBLIC_URL: "https://memory.example",
+    AUTH_ISSUER: "https://issuer.example/", AUTH_AUDIENCE: "memory", AUTH_JWKS_URL: "https://issuer.example/jwks" };
+  assert.deepEqual(loadConfig(env).webAllowedOrigins, []);
+  assert.deepEqual(loadConfig({ ...env, WEB_ALLOWED_ORIGINS: " https://web.example,https://second.example:8443,https://web.example " }).webAllowedOrigins,
+    ["https://web.example", "https://second.example:8443"]);
+  for (const value of ["*", "null", "https://*.example", "https://web.example/", "https://web.example/path",
+    "https://web.example?x=1", "https://web.example#x", "https://user:pass@web.example", "https://web.example,",
+    "http://web.example", "http://127.0.0.1:3000", "http://localhost:3000", "file:///tmp/web", 42])
+    assert.throws(() => loadConfig({ ...env, WEB_ALLOWED_ORIGINS: value }), /WEB_ALLOWED_ORIGINS/);
+  assert.deepEqual(loadConfig({ ...env, CLOUD_ALLOW_INSECURE_LOCAL: "true", WEB_ALLOWED_ORIGINS: "http://127.0.0.1:3000,http://localhost:3000" }).webAllowedOrigins,
+    ["http://127.0.0.1:3000", "http://localhost:3000"]);
+  assert.throws(() => loadConfig({ ...env, CLOUD_ALLOW_INSECURE_LOCAL: "true", WEB_ALLOWED_ORIGINS: "http://web.example" }), /WEB_ALLOWED_ORIGINS/);
+});
+
+test("Web CORS preflight is unauthenticated, path/method/header bounded, and exclusive to REST", async (t) => {
+  const origin = "https://web.example";
+  const service = await fixture(t, { webAllowedOrigins: origin });
+  const preflight = (path, method = "GET", requestedHeaders = "Authorization, Content-Type", extra = {}) => service.call(path, {
+    method: "OPTIONS", authorization: "", headers: { Origin: origin, "Access-Control-Request-Method": method,
+      "Access-Control-Request-Headers": requestedHeaders, ...extra },
+  });
+  for (const [path, method, methods] of [["/v1/settings", "PATCH", "GET, PATCH"], ["/v1/captures", "POST", "POST"],
+    ["/v1/points/23", "DELETE", "GET, PATCH, DELETE"], ["/v1/languages", "GET", "GET"], ["/v1/changes", "GET", "GET"]]) {
+    const result = await preflight(path, method);
+    assert.equal(result.status, 204);
+    assert.equal(result.body, null);
+    assert.equal(result.headers.get("access-control-allow-origin"), origin);
+    assert.equal(result.headers.get("access-control-allow-methods"), methods);
+    assert.equal(result.headers.get("access-control-allow-headers"), "Authorization, Content-Type");
+    assert.equal(result.headers.get("access-control-allow-credentials"), null);
+    assert.match(result.headers.get("vary"), /Origin/);
+    assert.equal(result.headers.get("www-authenticate"), null);
+  }
+  assert.equal(service.jwksRequests, 0, "preflight must not authenticate or read storage");
+  assert.equal((await preflight("/v1/missing")).status, 403);
+  assert.equal((await preflight("/v1/points/not-an-id")).status, 403);
+  assert.equal((await preflight("/v1/points", "DELETE")).status, 405);
+  assert.equal((await preflight("/v1/settings", "PUT")).status, 405);
+  for (const headers of ["X-User-ID", "Authorization, X-User-ID", "Authorization,", "Authorization, authorization"])
+    assert.equal((await preflight("/v1/points", "GET", headers)).status, 400);
+  assert.equal((await service.call("/v1/settings", { method: "OPTIONS", authorization: "", headers: { Origin: origin } })).status, 405);
+  assert.equal((await service.call("/v1/settings", { method: "OPTIONS", authorization: "" })).status, 403);
+  for (const path of ["/mcp", "/healthz", "/readyz", "/.well-known/oauth-protected-resource/mcp"]) {
+    const result = await preflight(path);
+    assert.equal(result.status, 403);
+    assert.equal(result.headers.get("access-control-allow-origin"), null);
+  }
+});
+
+test("Trusted Web origins can read REST JWT/validation errors; origin and Host protections remain exact", async (t) => {
+  const origin = "https://web.example";
+  const service = await fixture(t, { webAllowedOrigins: origin });
+  for (const [path, options, status] of [["/v1/settings", { authorization: "" }, 401],
+    ["/v1/settings", { authorization: "Bearer invalid" }, 401], ["/v1/points?user_id=bob", {}, 422],
+    ["/v1/points/999", {}, 404], ["/v1/settings", { method: "POST" }, 405]]) {
+    const result = await service.call(path, { ...options, headers: { Origin: origin } });
+    assert.equal(result.status, status);
+    assert.equal(result.headers.get("access-control-allow-origin"), origin);
+    assert.match(result.headers.get("vary"), /Origin/);
+    assert.equal(result.headers.get("access-control-allow-credentials"), null);
+  }
+  const trusted = await service.call("/v1/settings", { headers: { Origin: origin } });
+  assert.equal(trusted.status, 200);
+  const insufficient = await service.call("/v1/points", { headers: { Origin: origin },
+    authorization: `Bearer ${await service.token("alice", { scope: "memory:read" })}` });
+  assert.equal(insufficient.status, 403);
+  assert.equal(insufficient.headers.get("access-control-allow-origin"), origin);
+  const saved = await service.call("/v1/captures", { method: "POST", body: { request_id: "cors-conflict", items: [point] } });
+  const id = saved.body.results[0].id;
+  await service.call(`/v1/points/${id}`, { method: "PATCH", body: { patch: { note: "New note" }, expected_revision: "a".repeat(64) } });
+  const conflict = await service.call(`/v1/points/${id}`, { method: "PATCH", headers: { Origin: origin },
+    body: { patch: { note: "Stale note" }, expected_revision: "a".repeat(64) } });
+  assert.equal(conflict.status, 409);
+  assert.equal(conflict.headers.get("access-control-allow-origin"), origin);
+  for (const rejected of ["https://web.example.evil", "https://evil.web.example", "https://web.example:8443", "null", "https://other.example"]) {
+    const result = await service.call("/v1/settings", { headers: { Origin: rejected } });
+    assert.equal(result.status, 403);
+    assert.equal(result.headers.get("access-control-allow-origin"), null);
+  }
+  const disabled = await fixture(t);
+  assert.equal((await disabled.call("/v1/settings", { headers: { Origin: origin } })).status, 403);
+  for (const path of ["/mcp", "/healthz", "/readyz", "/.well-known/oauth-protected-resource/mcp"])
+    assert.equal((await service.call(path, { headers: { Origin: origin } })).status, 403);
+  const broken = await fixture(t, { webAllowedOrigins: origin, repositoryFactory: () => ({ async settings() { throw new Error("private-db-data"); } }) });
+  const unavailable = await broken.call("/v1/settings", { headers: { Origin: origin } });
+  assert.equal(unavailable.status, 503);
+  assert.deepEqual(unavailable.body, { error: "unavailable" });
+  assert.equal(unavailable.headers.get("access-control-allow-origin"), origin);
+  const badHost = await new Promise((resolve, reject) => {
+    const request = httpRequest(service.base + "/v1/settings", { headers: { Host: "attacker.example", Origin: origin } }, (response) => {
+      response.resume(); response.once("end", () => resolve({ status: response.statusCode, origin: response.headers["access-control-allow-origin"] }));
+    });
+    request.once("error", reject); request.end();
+  });
+  assert.deepEqual(badHost, { status: 403, origin: undefined });
+});
+
+test("Languages and changes routes use only the verified tenant and reject anonymous access", async (t) => {
+  const { call } = await fixture(t);
+  for (const path of ["/v1/languages", "/v1/changes"]) {
+    assert.equal((await call(path, { authorization: "" })).status, 401);
+    assert.equal((await call(path + "?user_id=bob")).status, 422);
+    assert.equal((await call(path, { method: "POST" })).status, 405);
+  }
+  await call("/v1/captures", { method: "POST", body: { request_id: "catalog-alice", items: [point] } });
+  assert.deepEqual((await call("/v1/languages")).body.languages, ["en"]);
+  assert.deepEqual((await call("/v1/languages", { subject: "bob" })).body.languages, []);
+  assert.equal((await call("/v1/changes")).body.content, 1);
+  assert.equal((await call("/v1/changes", { subject: "bob" })).body.content, 0);
+  await call("/v1/settings", { method: "PATCH", body: { enabled: false } });
+  assert.equal((await call("/v1/changes")).body.preferences, 1);
+  assert.equal((await call("/v1/changes", { subject: "bob" })).body.preferences, 0);
 });
 
 test("real JWKS/RSA authentication, metadata, health and scope enforcement", async (t) => {
@@ -298,6 +416,15 @@ test("real PostgreSQL repository shares authenticated HTTP/MCP storage without c
   assert.equal(saved.body.result.structuredContent.results[0].status, "added");
   const id = saved.body.result.structuredContent.results[0].id;
   assert.equal((await service.call("/v1/points")).body.records.length, 1);
+  assert.deepEqual((await service.call("/v1/languages")).body.languages, ["en"]);
+  assert.deepEqual((await service.call("/v1/languages", { subject: "bob" })).body.languages, []);
+  const aliceVersions = (await service.call("/v1/changes")).body;
+  const bobVersions = (await service.call("/v1/changes", { subject: "bob" })).body;
+  assert.equal(aliceVersions.content, 1);
+  assert.deepEqual(bobVersions, { content: 0, preferences: 0 });
+  await service.call("/v1/settings", { method: "PATCH", body: { ui_language: "zh" } });
+  assert.equal((await service.call("/v1/changes")).body.preferences, 1);
+  assert.equal((await service.call("/v1/changes", { subject: "bob" })).body.preferences, 0);
   assert.deepEqual((await service.call("/v1/points", { subject: "bob" })).body.records, []);
   assert.equal((await service.call(`/v1/points/${id}`, { subject: "bob", method: "DELETE" })).status, 404);
   const bob = await service.rpc("tools/call", { name: "find_points", arguments: {} }, "bob");

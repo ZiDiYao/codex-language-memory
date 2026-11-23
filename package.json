@@ -4,9 +4,12 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build_mcp_app.mjs",
-    "test": "node --test tests/*.mjs"
+    "test": "node --test tests/*.mjs",
+    "build:web": "node scripts/build_cloud_app.mjs",
+    "start:web": "node frontend-web/server.mjs"
   },
   "devDependencies": {
+    "@auth0/auth0-spa-js": "2.30.0",
     "@modelcontextprotocol/ext-apps": "2.0.4",
     "esbuild": "0.28.2"
   }

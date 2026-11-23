@@ -1,0 +1,82 @@
+import { CloudAuthError } from "./cloud-auth.js";
+
+function identifier(value) {
+  if (!Number.isSafeInteger(value) || value < 1) throw new Error("invalid");
+  return String(value);
+}
+
+function target(action, arguments_) {
+  const get = (path) => ({ method: "GET", path });
+  switch (action) {
+    case "settings/read": return get("/v1/settings");
+    case "settings/update": return { method: "PATCH", path: "/v1/settings", body: arguments_ };
+    case "languages/list": return get("/v1/languages");
+    case "changes/read": return get("/v1/changes");
+    case "points/query": return { ...get("/v1/points"), query: arguments_ };
+    case "scenes/list": return { ...get("/v1/scenes"), query: arguments_ };
+    case "points/read": return get("/v1/points/" + identifier(arguments_.record_id));
+    case "points/delete": return { method: "DELETE", path: "/v1/points/" + identifier(arguments_.record_id) };
+    case "points/update": return {
+      method: "PATCH", path: "/v1/points/" + identifier(arguments_.record_id),
+      body: { patch: arguments_.patch, ...(arguments_.expected_revision !== undefined ? { expected_revision: arguments_.expected_revision } : {}) },
+    };
+    default: throw new Error("unavailable");
+  }
+}
+
+export function createCloudTransport({ apiBaseUrl, session, fetchImpl = globalThis.fetch }) {
+  const base = new URL(apiBaseUrl);
+  return {
+    capabilities: Object.freeze({ export: false, speech: false }),
+    async request(route, payload) {
+      // Unsupported local-only operations never fall back to loopback or MCP.
+      if (route !== "api" || !payload || typeof payload.action !== "string") throw new Error("unavailable");
+      const operation = target(payload.action, payload.arguments || {});
+      const url = new URL(operation.path, base);
+      for (const [key, value] of Object.entries(operation.query || {})) {
+        if (value === null || value === undefined) continue;
+        if (!["string", "boolean", "number"].includes(typeof value)) throw new Error("invalid");
+        url.searchParams.set(key, String(value));
+      }
+      const token = await session.getToken();
+      session.assertActive();
+      const epoch = session.epoch;
+      const headers = { Authorization: "Bearer " + token };
+      if (operation.body !== undefined) headers["Content-Type"] = "application/json";
+      let response;
+      try {
+        response = await fetchImpl(url.href, {
+          method: operation.method, headers, credentials: "omit", cache: "no-store", redirect: "error",
+          signal: AbortSignal.timeout(15000),
+          ...(operation.body !== undefined ? { body: JSON.stringify(operation.body) } : {}),
+        });
+      } catch {
+        session.assertActive(epoch);
+        throw new Error("disconnected");
+      }
+      session.assertActive(epoch);
+      if (response.status === 401) {
+        session.pause("authenticationRequired");
+        throw new CloudAuthError();
+      }
+      return response;
+    },
+  };
+}
+
+export function validateCloudConfig(value, origin) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("unavailable");
+  for (const key of ["appName", "auth0Domain", "auth0ClientId", "apiBaseUrl", "audience"])
+    if (typeof value[key] !== "string" || !value[key].trim()) throw new Error("unavailable");
+  if (value.appName.length > 80 || !/^[a-zA-Z0-9.-]+(?::\d+)?$/.test(value.auth0Domain) || value.auth0Domain.includes(".."))
+    throw new Error("unavailable");
+  const api = new URL(value.apiBaseUrl);
+  const page = new URL(origin);
+  const local = (hostname) => ["localhost", "127.0.0.1", "[::1]"].includes(hostname);
+  if (api.username || api.password || api.search || api.hash || api.pathname !== "/" ||
+      (api.protocol !== "https:" && !(api.protocol === "http:" && local(api.hostname) && local(page.hostname)))) throw new Error("unavailable");
+  const audience = new URL(value.audience);
+  if (audience.username || audience.password || audience.hash || audience.search ||
+      (audience.protocol !== "https:" && !(audience.protocol === "http:" && local(audience.hostname) && local(page.hostname)))) throw new Error("unavailable");
+  return Object.freeze({ ...value, apiBaseUrl: api.origin });
+}

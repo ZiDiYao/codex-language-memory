@@ -12,6 +12,22 @@ function absoluteUrl(value, name, allowLocal) {
   return raw;
 }
 
+function webOrigins(value, allowLocal) {
+  if (typeof value !== "string") throw new Error("WEB_ALLOWED_ORIGINS must be a comma-separated list of origins");
+  if (!value.trim()) return Object.freeze([]);
+  const origins = value.split(",").map((part) => part.trim());
+  for (const origin of origins) {
+    let url;
+    try { url = new URL(absoluteUrl(origin, "WEB_ALLOWED_ORIGINS", allowLocal)); }
+    catch { throw new Error("WEB_ALLOWED_ORIGINS requires explicit HTTPS origins; loopback HTTP requires explicit development mode"); }
+    // Store only serialized origins. Paths (including a trailing slash), wildcard
+    // hosts, credentials and opaque origins must never broaden this allowlist.
+    if (url.origin !== origin || url.pathname !== "/" || url.hostname.includes("*"))
+      throw new Error("WEB_ALLOWED_ORIGINS entries must be exact origins without paths or wildcards");
+  }
+  return Object.freeze([...new Set(origins)]);
+}
+
 export function loadConfig(environment = process.env) {
   const required = ["DATABASE_URL", "PUBLIC_URL", "AUTH_ISSUER", "AUTH_AUDIENCE", "AUTH_JWKS_URL"];
   const missing = required.filter((key) => !environment[key]);
@@ -19,6 +35,7 @@ export function loadConfig(environment = process.env) {
   const insecure = (environment.CLOUD_ALLOW_INSECURE_LOCAL ?? "false").toLowerCase();
   if (!["true", "false"].includes(insecure)) throw new Error("CLOUD_ALLOW_INSECURE_LOCAL must be true or false");
   const allowInsecureLocal = insecure === "true";
+  const webAllowedOrigins = webOrigins(environment.WEB_ALLOWED_ORIGINS ?? "", allowInsecureLocal);
   const databaseUrl = environment.DATABASE_URL;
   if (typeof databaseUrl !== "string" || !/^(?:postgres|postgresql|postgresql\+psycopg):\/\//.test(databaseUrl))
     throw new Error("DATABASE_URL must use PostgreSQL");
@@ -34,6 +51,6 @@ export function loadConfig(environment = process.env) {
   const rawPort = environment.PORT ?? "8080";
   if (!/^\d+$/.test(rawPort) || Number(rawPort) < 1 || Number(rawPort) > 65535) throw new Error("PORT must be between 1 and 65535");
   return Object.freeze({ databaseUrl, publicUrl, authIssuer, authAudience, authJwksUrl,
-    requiredScopes: Object.freeze(requiredScopes), allowInsecureLocal,
+    requiredScopes: Object.freeze(requiredScopes), allowInsecureLocal, webAllowedOrigins,
     host: environment.HOST ?? "0.0.0.0", port: Number(rawPort), resourceUrl: publicUrl + "/mcp" });
 }

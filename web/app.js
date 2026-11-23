@@ -7,10 +7,12 @@ import { RecordFeed } from "./record-feed.js";
 import { languageSelection } from "./history-model.js";
 import { sceneSelection, sceneLabel } from "./scene-model.js";
 import { ExportDialog } from "./export-dialog.js";
-import { request, saveDownload } from "./transport.js";
+import { request, saveDownload, capabilities } from "./transport.js";
 
 const $ = (selector) => document.querySelector(selector);
 const pageSize = 20;
+const available = capabilities();
+const runtime = globalThis.languageMemoryRuntime;
 let locale = "en";
 let settings;
 let catalog = { languages: [], counts: {}, kinds: {}, by_language: {} };
@@ -133,10 +135,11 @@ const explanationLanguagePicker = new Picker($("#explanation-language"), {
   label: "Explanation language",
   onChange: (explanation_language) => saveSettings({ explanation_language: explanation_language || null }),
 });
-const exportDialog = new ExportDialog($("#export-dialog"), {
+const exportDialog = available.export ? new ExportDialog($("#export-dialog"), {
   t, api, languageName, download, flushEditors, feedback, errorKey,
   getFilters: filters, getCatalog: () => catalog, getLocale: () => locale,
-});
+}) : null;
+$("#export-open").hidden = !available.export;
 
 function renderLanguagePreferences() {
   const codes = [...new Set(["en", "zh", "ja", "ko", "fr", "es", ...catalog.languages,
@@ -239,6 +242,7 @@ async function flushEditors() {
   }
   return true;
 }
+if (runtime) runtime.beforeAccountChange = flushEditors;
 function applyLocale() {
   document.documentElement.lang = locale;
   document.title = t("appTitle");
@@ -267,7 +271,7 @@ function applyLocale() {
   renderScenes();
   renderLanguagePreferences();
   refreshEditorLocales();
-  exportDialog.relabel();
+  exportDialog?.relabel();
 }
 function refreshEditorLocales() {
   for (const editor of editors.values()) {
@@ -374,7 +378,8 @@ function card(record, expanded = false) {
   mastery.append(...statusButtons);
   const preview = element("p", undefined, "entry-preview");
   const lastSeen = translated("small", "lastSeen", { date: record.last_seen_at }, "entry-last-seen");
-  heading.append(title, listenButton, mastery, element("span", undefined, "entry-chevron"));
+  if (!available.speech) heading.classList.add("without-speech");
+  heading.append(title, ...(available.speech ? [listenButton] : []), mastery, element("span", undefined, "entry-chevron"));
   summary.append(heading, preview, lastSeen);
   function renderSummary(point) {
     const fullTitle = point.note_title || t("untitledNote");
@@ -569,7 +574,7 @@ function saveSettings(patch) {
   });
 }
 async function synchronize() {
-  if (!ready || syncing || historyFeed.loading || document.visibilityState === "hidden")
+  if (!ready || runtime?.isPaused?.() || syncing || historyFeed.loading || document.visibilityState === "hidden")
     return;
   syncing = true;
   try {
@@ -641,7 +646,7 @@ $("#settings-open").addEventListener("click", async () => {
     feedback(".settings-feedback", errorKey(error), true);
   }
 });
-$("#export-open").addEventListener("click", () => exportDialog.open());
+$("#export-open").addEventListener("click", () => exportDialog?.open());
 document
   .querySelectorAll(".dialog-close")
   .forEach((button) =>

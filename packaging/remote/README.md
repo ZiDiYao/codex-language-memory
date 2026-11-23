@@ -1,8 +1,8 @@
-# Language Memory remote plugin
+# Sayrove remote plugin
 
 This package targets the Node service at
 `https://language-memory-api.up.railway.app/mcp` with the public display name
-**Language Memory**. Its package ID remains `language-memory-cloud`, separate
+**Sayrove** (拾语). Its package ID remains `language-memory-cloud`, separate
 from the desktop plugin. A configured manifest is not evidence of installation,
 publication or a completed browser OAuth flow.
 

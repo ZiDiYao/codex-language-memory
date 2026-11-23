@@ -197,7 +197,7 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                 })
                 page = await self.call(session, "open_memory_page")
                 with urlopen(page["url"]) as response:
-                    self.assertIn("Language memory", response.read().decode())
+                    self.assertIn("Sayrove", response.read().decode())
             async with stdio_client(params) as streams, ClientSession(*streams) as session:
                 await session.initialize()
                 settings = await self.call(session, "get_settings")
