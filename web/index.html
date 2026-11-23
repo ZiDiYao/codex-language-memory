@@ -37,7 +37,7 @@
             <dialog id="local-profile-dialog" class="profile-dialog" aria-labelledby="local-profile-title">
               <div class="dialog-heading">
                 <h2 id="local-profile-title" data-i18n="accountProfile">Profile</h2>
-                <button id="local-profile-close" type="button" class="icon-button"><span aria-hidden="true">×</span><span class="sr-only" data-i18n="close">Close</span></button>
+                <button id="local-profile-close" type="button" class="sr-only-focusable" data-i18n="close">Close</button>
               </div>
               <section class="profile-account profile-section" aria-labelledby="local-profile-account-title">
                 <h3 id="local-profile-account-title" data-i18n="profileAccount">Account</h3>
@@ -136,7 +136,9 @@
           <label class="sr-only" for="search" data-i18n="search"></label>
           <input
             id="search"
-            type="search"
+            type="text"
+            role="searchbox"
+            enterkeyhint="search"
             maxlength="350"
             data-placeholder="searchPlaceholder"
           />
@@ -151,6 +153,7 @@
     <dialog id="settings-dialog" aria-labelledby="settings-title">
       <div class="dialog-heading">
         <h2 id="settings-title" data-i18n="settingsTitle"></h2>
+        <button type="button" class="dialog-close sr-only-focusable" data-i18n="close">Close</button>
       </div>
       <p class="help" data-i18n="settingsHelp"></p>
       <div class="setting">
@@ -211,10 +214,7 @@
     <dialog id="export-dialog" aria-labelledby="export-title">
       <div class="dialog-heading">
         <h2 id="export-title" data-i18n="export"></h2>
-        <button class="icon-button dialog-close">
-          <span aria-hidden="true">×</span
-          ><span class="sr-only" data-i18n="close"></span>
-        </button>
+        <button type="button" class="dialog-close sr-only-focusable" data-i18n="close">Close</button>
       </div>
       <form id="export-filters">
         <div id="export-history" class="export-history" role="status"><span id="export-history-title"></span><small id="export-history-detail"></small></div>

@@ -102,17 +102,24 @@ npm run build
 .venv/bin/python -m unittest discover -s tests -v
 node --test tests/*.mjs
 .venv/bin/python scripts/build_beta.py
-.venv/bin/python scripts/test_beta.py dist/language-memory-0.2.0-beta.38-macos-arm64.zip
+.venv/bin/python scripts/test_beta.py dist/language-memory-0.2.0-beta.39-macos-arm64.zip
 ```
 
 Change `VERSION` for the next Beta. The builder copies that version into the packaged
 manifest, collects third-party license notices, bundles the runtime and assets, writes
 `release.json`, and creates the ZIP with `ditto` to preserve framework symlinks and modes.
 `dist/SHA256SUMS.txt` contains the archive checksum. Build outputs are ignored by Git.
-Do not use `--skip-freeze` after changing Python, JavaScript, CSS or native App
-HTML: all of them live inside the frozen runtime. It is only for repackaging
-outer assets such as the Skill, plugin manifest and command files when the
-frozen runtime is unchanged.
+Do not use `--skip-freeze` alone after changing Python, JavaScript, CSS or native
+App HTML: it neither rebuilds nor synchronizes those assets. Ordinarily rebuild
+the frozen runtime. A UI-only release can instead preserve an already verified
+runtime core to retain its Keychain code identity, but only with these guards:
+verify the base package inventory; prove Python sources, dependencies and build
+inputs are unchanged; rebuild the native HTML; independently copy the runtime
+and replace its entire `_internal/web` tree; then repackage. Compare every
+non-web runtime file/symlink, executable SHA256, CDHash and designated requirement
+against the base, verify the signature, and run the extracted package acceptance
+suite. Never edit the active installation or reuse a core after Python/dependency
+changes. The controlled Beta 39 build follows this path from Beta 38.
 
 `scripts/test_beta.py` extracts the actual archive and executes its command files in a
 temporary profile whose paths contain spaces. Runtime PATH excludes developer tools.

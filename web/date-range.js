@@ -35,6 +35,9 @@ export class DateRange {
         event.preventDefault(); event.stopPropagation(); this.close(true);
       }
     });
+    document.addEventListener("click", event => {
+      if (this.expanded && !host.contains(event.target)) this.close();
+    });
     this.days.addEventListener("keydown", event => {
       const value = event.target.dataset.date;
       if (!value) return;
