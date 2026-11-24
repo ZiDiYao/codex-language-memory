@@ -26,6 +26,32 @@ actual encounter keeps its own receipt and encounter count. Processing, complete
 or failed tasks are not reused as a content cache: different snapshots or new
 contexts may require another meaning. Changed context/correction schedules its own work.
 
+## Single-call capture and answer context
+
+`POST /v1/observations/context` and MCP `capture_and_context` accept the same
+minimal observation envelope. They return the capture outcome plus `_context`:
+
+```json
+{"enabled":true,"enabled_types":["word","expression","grammar","correction"],"first_language":"fr","explanation_language":null}
+```
+
+The backend reads those fields from the authenticated tenant in the same locked
+transaction that enforces recording and type settings. Codex can submit the target
+first and use the returned confirmed preferences for its answer, without a separate
+model/tool round for settings. A null first language is not an inferred preference.
+Context is included with processed, paused and request-conflict outcomes. Replays
+return current preferences and the original outcome without another encounter;
+the context itself is never persisted inside a capture receipt. Existing and
+contextual observation endpoints share request IDs/fingerprints, so an exact
+cross-endpoint retry cannot add another encounter.
+
+Settings responses advertise `_capabilities.capture_context=true`. The desktop
+must additionally bind single-call writes to the original MCP connection/account
+epoch and reject an account switch; authenticated backend tenant isolation does
+not replace that desktop guard. This additive API needs no database migration or
+enrichment-provider changes. Existing observation and rich-save contracts remain
+available.
+
 ## Configure and deploy
 
 The production cloud service uses `backend-node/`. Apply `node src/migration.js`

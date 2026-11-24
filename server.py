@@ -35,6 +35,19 @@ def create_server(store: Store) -> FastMCP:
     study = StudySessions(store)
     register_app(server, store)
 
+    # An implicit first capture must belong to the account that exposed these
+    # tools, never whichever account happens to be active at invocation time.
+    # This reads safe local routing metadata only, without OAuth/cloud access.
+    # Reconnect after a sign-in/account change to establish a new binding.
+    capture_binding = store.connection_status() if cloud_capable else None
+
+    def local_tool(**options):
+        # Cloud has no session/history/profile/export endpoints. Advertising
+        # them adds schemas and invites unsupported calls in every question.
+        if capture_binding is None or capture_binding["mode"] == "local":
+            return server.tool(**options)
+        return lambda function: function
+
     def write_at_epoch(expected_epoch, operation):
         binder = getattr(store, "expect_epoch", None)
         if binder is None:
@@ -102,20 +115,35 @@ def create_server(store: Store) -> FastMCP:
         source: CaptureMode = "automatic",
         expected_connection_epoch: ConnectionEpoch | None = None,
     ) -> dict[str, Any]:
-        """Record real learning gaps with minimal content; the backend enriches them asynchronously.
-
-        Submit only kind, language, title and relevant original context (plus an already
-        given correction if applicable). Do not generate meanings, sense keys, scenes or
-        examples for storage, or search before an ordinary capture. The backend deduplicates.
-        Use only when get_settings(for_capture=true) advertises lightweight_capture.
-        Retry uncertain results with the same request_id and exact items. A confirmed
-        added/merged result records the encounter; pending content is still being organized.
-        Never capture a review as a new encounter or claim queued enrichment is complete.
+        """Legacy minimal capture with an explicit current epoch; backend enriches asynchronously.
+        Requires get_settings capability lightweight_capture. Prefer capture_and_context for one-call learning.
+        Send only kind/language/title/context/correction, no generated notes/scenes or pre-save search.
+        Reuse request_id and exact items on retry; pending content is not complete.
         """
         if not hasattr(store, "capture"):
             return {"status": "failed", "error": "lightweight_capture_unavailable"}
         payload = [item.model_dump(exclude_none=True) for item in items]
         return write_at_epoch(expected_connection_epoch, lambda: store.capture(request_id, payload, source))
+
+    @server.tool(annotations=local_write)
+    def capture_and_context(
+        request_id: RequestId,
+        items: Annotated[list[LearningObservation], Field(min_length=1, max_length=20)],
+        source: CaptureMode = "automatic",
+    ) -> dict[str, Any]:
+        """Submit real learning targets once and return confirmed answer-language preferences.
+
+        No preliminary settings/search call is needed. Send only kind, language,
+        title and necessary original context/correction. The backend enforces
+        recording/types, deduplicates and enriches later. Use returned _context
+        for the answer language. Reuse request_id and exact items on uncertain
+        retries. Account changes require reconnecting Sayrove; never rebind an
+        old request automatically. Pending enrichment is not a finished note.
+        """
+        if capture_binding is None or capture_binding["mode"] != "cloud" or not hasattr(store, "capture_with_context"):
+            return {"status": "failed", "error": "single_call_unavailable"}
+        payload = [item.model_dump(exclude_none=True) for item in items]
+        return write_at_epoch(capture_binding["epoch"], lambda: store.capture_with_context(request_id, payload, source))
 
     @server.tool(annotations=local_write)
     def save_points(
@@ -124,26 +152,10 @@ def create_server(store: Store) -> FastMCP:
         source: CaptureMode = "automatic",
         expected_connection_epoch: ConnectionEpoch | None = None,
     ) -> dict[str, Any]:
-        """Save one batch from a learning encounter. Reuse request_id and exact items on retry.
-
-        Each item needs kind (word/expression/grammar/correction), language (e.g. en),
-        title, sense_key (stable short meaning/use label) and meaning. Codex must also provide
-        a useful explanation with natural usage/collocations and two to five distinct examples
-        (text, translation in the preferred explanation language when useful).
-        Optional fields are context and corrected_sentence. Generate content before saving; never ask the user to fill a form.
-        Include scenes as a list of short real-world situation labels (up to 12,
-        80 characters each). Classify from the actual meaning/context, reuse
-        matching list_scenes names, and allow a point in several scenes. Labels
-        are open-ended, separate from kind/language. [] leaves a point ungrouped.
-        A word has one record per language and normalized title. Different sense_key values
-        add meanings inside that record. Reuse an existing word's title, including when
-        the question uses an inflected form. A fresh encounter moves it to the top of history
-        and boosts review priority; multiple meanings in one batch count as one encounter.
-        Set source=explicit only when the user requested this save.
-        Do not call this for reading, explaining or practicing already saved notes during
-        study/review; those actions are not new encounters. Use queries and record_review.
-        Returns one added/merged/skipped/failed outcome per item when processed.
-        Skipped means the current capture settings exclude the item.
+        """Save rich notes with kind/language/title/sense_key/meaning/explanation and 2–5 examples.
+        Prefer capture_and_context for ordinary learning. Optional context/correction/scenes.
+        Reuse request_id and exact items on retry; skipped items are excluded by settings.
+        Reading/review is not a new encounter. Rich-content guidance is in the legacy-capture reference.
         """
         return write_at_epoch(expected_connection_epoch, lambda: store.save(request_id, items, source))
 
@@ -173,17 +185,11 @@ def create_server(store: Store) -> FastMCP:
             cursor=cursor, needs_enrichment=needs_enrichment,
         )
 
-    @server.tool(annotations=local_write)
+    @local_tool(annotations=local_write)
     def export_points(request: ExportRequest) -> dict[str, Any]:
-        """Export all matching points as PDF, XLSX, DOCX, a Notion import ZIP, or JSON.
-        Filter by kind or kinds, scene, language, status, keyword, and timezone-aware start_at
-        (inclusive) / end_at (exclusive), using date_field created_at or last_seen_at.
-        content=notes exports current editable notes; terms exports current titles only.
-        content=sections requires fields (meaning, explanation, examples, translations,
-        context, corrected_sentence) and uses original captured fields, not freeform edits.
-        translations requires examples. include_metadata controls learning dates/history.
-        Returns a local file path and count. Notion ZIP contains Markdown and CSV;
-        it does not publish to Notion. Use find_points for direct conversational reading.
+        """Export matching records to PDF/XLSX/DOCX/Notion-import ZIP/JSON; local-only.
+        Request schema defines filters/sections/date bounds. notes uses current edits; sections uses
+        captured fields. Returns a local path/count; Notion ZIP does not publish anything.
         """
         try:
             return save_export(store, request)
@@ -196,20 +202,9 @@ def create_server(store: Store) -> FastMCP:
         include_variants: bool = False, include_upcoming: bool = False,
         exclude_ids: Annotated[list[RecordId], Field(max_length=100)] | None = None,
     ) -> dict[str, Any]:
-        """Choose material for guided study: repeated questions, due FSRS reviews, then unassessed points.
-        Excludes mastered and empty custom notes. Pass this round's completed/skipped IDs
-        in exclude_ids to avoid repeating an assisted or skipped point with an unchanged schedule.
-        Returns current notes, selection reasons, latest attempts and counts for the filtered
-        scope after exclusions (before limit). limit must be 1 to 50; counts already cover
-        the entire scope. Schedule-only questions can use counts and next_due_at without
-        loading upcoming records. Use last_attempt to address a specific difficulty,
-        but the current note remains authoritative after user edits. Reading never records practice.
-        Other future reviews are excluded unless include_upcoming=true for requested early practice.
-        Memory estimates use population parameters and are not calibrated proficiency scores.
-        Repeated questions rank first and can be selected before their FSRS due time.
-        repeat_priority counts repeat encounters since the last independent correct answer;
-        it does not modify FSRS state. Mastered and empty notes stay excluded.
-        Supply language to review one language. include_variants includes regional forms.
+        """Select saved notes by repeat priority, then due/unassessed reviews; reading records no practice.
+        Excludes mastered/empty notes. Pass completed/skipped IDs in exclude_ids; counts cover the full
+        filtered scope. include_upcoming is only for requested early practice. Estimates are not proficiency.
         """
         return store.review(language=language, kind=kind, scene=scene, limit=limit, include_variants=include_variants,
                             include_upcoming=include_upcoming, exclude_ids=exclude_ids)
@@ -217,87 +212,66 @@ def create_server(store: Store) -> FastMCP:
     @server.tool(annotations=local_write)
     def record_review(record_id: RecordId, request_id: RequestId, review: Review,
                       expected_connection_epoch: ConnectionEpoch | None = None) -> dict[str, Any]:
-        """Record an actual answered quiz once; reuse request_id and exact arguments on retry.
-        result is correct/partial/incorrect/skipped. Set assisted=true if hints or the answer
-        were shown before the learner responded. A quiz immediately after you explained or
-        displayed the same target is assisted even when you use a different example sentence.
-        Check the preceding teaching context before choosing assisted. Assisted/skipped attempts
-        do not train FSRS.
-        Correct maps to Good; partial/incorrect to Again. effort=hard/easy applies only to
-        an unassisted correct answer when the user explicitly reports recall effort.
-        Include only the exercise prompt and relevant learner answer. Never infer a quiz
-        result from asking a meaning, reading an explanation, or marking Mastered.
-        This never changes user-controlled mastery or encounter counts.
+        """Record a real quiz answer once; reuse request_id and exact arguments on retry.
+        Mark assisted for hints, answer exposure or immediately preceding teaching. Assisted/skipped
+        attempts do not train FSRS. effort applies only to explicitly reported independent correct recall.
+        Reading or marking mastery is not a quiz. This never changes mastery or encounter counts.
         """
         return write_at_epoch(expected_connection_epoch, lambda: store.record_review(record_id, request_id, review))
 
-    @server.tool(annotations=local_write)
+    @local_tool(annotations=local_write)
     def start_study(
         request_id: RequestId, language: Language, kind: Kind | None = None,
         limit: Annotated[int, Field(ge=1, le=20)] = 3,
         include_variants: bool = True, include_upcoming: bool = False,
     ) -> dict[str, Any]:
-        """Start a persistent round from saved notes in repeat-priority, then FSRS queue order.
-        Read get_learning_profile first. Default to three points for a short round.
-        A requested time budget is approximate. Retry with the same request_id and options.
-        For 'continue', use get_study instead of starting another round. Returns only the
-        current point, not all planned answers. No quiz attempt or encounter is recorded.
-        include_upcoming allows requested early practice. Empty means no eligible material.
+        """Start a local-only persistent round from saved notes; read profile first.
+        Reuse request_id/options on retry. For continuation call get_study. Returns only the current
+        point; no quiz attempt or new encounter. include_upcoming is requested early practice.
         """
         return study.start(request_id, language=language, kind=kind, limit=limit,
                            include_variants=include_variants, include_upcoming=include_upcoming)
 
-    @server.tool(annotations=read_only)
+    @local_tool(annotations=read_only)
     def get_study(session_id: RequestId | None = None, language: Language | None = None) -> dict[str, Any]:
-        """Resume from a saved round, current question, hint flag and actual progress.
-        Without an ID, find an unfinished round; choose_session means multiple matches.
-        Read current notes and refresh get_learning_profile on a new chat or preference change.
-        Do not expose the returned answer material when asking the pending question.
-        question_stale requires preparing a fresh question from the edited note.
+        """Resume a local-only round, pending question and assistance flag. Do not expose answers.
+        choose_session requires selecting a round; question_stale requires a fresh question from current notes.
         """
         return study.get(session_id, language)
 
-    @server.tool(annotations=local_write)
+    @local_tool(annotations=local_write)
     def prepare_study_question(
         session_id: RequestId, expected_version: Annotated[int, Field(ge=0)],
         record_id: RecordId, expected_revision: Revision, prompt: Text, assisted: bool = False,
     ) -> dict[str, Any]:
-        """Persist one question BEFORE showing it, using the current point and revision.
-        Return the saved prompt to the learner and wait. Reuse its prompt with assisted=true
-        BEFORE giving a hint or showing the answer; assistance cannot be reset for this point.
-        Recent teaching/answer exposure also requires assisted=true. A version conflict means
-        reread get_study; never overwrite another chat's progress blindly.
+        """Persist a local-only question before showing it using current version/revision.
+        Persist assisted=true before a hint or answer; recent teaching is assistance. On conflict reread
+        get_study. Never reset assistance or overwrite another chat's progress.
         """
         return study.prepare(session_id, expected_version, record_id, expected_revision, prompt, assisted)
 
-    @server.tool(annotations=local_write)
+    @local_tool(annotations=local_write)
     def submit_study_answer(
         session_id: RequestId, expected_version: Annotated[int, Field(ge=0)],
         request_id: RequestId, review: Review,
     ) -> dict[str, Any]:
-        """Atomically save the learner's actual answer and advance the persistent round.
-        Codex grades correct/partial/incorrect/skipped. answer is required except for skipped;
-        never invent a reply. Prompt comes from the prepared question. Persisted assistance
-        overrides assisted=false. Assisted/skipped attempts do not update FSRS.
-        Retries must use the same request_id, expected_version and review, including after
-        a new chat. Do not ALSO call record_review: this tool already records exactly one attempt.
-        Returns actual progress and the next point. Mastery and encounter counts never change.
+        """Save the actual learner answer and advance a local-only round atomically.
+        Reuse request_id/version/review on retry; never invent an answer or also call record_review.
+        Persisted assistance prevails; assisted/skipped attempts do not train FSRS. Mastery/encounters stay unchanged.
         """
         return study.answer(session_id, expected_version, request_id, review)
 
-    @server.tool(annotations=local_write)
+    @local_tool(annotations=local_write)
     def set_study_state(
         session_id: RequestId, expected_version: Annotated[int, Field(ge=0)],
         state: Literal["active", "paused", "completed"],
     ) -> dict[str, Any]:
-        """Pause, resume or finish a round without grading an unanswered question.
-        Pause preserves the question and hint flag across chats. Completed rounds cannot
-        reopen; start a new round when requested. Do not mark a stop request as an incorrect
-        or skipped answer. Use the latest session version from get_study.
+        """Pause/resume/finish a local-only round using its current version.
+        Pause preserves question/assistance; stopping records no quiz answer. Completed rounds cannot reopen.
         """
         return study.set_state(session_id, expected_version, state)
 
-    @server.tool(annotations=read_only)
+    @local_tool(annotations=read_only)
     def get_point_history(
         record_id: RecordId, limit: Limit = 20,
         before_encounter_id: RecordId | None = None, before_review_id: RecordId | None = None,
@@ -309,7 +283,7 @@ def create_server(store: Store) -> FastMCP:
         return store.history(record_id, limit=limit, before_encounter_id=before_encounter_id,
                              before_review_id=before_review_id)
 
-    @server.tool(annotations=read_only)
+    @local_tool(annotations=read_only)
     def get_learning_profile(language: Language | None = None, include_variants: bool = False) -> dict[str, Any]:
         """Read observed practice counts, recurring points and explicit learning preferences.
         Use before personalized teaching/review or when asked about learning progress.
@@ -318,7 +292,7 @@ def create_server(store: Store) -> FastMCP:
         """
         return store.learning_profile(language=language, include_variants=include_variants)
 
-    @server.tool(annotations=local_write)
+    @local_tool(annotations=local_write)
     def update_learning_preferences(patch: LearnerPreferences, language: Language | None = None) -> dict[str, Any]:
         """Remember explicitly stated explanation_language, explanation_style (concise/detailed),
         learning_goal or interests. Omit language for global preferences; otherwise scope to
@@ -329,16 +303,10 @@ def create_server(store: Store) -> FastMCP:
     @server.tool(annotations=ToolAnnotations(openWorldHint=cloud_capable))
     def update_point(record_id: RecordId, patch: Patch, expected_revision: Revision | None = None,
                      expected_connection_epoch: ConnectionEpoch | None = None) -> dict[str, Any]:
-        """Edit supplied fields only. Use null to clear optional content.
-        patch.scenes replaces the point's scene labels; [] explicitly removes all
-        scenes. User scene edits are preserved across later automatic captures.
-        The returned note is the current editable study content. Set patch.note to replace
-        it verbatim, including an empty string; null restores the generated source content.
-        If note_is_custom is true, edit note rather than the historical structured fields.
-        Status changes only when supplied. Record quiz results with record_review and its
-        idempotent request_id; legacy review_result patches fail without changing data.
-        Pass the record's revision to avoid overwriting a concurrent page edit. On edit_conflict,
-        reread and reconcile the change; do not blindly retry without the revision.
+        """Edit supplied fields with current epoch and expected_revision; reread/reconcile edit_conflict.
+        For custom notes edit note verbatim (including empty); null restores generated content.
+        scenes replaces labels ([] clears); status changes only when supplied. Record actual quiz results
+        with record_review, never review_result patches. Respect manual edits.
         """
         return write_at_epoch(expected_connection_epoch, lambda: store.update(record_id, patch, expected_revision))
 

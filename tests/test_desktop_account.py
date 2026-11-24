@@ -79,6 +79,7 @@ class MockCloud:
         self.import_status = 200
         self.requests = []
         self.lightweight_capture = False
+        self.single_call_status = 200
 
     async def __call__(self, request):
         url = str(request.url)
@@ -115,7 +116,7 @@ class MockCloud:
             if not request.headers.get("authorization"):
                 return httpx.Response(401, headers={"WWW-Authenticate": 'Bearer resource_metadata="' + account.PRM + '"'})
             if request.url.path.startswith("/v1/"):
-                tools = {"/v1/settings": "get_settings", "/v1/scenes": "list_scenes", "/v1/points": "find_points", "/v1/captures": "save_points", "/v1/observations": "capture_points"}
+                tools = {"/v1/settings": "get_settings", "/v1/scenes": "list_scenes", "/v1/points": "find_points", "/v1/captures": "save_points", "/v1/observations": "capture_points", "/v1/observations/context": "capture_and_context"}
                 if request.url.path in tools:
                     name = tools[request.url.path]
                     payload = request.headers["authorization"].split(".")[1]
@@ -134,6 +135,10 @@ class MockCloud:
                         return httpx.Response(200, json={"scenes": [{"name": "Food & cooking", "count": 1}], "total": 1})
                     if name == "find_points":
                         return httpx.Response(200, json={"records": [], "has_more": False, "next_cursor": None})
+                    if name == "capture_and_context":
+                        return httpx.Response(self.single_call_status, json={"status": "processed", "results": [],
+                            "replayed": False, "_context": {"enabled": True, "enabled_types": ["word"],
+                                "first_language": "fr", "explanation_language": "ja"}})
                     return httpx.Response(200, json={"status": "processed", "results": [], "replayed": False})
                 if request.url.path == "/v1/desktop-imports":
                     self.imports.append({"method": request.method, "body": json.loads(request.content)})
@@ -219,6 +224,38 @@ class DesktopAccountTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "oauth_configuration_invalid")
         self.assertEqual(len(self.cloud.calls), count)
         self.assertEqual(self.cloud.unexpected_urls, [])
+
+    def test_single_call_capture_has_one_post_and_returns_confirmed_context(self):
+        self.login()
+        before = len(self.cloud.requests)
+        args = {"request_id": "combined-observation", "items": [{"kind": "word", "language": "en", "title": "celery"}]}
+        result = self.manager.call_tool("capture_and_context", args, expected_epoch=self.manager.status()["epoch"])
+        self.assertEqual(self.cloud.requests[before:], [("POST", "/v1/observations/context")])
+        self.assertEqual(self.cloud.calls[-1], {"name": "capture_and_context", "arguments": args})
+        self.assertEqual(result["_context"]["first_language"], "fr")
+        self.assertEqual(result["_context"]["explanation_language"], "ja")
+        self.assertEqual(result["_timing"]["deadline_ms"], 1500)
+
+    def test_single_call_old_backend_returns_definitive_unavailable_without_legacy_write(self):
+        self.login()
+        for status in (404, 405):
+            self.cloud.single_call_status = status
+            before = len(self.cloud.requests)
+            result = self.manager.call_tool("capture_and_context", {"request_id": "old-backend-route", "items": []})
+            self.assertEqual(result["error"], "single_call_unavailable")
+            self.assertEqual(self.cloud.requests[before:], [("POST", "/v1/observations/context")])
+
+    def test_single_call_timeout_never_retries_another_capture_route(self):
+        self.login()
+        self.manager.capture_timeout = 0.05
+        self.cloud.tool_entered, self.cloud.tool_release = threading.Event(), threading.Event()
+        before = len(self.cloud.requests)
+        with self.assertRaises(account.AccountError) as raised:
+            self.manager.call_tool("capture_and_context", {"request_id": "combined-timeout", "items": []})
+        self.assertEqual(raised.exception.code, "capture_budget_exceeded")
+        self.assertEqual(self.cloud.requests[before:], [("POST", "/v1/observations/context")])
+        self.assertFalse(self.manager._last_capture_timing["response_received"])
+        self.cloud.tool_release.set()
 
     def test_automatic_capture_has_a_bounded_wait_and_no_synchronous_retry(self):
         self.login()

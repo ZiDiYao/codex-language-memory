@@ -754,6 +754,10 @@ class AccountManager:
             raise AccountError("authentication_required")
         if response.status_code >= 500:
             raise AccountError("cloud_unavailable")
+        if path == "/v1/observations/context" and response.status_code in (404, 405):
+            # An old backend has no such route and has not committed a capture.
+            # Only this definitive response permits a legacy fallback.
+            return {"status": "failed", "error": "single_call_unavailable"}
         if response.status_code not in (200, 201, 400, 404, 409, 422):
             raise AccountError("cloud_request_failed")
         result = response.json()
@@ -832,7 +836,7 @@ class AccountManager:
         started = time.perf_counter()
         locked_at = metadata_at = finished_at = None
         successful = False
-        automatic = name in ("save_points", "capture_points") and (arguments or {}).get("source", "automatic") == "automatic"
+        automatic = name in ("save_points", "capture_points", "capture_and_context") and (arguments or {}).get("source", "automatic") == "automatic"
         def timing():
             end = finished_at or time.perf_counter()
             return {"total_ms": round((end - started) * 1000), "deadline_ms": round(budget * 1000),
@@ -857,9 +861,9 @@ class AccountManager:
                             "automatic_timeout_ms": round(self.capture_timeout * 1000),
                             "last_capture_timing": self._last_capture_timing,
                             "unsupported": ["learning_profile", "learning_preferences", "point_history", "study_sessions", "exports"]}}
-                    elif path is None and name in ("get_settings", "list_scenes", "find_points", "save_points", "capture_points"):
-                        routes = {"get_settings": "/v1/settings", "list_scenes": "/v1/scenes", "find_points": "/v1/points", "save_points": "/v1/captures", "capture_points": "/v1/observations"}
-                        writing = name in ("save_points", "capture_points")
+                    elif path is None and name in ("get_settings", "list_scenes", "find_points", "save_points", "capture_points", "capture_and_context"):
+                        routes = {"get_settings": "/v1/settings", "list_scenes": "/v1/scenes", "find_points": "/v1/points", "save_points": "/v1/captures", "capture_points": "/v1/observations", "capture_and_context": "/v1/observations/context"}
+                        writing = name in ("save_points", "capture_points", "capture_and_context")
                         result = await self._rest(provider, "POST" if writing else "GET", routes[name],
                             body=arguments if writing else None, params=None if writing else arguments)
                     elif path is None:
@@ -924,7 +928,7 @@ class AccountManager:
         # remain bounded; an unsupported tool returns an explicit error, never SQLite.
         if not isinstance(name, str) or not name or len(name) > 100 or (args is not None and not isinstance(args, dict)):
             raise AccountError("unsupported_cloud_operation")
-        budget = {"budget": self.capture_timeout} if name in ("save_points", "capture_points") and (args or {}).get("source", "automatic") == "automatic" else {}
+        budget = {"budget": self.capture_timeout} if name in ("save_points", "capture_points", "capture_and_context") and (args or {}).get("source", "automatic") == "automatic" else {}
         return self._call(name=name, arguments=args, expected_epoch=expected_epoch, **budget)
 
     def request_api(self, method, path, params=None, json=None, *, expected_epoch=None):

@@ -207,6 +207,17 @@ class RoutingStore:
             "capture_points", {"request_id": request_id, "items": items, "source": source}, epoch=epoch),
             migrate=source != "automatic")
 
+    def capture_with_context(self, request_id, items, source="automatic"):
+        """One cloud transaction returns the receipt and confirmed preferences."""
+        snapshot = self._snapshot()
+        if snapshot["mode"] != "cloud":
+            raise CloudFeatureUnavailable("single_call_capture")
+        if source == "automatic" and self._migration is not None and not self._migration.capture_ready():
+            raise CloudAccountUnavailable("cloud_import_unavailable")
+        return self._dispatch("capture_with_context", cloud=lambda epoch: self._tool(
+            "capture_and_context", {"request_id": request_id, "items": items, "source": source}, epoch=epoch),
+            metadata=True, migrate=source != "automatic")
+
     def query(self, *, keyword=None, kind=None, language=None, status=None, scene=None, limit=10, offset=0,
               include_variants=False, cursor=None, needs_enrichment=False):
         filters = dict(keyword=keyword, kind=kind, language=language, status=status, scene=scene, limit=limit,

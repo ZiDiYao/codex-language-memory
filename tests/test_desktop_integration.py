@@ -79,6 +79,10 @@ class IntegrationAccount:
             return {"status": "updated", "record": copy.deepcopy(self.record)}
         elif name == "delete_point":
             return {"status": "deleted", "id": arguments["record_id"]}
+        elif name == "capture_and_context":
+            return {"status": "processed", "replayed": False, "results": [{"status": "added", "id": 900,
+                    "enrichment_state": "pending"}], "_context": {key: copy.deepcopy(self.settings[key]) for key in (
+                    "enabled", "enabled_types", "first_language", "explanation_language")}}
         elif name in ("save_points", "capture_points"):
             return {"status": "processed", "replayed": False, "results": [{"status": "added", "id": 900}]}
         elif name == "record_review":
@@ -146,7 +150,7 @@ class DesktopProtocolIntegrationTests(unittest.IsolatedAsyncioTestCase):
             factory.assert_called_once_with(state_path=path.with_name("desktop-account.json"))
             self.assertFalse(path.exists(), "production cloud client must not create a local learning database")
             tools = {tool.name: tool for tool in await server.list_tools()}
-            self.assertEqual(len(tools), 25)
+            self.assertEqual(len(tools), 17)
             for name in ("save_points", "capture_points", "update_point", "delete_point", "update_settings", "set_recording", "record_review"):
                 self.assertIn("expected_connection_epoch", tools[name].inputSchema["properties"])
             self.assertIn("memory_app_request", tools)
@@ -183,6 +187,49 @@ class DesktopProtocolIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 await self.call("capture_points", {"request_id": "invalid-capture", "items": [invalid], "expected_connection_epoch": 7})
         self.assertEqual(len(self.account.calls), 1)
 
+    async def test_single_call_capture_uses_startup_binding_without_reading_settings(self):
+        self.account.settings.update(first_language="fr", explanation_language="ja")
+        item = {"kind": "word", "language": "en", "title": "celery"}
+        result = await self.call("capture_and_context", {"request_id": "single-call", "items": [item]})
+        self.assertEqual(self.account.calls, [("capture_and_context", {
+            "request_id": "single-call", "items": [item], "source": "automatic"}, 7)])
+        self.assertEqual(result["_context"]["first_language"], "fr")
+        self.assertEqual(result["_context"]["explanation_language"], "ja")
+        self.assertEqual(result["_connection"], {"mode": "cloud", "state": "connected", "epoch": 7})
+        self.assertNotIn("private-", json.dumps(result))
+
+    async def test_single_call_capture_never_silently_rebinds_after_account_change(self):
+        self.account.epoch += 1
+        arguments = {"request_id": "stale-implicit", "items": [{"kind": "word", "language": "en", "title": "celery"}]}
+        with self.assertRaisesRegex(ToolError, "account_changed"):
+            await self.call("capture_and_context", arguments)
+        self.assertEqual(self.account.calls, [])
+        # Even a normal settings read for another workflow does not rebind old captures.
+        await self.call("get_settings")
+        with self.assertRaisesRegex(ToolError, "account_changed"):
+            await self.call("capture_and_context", arguments)
+        self.server = create_server(self.store)
+        self.assertEqual((await self.call("capture_and_context", {**arguments, "request_id": "new-connection"}))["_connection"]["epoch"], 8)
+
+    async def test_single_call_rejects_rich_content_and_unknown_epoch_override(self):
+        item = {"kind": "word", "language": "en", "title": "celery"}
+        for bad in ({**item, "meaning": "芹菜"}, {**item, "title": ""}):
+            with self.assertRaises(ToolError):
+                await self.call("capture_and_context", {"request_id": "invalid-single", "items": [bad]})
+        tools = {tool.name: tool for tool in await self.server.list_tools()}
+        self.assertNotIn("expected_connection_epoch", tools["capture_and_context"].inputSchema["properties"])
+        self.assertEqual(self.account.calls, [])
+
+    async def test_single_call_drops_reply_if_account_changes_during_remote_write(self):
+        original = self.account.call_tool
+        def change_account(*args, **kwargs):
+            result = original(*args, **kwargs)
+            self.account.epoch += 1
+            return result
+        with patch.object(self.account, "call_tool", side_effect=change_account), self.assertRaisesRegex(ToolError, "account_changed"):
+            await self.call("capture_and_context", {"request_id": "changed-during-write", "items": [
+                {"kind": "word", "language": "en", "title": "celery"}]})
+
     async def test_conversation_and_page_read_and_edit_the_same_cloud_record(self):
         self.assertEqual((await self.call("get_settings"))["_connection"]["epoch"], 7)
         await self.call("update_point", {"record_id": 900, "patch": {"note": "Edited in conversation"}, "expected_connection_epoch": 7})
@@ -207,10 +254,12 @@ class DesktopProtocolIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.account.calls, [])
 
     async def test_cloud_guided_study_profile_history_and_exports_are_explicitly_unavailable(self):
+        tools = {tool.name for tool in await self.server.list_tools()}
         for name, arguments in (("get_study", {}), ("get_learning_profile", {}), ("get_point_history", {"record_id": 900}),
             ("update_learning_preferences", {"patch": {"learning_goal": "Everyday conversation"}}),
             ("export_points", {"request": {"format": "json"}})):
-            with self.subTest(name=name), self.assertRaisesRegex(ToolError, "cloud_feature_unavailable"):
+            self.assertNotIn(name, tools)
+            with self.subTest(name=name), self.assertRaisesRegex(ToolError, "Unknown tool"):
                 await self.call(name, arguments)
         bridge = AppTransport(self.store)
         self.assertEqual(bridge.request("export", {"format": "json"}), {"status": 400, "data": {"error": "cloud_feature_unavailable"}})

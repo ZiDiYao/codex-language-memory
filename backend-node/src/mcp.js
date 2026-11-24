@@ -31,7 +31,7 @@ export function createMcpServer({ repositoryFactory, principal, logger = console
       return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
     });
   }
-  tool("get_settings", "Read this learner's recording and language preferences.", empty, async () => ({ ...await call("settings"), _capabilities: { lightweight_capture: true } }));
+  tool("get_settings", "Read this learner's recording and language preferences.", empty, async () => ({ ...await call("settings"), _capabilities: { lightweight_capture: true, capture_context: true } }));
   tool("update_settings", "Update only supplied preferences for this learner.", z.object({ patch: schemas.settingsPatch }).strict(),
     ({ patch }) => call("settings", patch), write);
   tool("get_recording", "Read whether new language-learning captures are enabled.", empty, async () => {
@@ -46,6 +46,10 @@ export function createMcpServer({ repositoryFactory, principal, logger = console
     "optional context and corrected_sentence. Backend normalization deduplicates targets and a durable background job enriches content. " +
     "Do not generate definitions, examples or scenes. Reuse request_id and exact items on uncertain retries.", schemas.observations,
   ({ request_id, items, source }) => call("observe", request_id, items, source), write);
+  tool("capture_and_context", "Submit minimal learning targets and receive confirmed language preferences in _context. " +
+    "The backend enforces recording/type settings, deduplicates and enriches asynchronously. " +
+    "Reuse request_id and exact items on uncertain retries.", schemas.observations,
+  ({ request_id, items, source }) => call("observeWithContext", request_id, items, source), write);
   tool("save_points", "Save a real learning encounter. Supply kind, language, title, sense_key, meaning, explanation, " +
     "two distinct examples and contextual scenes. A point can belong to several scenes. Reuse existing scene names. " +
     "Retry uncertain results with the same request_id and exact items; never fabricate encounters.", schemas.capture,

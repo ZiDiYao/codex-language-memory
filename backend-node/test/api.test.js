@@ -369,7 +369,7 @@ test("fresh stateless MCP requests initialize/list/call and concurrent users nev
   assert.equal(init.headers.get("mcp-session-id"), null);
   const tools = await rpc();
   assert.equal(tools.status, 200);
-  assert.equal(tools.body.result.tools.length, 13);
+  assert.equal(tools.body.result.tools.length, 14);
   assert.ok(tools.body.result.tools.some((tool) => tool.name === "save_points"));
   assert.ok(!tools.body.result.tools.some((tool) => ["export_points", "start_study", "open_memory_page"].includes(tool.name)));
   const saved = await rpc("tools/call", { name: "save_points", arguments: { request_id: "mcp-capture-once", items: [point] } });
@@ -480,6 +480,20 @@ test("real PostgreSQL repository shares authenticated HTTP/MCP storage without c
   const repeated = await service.call("/v1/captures", { method: "POST", body: { request_id: "real-pg-capture", items: [point] } });
   assert.equal(repeated.body.replayed, true);
   assert.equal((await service.call("/v1/points")).body.records[0].encounter_count, 1);
+
+  const observation = { request_id: 'real-pg-context-capture', items: [{ kind: 'word', language: 'en', title: 'celery' }] };
+  const first = await service.call('/v1/observations', { method: 'POST', body: observation });
+  await service.call('/v1/settings', { method: 'PATCH', body: { first_language: 'fr' } });
+  const contextual = await service.call('/v1/observations/context', { method: 'POST', body: observation });
+  assert.equal(contextual.status, 200);
+  assert.equal(contextual.body.replayed, true);
+  assert.equal(contextual.body.results[0].id, first.body.results[0].id);
+  assert.equal(contextual.body._context.first_language, 'fr');
+  await service.call('/v1/settings', { subject: 'bob', method: 'PATCH', body: { first_language: 'ja', enabled: false } });
+  const paused = await service.rpc('tools/call', { name: 'capture_and_context', arguments: observation }, 'bob');
+  assert.equal(paused.body.result.structuredContent.status, 'paused');
+  assert.equal(paused.body.result.structuredContent._context.first_language, 'ja');
+  assert.deepEqual((await service.call('/v1/points', { subject: 'bob' })).body.records, []);
 });
 
 test('lightweight observations and capture_points share verified scope and advertise capability', async t => {
@@ -497,4 +511,32 @@ test('lightweight observations and capture_points share verified scope and adver
   assert.equal(observed.length, 2);
   assert.equal(observed[0].principal.subject, 'alice'); assert.equal(observed[1].principal.subject, 'bob');
   assert.deepEqual(observed[0].args, [body.request_id, body.items, 'automatic']);
+});
+
+test('single-call capture transport validates requests and scopes context to the verified principal', async t => {
+  const observed = [];
+  const service = await fixture(t, { repositoryFactory: principal => ({
+    settings: async () => ({ enabled: true }),
+    observeWithContext: async (...args) => {
+      observed.push({ principal, args });
+      return { status: 'processed', results: [{ status: 'added', id: 1, enrichment_state: 'pending' }],
+        _context: { enabled: true, enabled_types: ['word'], first_language: principal.subject === 'alice' ? 'fr' : 'ja', explanation_language: null } };
+    },
+  }) });
+  assert.equal((await service.call('/v1/settings')).body._capabilities.capture_context, true);
+  const tools = (await service.rpc()).body.result.tools;
+  assert.equal(tools.some(tool => tool.name === 'capture_and_context'), true);
+  const body = { request_id: 'context-api-observation', items: [{ kind: 'word', language: 'en', title: 'celery' }] };
+  const rest = await service.call('/v1/observations/context', { method: 'POST', body });
+  assert.equal(rest.status, 200);
+  assert.equal(rest.body._context.first_language, 'fr');
+  const rpc = await service.rpc('tools/call', { name: 'capture_and_context', arguments: body }, 'bob');
+  assert.equal(rpc.body.result.structuredContent._context.first_language, 'ja');
+  assert.deepEqual(observed.map(entry => entry.principal.subject), ['alice', 'bob']);
+  assert.deepEqual(observed[0].args, [body.request_id, body.items, 'automatic']);
+  assert.equal((await service.call('/v1/observations/context', { method: 'POST', authorization: '', body })).status, 401);
+  assert.equal((await service.call('/v1/observations/context', { method: 'POST', body: { ...body, user_id: 'bob' } })).status, 422);
+  assert.equal((await service.call('/v1/observations/context?user_id=bob', { method: 'POST', body })).status, 422);
+  assert.equal((await service.call('/v1/observations/context')).status, 405);
+  assert.equal(observed.length, 2);
 });

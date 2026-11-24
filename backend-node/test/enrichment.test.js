@@ -57,6 +57,49 @@ dbtest('settings, partial failures, normalized identity and concurrent retries a
   assert.equal((await repo.save('concurrent-observation', [rich])).error, 'request_id_conflict');
 });
 
+dbtest('single-call capture returns current preferences on replay without another encounter', async t => {
+  const { repo, pool } = await fixture(t);
+  const original = await repo.observe('context-shared-request', [raw]);
+  assert.equal('_context' in original, false);
+  await repo.settings({ first_language: 'fr', explanation_language: 'ja', enabled_types: ['word'] });
+  const replay = await repo.observeWithContext('context-shared-request', [raw]);
+  assert.equal(replay.replayed, true);
+  assert.equal(replay.results[0].id, original.results[0].id);
+  assert.deepEqual(replay._context, { enabled: true, enabled_types: ['word'], first_language: 'fr', explanation_language: 'ja' });
+  const conflict = await repo.observeWithContext('context-shared-request', [{ ...raw, title: 'rinse' }]);
+  assert.equal(conflict.error, 'request_id_conflict');
+  assert.deepEqual(conflict._context, replay._context);
+  const captured = await repo.observeWithContext('context-first-request', [{ ...raw, title: 'rinse' }]);
+  assert.equal(captured.results[0].enrichment_state, 'pending');
+  assert.deepEqual(captured._context, replay._context);
+  assert.equal((await repo.observe('context-first-request', [{ ...raw, title: 'rinse' }])).replayed, true);
+  assert.equal((await pool.query('SELECT count(*)::integer n FROM lm_encounters')).rows[0].n, 2);
+  assert.equal((await pool.query('SELECT count(*)::integer n FROM lm_enrichment_jobs')).rows[0].n, 2);
+});
+
+dbtest('single-call capture honors recording/type settings and isolates context to its tenant', async t => {
+  const { repo, pool, principal } = await fixture(t);
+  await repo.settings({ enabled: false, explanation_language: 'fr' });
+  const paused = await repo.observeWithContext('context-paused-request', [raw]);
+  assert.equal(paused.status, 'paused');
+  assert.equal(paused._context.enabled, false);
+  assert.equal(paused._context.explanation_language, 'fr');
+  assert.equal((await pool.query('SELECT count(*)::integer n FROM lm_encounters')).rows[0].n, 0);
+  await repo.settings({ enabled: true, enabled_types: ['grammar'] });
+  const skipped = await repo.observeWithContext('context-type-request', [raw]);
+  assert.equal(skipped.results[0].status, 'skipped');
+  assert.deepEqual(skipped._context.enabled_types, ['grammar']);
+  assert.equal((await pool.query('SELECT count(*)::integer n FROM lm_enrichment_jobs')).rows[0].n, 0);
+  const other = new Repository(pool, { ...principal, subject: 'bob' });
+  await other.settings({ first_language: 'ja' });
+  const saved = await other.observeWithContext('context-type-request', [raw]);
+  assert.equal(saved.results[0].status, 'added');
+  assert.equal(saved._context.first_language, 'ja');
+  assert.equal(saved._context.explanation_language, null);
+  assert.deepEqual((await repo.query()).records, []);
+  assert.equal((await repo.getPoint(saved.results[0].id)).status, 'not_found');
+});
+
 dbtest('background completion adds content and scenes without a new encounter or review', async t => {
   const { repo, pool, save } = await fixture(t); const id = (await save()).results[0].id;
   let prompt;

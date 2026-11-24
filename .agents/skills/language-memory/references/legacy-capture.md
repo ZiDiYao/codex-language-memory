@@ -1,0 +1,25 @@
+# Legacy capture compatibility
+
+Read only when `capture_and_context` is unavailable or explicitly reports unsupported before any write. Never enter this path after a timeout or another uncertain result: the original request may already have committed. On account/epoch errors stop and reconnect; do not retry against another account.
+
+1. Read `get_settings(for_capture=true)` if that flag is supported, otherwise `get_settings()`. Honor recording, `enabled_types`, confirmed explanation preferences and `capture_ready`; if import is not ready, leave it to account setup. Reuse fresh context only for its `reuse_for_seconds` (currently 60), refreshing after settings/account changes or uncertain freshness. Do not call a clock for this.
+2. If `_capture.lightweight_capture=true` or direct remote `_capabilities.lightweight_capture=true`, use `capture_points` once with only kind, target-language tag, title and necessary original context/correction. Pass `expected_connection_epoch` when its schema supports it. Do not generate definitions, examples or scenes, query a scene catalog, search for duplicates or read back the write.
+3. Only when lightweight capture is unavailable, use `save_points` with current account epoch and the rich content rules below. Never fall back to a local store. No profile/history/session probes are needed for ordinary questions.
+
+The backend enforces recording/type settings for both automatic and explicit saves. A paused or skipped result is not permission to change source, request ID or settings and retry. An explicit later request after a settings change is a new encounter. Use a fresh request ID for a real new encounter; retries of an uncertain write must keep the original ID and exact payload. A repeated save request for an already confirmed encounter needs no second write.
+
+## Rich content
+
+Use `kind`, target-language `language`, a clear canonical `title`, stable semantic `sense_key`, `meaning`, useful `explanation` and two to five distinct natural `examples` (`text`, optional `translation`). A word has one normalized title/language record containing its senses; never suffix titles to create duplicate cards. Use grammar/correction titles for the reusable rule or error pattern. Send each meaning once per batch. For corrections, put the original in `context`, revision in `corrected_sentence`, and reason in `explanation`. Keep context limited to the observed learning gap.
+
+## Content quality
+
+These requirements apply to legacy rich captures and requested note edits, not the minimal `capture_and_context`/`capture_points` submissions. Backend enrichment validates complete generated content separately.
+
+- Stay focused on the observed meaning or usage. Give the contextual meaning and, for words, the relevant part of speech. For a quick single-word question, one useful usage sentence is enough in `explanation`; do not generate extra collocation lists just for capture. For a requested usage lesson, add useful natural phrasing, common patterns and register notes. For grammar and corrections, show the reusable pattern and why it fits. Include a relevant pitfall or contrast when helpful; do not invent one to fill a template.
+- Supply at least two distinct, natural examples in `examples`, preferably in different practical situations. Include translations in the resolved explanation language when it differs from the target language. Repeating the same sentence with different capitalization or translations does not count. Keep examples consistent with this sense; additional senses or words in your examples are not separate learning gaps.
+- Prefer common, usable language to obscure idioms. Do not label a phrase as informal, formal or idiomatic without confidence. Verify uncertain usage with a reliable dictionary or usage source when browsing is available; otherwise omit the doubtful claim. Examples can be original; never present generated examples as dictionary quotations.
+- Do not append routine source references, dictionary URLs or statements that examples are original to saved notes unless the user requests attribution. Keep verification references separate from the saved study content.
+- Keep the note readable and compact, using short paragraphs or brief headings in the explanation language as useful. Respect explicit preferences for concise explanations without dropping the two examples from newly captured records. Do not turn the chat response into a storage report. This standard applies to Codex-generated captures, not to the user's freely editable note.
+
+For legacy rich scene assignment, read the **Scenes** section in [library.md](library.md) only if you need its catalog or constraints. Read its **Languages** section for language-specific lookup or translation of existing notes. Respect the main skill's outcome, account and retry rules.

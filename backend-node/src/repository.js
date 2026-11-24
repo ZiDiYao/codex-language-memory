@@ -253,22 +253,32 @@ export class Repository {
   }
 
   /** Minimal observations are durable before any model runs. Never invent study content. */
-  async observe(requestId, items, source = 'automatic') {
+  async observeWithContext(requestId, items, source = 'automatic') {
+    return this.observe(requestId, items, source, true);
+  }
+
+  async observe(requestId, items, source = 'automatic', includeContext = false) {
     validateRequestId(requestId);
     if (!['automatic', 'explicit'].includes(source) || !Array.isArray(items) || !items.length || items.length > 20)
       throw new ValidationError();
     const digest = fingerprintAscii({ format: 'observation-v1', source, items });
     return this.transaction(true, async (client, tenant) => {
+      const settings = settingsWithDefaults(tenant.settings);
+      // Return preferences from the same verified tenant/transaction, including
+      // on replay. Receipts contain capture outcomes, never stale preferences.
+      const respond = (value) => includeContext ? { ...value, _context: {
+        enabled: settings.enabled, enabled_types: [...settings.enabled_types],
+        first_language: settings.first_language, explanation_language: settings.explanation_language,
+      } } : value;
       const receipt = (await client.query('SELECT * FROM lm_save_requests WHERE tenant_id=$1 AND request_id=$2',
         [this.tenantId, requestId])).rows[0];
       if (receipt) {
-        if (receipt.fingerprint !== digest) return { status: 'failed', error: 'request_id_conflict' };
+        if (receipt.fingerprint !== digest) return respond({ status: 'failed', error: 'request_id_conflict' });
         const results = clone(receipt.results);
         for (const result of results) if (result.id && !await this.point(client, result.id)) result.deleted = true;
-        return { status: 'processed', replayed: true, results };
+        return respond({ status: 'processed', replayed: true, results });
       }
-      const settings = settingsWithDefaults(tenant.settings);
-      if (!settings.enabled) return { status: 'paused', results: [] };
+      if (!settings.enabled) return respond({ status: 'paused', results: [] });
       const results = [], seen = new Set(), occurredAt = now();
       for (const [index, raw] of items.entries()) {
         let input;
@@ -329,7 +339,7 @@ export class Repository {
       }
       await client.query('INSERT INTO lm_save_requests(tenant_id,request_id,fingerprint,results) VALUES($1,$2,$3,$4::jsonb)',
         [this.tenantId, requestId, digest, json(results)]);
-      return { status: 'processed', replayed: false, results };
+      return respond({ status: 'processed', replayed: false, results });
     });
   }
 

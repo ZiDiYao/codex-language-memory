@@ -14,7 +14,7 @@ Use this workflow when the user asks to study saved material, practice for a few
 ## Ask one question
 
 - For words, ask the meaning in a fresh context; for expressions, use a situation or gap; for grammar, ask the learner to apply or explain the rule; for corrections, use the same error pattern in a new sentence. Test the saved sense, not incidental vocabulary.
-- Read `get_point_history` when specific earlier mistakes matter. Distinguish observed mistakes from guesses. An existing incomplete generated note may be enriched under SKILL.md; a custom note must not be silently reconstructed.
+- Read `get_point_history` when specific earlier mistakes matter. Distinguish observed mistakes from guesses. An existing incomplete generated note may be enriched under [review.md](review.md); a custom note must not be silently reconstructed.
 - Before showing a new question, call `prepare_study_question` with the current record ID, revision, session version, prompt and assistance flag. Then show only that question and wait. Do not display the stored definition, answer or remaining planned records.
 - On resume, reuse the persisted prompt if `question_stale=false`. If the note changed, read it and prepare a fresh question; do not grade the old prompt against changed content.
 - If the learner asks for a hint, persist the same prompt with `assisted=true` before giving a limited hint. Also set this before teaching or revealing the answer, including when relevant teaching already occurred in this chat. Assistance stays latched for this point, even after a new chat.
@@ -28,7 +28,7 @@ Use this workflow when the user asks to study saved material, practice for a few
 - Explain briefly in the current preferred explanation language. For errors, identify the concrete gap and provide a short contrast. Any immediate follow-up practice is assisted; it is not a new independent memory success.
 - On `version_conflict` or `content_changed`, read the current session before acting. A reply to a different question must not be attached to the new current point. A replay acknowledges an already committed attempt; use the returned current progress, not assumptions about the prior position.
 - Continue with the returned next point while the requested round is active. Do not fetch a new queue to bypass the round limit. Session tools do not change encounter counts or user-controlled mastery.
-- For ordinary standalone quizzes outside a persistent round, use `record_review` as described in SKILL.md.
+- For ordinary standalone quizzes outside a persistent round, use `record_review` as described in [review.md](review.md).
 
 ## Pause and finish
 

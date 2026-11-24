@@ -179,7 +179,7 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                 await session.initialize()
                 tools = await session.list_tools()
                 self.assertEqual({tool.name for tool in tools.tools}, {
-                    "get_recording", "set_recording", "save_points", "capture_points", "find_points",
+                    "get_recording", "set_recording", "save_points", "capture_points", "capture_and_context", "find_points",
                     "review_queue", "update_point", "delete_point",
                     "get_settings", "update_settings", "open_memory_page", "list_languages", "list_scenes", "export_points",
                     "record_review", "get_point_history", "get_learning_profile", "update_learning_preferences",

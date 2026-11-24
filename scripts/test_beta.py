@@ -79,7 +79,7 @@ async def exercise(archive):
         async with stdio_client(parameters(), errlog=error_log) as streams, ClientSession(*streams) as session:
             await session.initialize()
             tools = (await session.list_tools()).tools
-            assert len(tools) == 25 and {"list_scenes", "capture_points"} <= {tool.name for tool in tools}
+            assert len(tools) == 26 and {"list_scenes", "capture_points", "capture_and_context"} <= {tool.name for tool in tools}
             sidebar = (await session.read_resource("ui://language-memory/sidebar-v1.html")).contents[0]
             assert sidebar.mimeType == "text/html;profile=mcp-app"
             assert '<div id="records"' in sidebar.text
@@ -174,7 +174,7 @@ async def exercise(archive):
                 export = await call(session, "export_points", {"request": {"format": kind}})
                 assert export["count"] == 2 and export["format"] == kind, export
                 assert Path(export["path"]).is_file()
-            checks.append("Frozen MCP exposes 25 tools and saves multilingual data, reviews, preferences, page assets and all five exports")
+            checks.append("Frozen MCP exposes 26 tools and saves multilingual data, reviews, preferences, page assets and all five exports")
             with urlopen(Request(page["url"] + "api", data=json.dumps({
                 "action": "exports/history", "arguments": {},
             }).encode(), headers={"Content-Type": "application/json", "X-Language-Memory": "1"})) as response:
