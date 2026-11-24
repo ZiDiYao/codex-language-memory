@@ -8,6 +8,12 @@ services:
     image: language-memory-cloud-node:dev
     environment:
       DATABASE_URL: postgresql://language_memory:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/language_memory
+      SAYROVE_ENRICHMENT_PROVIDER: ${SAYROVE_ENRICHMENT_PROVIDER:-deepseek}
+      SAYROVE_ENRICHMENT_MODEL: ${SAYROVE_ENRICHMENT_MODEL:-}
+      SAYROVE_ENRICHMENT_BASE_URL: ${SAYROVE_ENRICHMENT_BASE_URL:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SAYROVE_ENRICHMENT_API_KEY: ${SAYROVE_ENRICHMENT_API_KEY:-}
 
   migrate:
     build:

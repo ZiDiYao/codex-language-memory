@@ -3,11 +3,14 @@ import { pathToFileURL } from "node:url";
 import { createApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { createPool, checkSchema } from "./database.js";
-import { createOpenAIEnricher, startEnrichmentWorker } from "./enrichment.js";
+import { startEnrichmentWorker } from "./enrichment.js";
+import { createEnricher } from "./providers/index.js";
 import { Repository } from "./repository.js";
 
 export async function start(environment = process.env) {
   const config = loadConfig(environment);
+  const provider = createEnricher({ provider: config.enrichmentProvider, apiKey: config.enrichmentApiKey,
+    model: config.enrichmentModel, baseUrl: config.enrichmentBaseUrl ?? undefined });
   const pool = createPool(config.databaseUrl);
   const handler = createApp({ config, repositoryFactory: (principal) => new Repository(pool, principal), readiness: () => checkSchema(pool) });
   const server = createServer(handler);
@@ -20,8 +23,7 @@ export async function start(environment = process.env) {
     await pool.end();
     throw new Error("Cloud service startup failed");
   }
-  const worker = startEnrichmentWorker({ pool,
-    provider: createOpenAIEnricher({ apiKey: config.enrichmentApiKey, model: config.enrichmentModel }) });
+  const worker = startEnrichmentWorker({ pool, provider });
   let closing;
   function close() {
     closing ??= (async () => {

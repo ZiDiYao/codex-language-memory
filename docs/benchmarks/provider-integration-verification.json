@@ -1,0 +1,51 @@
+{
+  "verified_on": "2026-11-23",
+  "base_commit": "2fefdeb",
+  "responsibilities": {
+    "codex": "Identify the actual learning target and submit minimal context",
+    "backend": "Deduplicate, durably accept and asynchronously enrich the supplied target"
+  },
+  "default_provider": "deepseek",
+  "default_model": "deepseek-flash",
+  "supported_adapters": [
+    "deepseek",
+    "openai",
+    "openai-compatible"
+  ],
+  "node_tests": {
+    "passed": 87,
+    "failed": 0,
+    "skipped": 0,
+    "includes": [
+      "actual isolated PostgreSQL",
+      "Python interoperability",
+      "authenticated REST/MCP",
+      "mocked provider transports",
+      "provider configuration",
+      "pending task deduplication"
+    ]
+  },
+  "compose_configuration": "passed with example environment and a disposable test password",
+  "live_provider_calls": false,
+  "deployed": false,
+  "desktop_changed": false,
+  "foreground_latency_remeasured": false,
+  "twenty_percent_latency_target": "not demonstrated; foreground tool roundtrips still remain",
+  "source_sha256": {
+    ".env.example": "23a70f5e0d042912aeacfe870cc34af06a18bf6dc5dc097217187ea76226c9bc",
+    "backend-node/src/config.js": "46b2f3b9a5f5e53460c3ca94750ef226c7d6c78f6f7740dd0ae39ef7f0ad5ffd",
+    "backend-node/src/enrichment.js": "a49d8cb98dd37babd7852ce2c5741f8bd77e555dcb81554cffb6086ec914343c",
+    "backend-node/src/main.js": "fead3c2caf2c1bbc51cf8f06f52e126dbedcb88aa947487c2b8df2b8e1ad2263",
+    "backend-node/src/providers/chat-completions.js": "55669677a6b17e9f4d604cfea20a039a7834a7d4590221e36c511fb42c7e05a7",
+    "backend-node/src/providers/deepseek.js": "a301daf8022c06a4a3a66023e66322e326bbaab1832e59897f286dbf88fe756a",
+    "backend-node/src/providers/index.js": "060963006556a30c7caa58bf37e8db001cce2960fb6f94a8f92c35670c0633f3",
+    "backend-node/src/providers/openai.js": "ebc1bb94bd5f14b6dd97240b374c4d4a4d2b9eda1f8c3181da9be067b701c5c0",
+    "backend-node/src/providers/shared.js": "883c4c5879e3092b9a67f8dc657d270f9726b90ddca93831a0318a285bc17d30",
+    "backend-node/src/repository.js": "07a17bf8ac624aa030c1cb71f77094661fa0dd0f338c13915cb314484c081df9",
+    "compose.node.yaml": "cce67507ca241b82b749d2e7f2d448b5707c924802ffff3399e0fe671c7be149"
+  },
+  "official_protocol_sources": [
+    "https://api-docs.deepseek.com/guides/json_mode/",
+    "https://api-docs.deepseek.com/api/create-chat-completion/"
+  ]
+}

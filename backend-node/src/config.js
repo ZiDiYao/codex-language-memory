@@ -1,3 +1,5 @@
+import { PROVIDER_FACTORIES } from './providers/index.js';
+
 /** Fail-closed configuration shared by the Node HTTP and MCP transports. */
 function absoluteUrl(value, name, allowLocal) {
   if (typeof value !== "string" || !value.trim()) throw new Error(`${name} is required`);
@@ -50,11 +52,29 @@ export function loadConfig(environment = process.env) {
   if (!requiredScopes.length) throw new Error("AUTH_REQUIRED_SCOPES must contain at least one scope");
   const rawPort = environment.PORT ?? "8080";
   if (!/^\d+$/.test(rawPort) || Number(rawPort) < 1 || Number(rawPort) > 65535) throw new Error("PORT must be between 1 and 65535");
-  const enrichmentApiKey = environment.OPENAI_API_KEY || null;
-  const enrichmentModel = environment.SAYROVE_ENRICHMENT_MODEL || null;
-  if (enrichmentModel != null && (typeof enrichmentModel !== 'string' || !enrichmentModel.trim()))
+  const enrichmentProvider = environment.SAYROVE_ENRICHMENT_PROVIDER ?? 'deepseek';
+  if (typeof enrichmentProvider !== 'string' || !Object.hasOwn(PROVIDER_FACTORIES, enrichmentProvider))
+    throw new Error('SAYROVE_ENRICHMENT_PROVIDER must name a registered provider');
+  const keyName = enrichmentProvider === 'deepseek' ? 'DEEPSEEK_API_KEY'
+    : enrichmentProvider === 'openai' ? 'OPENAI_API_KEY' : 'SAYROVE_ENRICHMENT_API_KEY';
+  const rawApiKey = environment[keyName];
+  if (rawApiKey != null && typeof rawApiKey !== 'string')
+    throw new Error(`${keyName} must be a nonempty API key`);
+  const enrichmentApiKey = rawApiKey?.trim() || null;
+  const rawModel = environment.SAYROVE_ENRICHMENT_MODEL;
+  if (rawModel != null && typeof rawModel !== 'string')
     throw new Error('SAYROVE_ENRICHMENT_MODEL must name a model');
-  return Object.freeze({ enrichmentApiKey, enrichmentModel, databaseUrl, publicUrl, authIssuer, authAudience, authJwksUrl,
+  const enrichmentModel = rawModel?.trim() || (enrichmentProvider === 'deepseek' ? 'deepseek-flash' : null);
+  const rawBaseUrl = environment.SAYROVE_ENRICHMENT_BASE_URL;
+  if (rawBaseUrl != null && typeof rawBaseUrl !== 'string')
+    throw new Error('SAYROVE_ENRICHMENT_BASE_URL must be an HTTPS API root');
+  let enrichmentBaseUrl = rawBaseUrl?.trim() || null;
+  if (enrichmentBaseUrl != null)
+    enrichmentBaseUrl = absoluteUrl(enrichmentBaseUrl, 'SAYROVE_ENRICHMENT_BASE_URL', false).replace(/\/+$/, '');
+  if (enrichmentProvider === 'openai-compatible' && !enrichmentBaseUrl)
+    throw new Error('SAYROVE_ENRICHMENT_BASE_URL is required for openai-compatible');
+  return Object.freeze({ enrichmentProvider, enrichmentApiKey, enrichmentModel, enrichmentBaseUrl,
+    databaseUrl, publicUrl, authIssuer, authAudience, authJwksUrl,
     requiredScopes: Object.freeze(requiredScopes), allowInsecureLocal, webAllowedOrigins,
     host: environment.HOST ?? "0.0.0.0", port: Number(rawPort), resourceUrl: publicUrl + "/mcp" });
 }

@@ -2,6 +2,8 @@
 
 Measured on 2026-11-23. Original source commit: `f249d74320a920abb6fdcb10a12ca5cce405c2f1`. The baseline was recorded before production source edits. All learning content in these experiments is isolated synthetic fixture data, never the user's learning library.
 
+> Historical measurement: these numbers describe the initial lightweight-capture implementation committed as `2fefdeb`. A later backend-only change adds DeepSeek/provider adapters and pending-task coalescing; [its verification](benchmarks/provider-integration-verification.json) does not remeasure Codex latency or establish the <=20% target.
+
 ## What changed
 
 Codex now submits only kind, target language, title and necessary original context. PostgreSQL commits the raw target, real encounter, idempotency receipt and durable enrichment job atomically; the response does not await AI. A server-side worker generates and validates note content later. Rich capture remains compatible. Scene reads were removed from the desktop's ordinary capture context. The first question still requires settings plus capture (two model/tool rounds); a fresh cached context allows a later question to use one capture.

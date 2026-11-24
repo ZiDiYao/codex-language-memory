@@ -21,6 +21,10 @@ one transaction. Results remain `added`/`merged` with `enrichment_state=pending`
 this means the learning target is recorded, not that its generated note is ready.
 Recording/type settings are enforced before acceptance. Paused recording creates
 no job. Partial invalid batches are reported individually and replay idempotently.
+An identical pending task for the same tenant and point is reused, while each
+actual encounter keeps its own receipt and encounter count. Processing, completed
+or failed tasks are not reused as a content cache: different snapshots or new
+contexts may require another meaning. Changed context/correction schedules its own work.
 
 ## Configure and deploy
 
@@ -33,26 +37,62 @@ Python cloud server does not offer the new observation endpoint/capability.
 
 Set these **on the backend service only**, in its secret/environment settings:
 
-- `OPENAI_API_KEY`: OpenAI API credential. Never include this in Codex tool
-  arguments, frontend configuration, logs or source files.
-- `SAYROVE_ENRICHMENT_MODEL`: an explicit model supporting Responses structured
-  output. No model or paid provider is selected implicitly.
+```sh
+SAYROVE_ENRICHMENT_PROVIDER=deepseek
+SAYROVE_ENRICHMENT_MODEL=deepseek-flash
+DEEPSEEK_API_KEY=your-server-side-secret
+```
 
-Both are required. Without either value, startup logs
-`enrichment_worker_disabled`; accepted observations remain durably pending. No
-placeholder definition is treated as completed. Configuring both and restarting
-the backend starts the worker and drains pending work. Deployment and provider
-setup were not performed by the implementation tests. The tests use a deterministic
-fake provider and an isolated local PostgreSQL service; no claim is made about
-real provider quality or enrichment completion latency.
+DeepSeek is the default provider; `deepseek-flash` is its default model, and the
+model name can be overridden without changing the worker. Never include provider
+keys in Codex tool arguments, frontend configuration, logs or source files.
+Empty/missing credentials leave the worker disabled with durable jobs pending.
+The exact API shape and current model identifiers were verified against the
+[DeepSeek Chat Completions reference](https://api-docs.deepseek.com/api/create-chat-completion/)
+and [JSON Output guide](https://api-docs.deepseek.com/guides/json_mode/).
+The adapter explicitly disables DeepSeek thinking, asks for JSON with a schema
+and example, and rejects blank final content, truncation, refusal, tool output
+and invalid JSON. Business validation of complete notes runs before commit.
 
-The provider sends the exact learning target, necessary context, existing sense
-labels, scene names and resolved explanation language to the OpenAI Responses
-API, with `store:false` and strict JSON Schema output. It does not send the whole
-conversation or any account credential. Missing explanation preferences fall
-back to the target language, never an inferred first language. Refusals,
-incomplete responses, invalid content and API failures remain failed/retryable.
-The existing knowledge-point validator validates generated content before commit.
+Provider configuration is explicit:
+
+| Provider | Protocol | Credential | Model | API root |
+| --- | --- | --- | --- | --- |
+| `deepseek` (default) | Chat Completions JSON | `DEEPSEEK_API_KEY` | `SAYROVE_ENRICHMENT_MODEL`, default `deepseek-flash` | Default `https://api.deepseek.com` |
+| `openai` | Responses strict JSON Schema | `OPENAI_API_KEY` | Explicit `SAYROVE_ENRICHMENT_MODEL` | Default `https://api.openai.com/v1` |
+| `openai-compatible` | Chat Completions JSON | `SAYROVE_ENRICHMENT_API_KEY` | Explicit `SAYROVE_ENRICHMENT_MODEL` | Required `SAYROVE_ENRICHMENT_BASE_URL` |
+
+All providers support a server-configured `SAYROVE_ENRICHMENT_BASE_URL` override.
+API roots must use HTTPS and cannot embed credentials, query strings or fragments.
+Requests reject redirects. Credentials are selected only for the chosen vendor;
+there is no automatic fallback to another vendor or reuse of another vendor's key.
+Existing OpenAI deployments must now explicitly set `SAYROVE_ENRICHMENT_PROVIDER=openai`.
+With no configured key/model, observations remain pending until configuration and
+restart. `.env.example` and `compose.node.yaml` pass the selected backend settings;
+the Python-only compose service does not implement this feature.
+
+Adapters live under `src/providers/`. Their common contract is
+`createEnricher({provider, apiKey, model, baseUrl?, fetchImpl?})`, returning an async
+`(input, {signal}) => generatedNote` function, or `null` when unconfigured. The
+frozen built-in registry holds factories; add a factory for another protocol
+without editing queue, tenant isolation, capture APIs or note validation. Model
+IDs are configuration rather than conditional branches. A newly registered vendor
+can use the generic `SAYROVE_ENRICHMENT_API_KEY` setting unless its factory needs
+additional explicit configuration. Providers share the learning-note schema and
+instructions; each transport sends only fields it supports.
+
+Codex remains the only learning-gap identifier. Providers receive the identified
+target, minimal context, existing sense labels, relevant scene names and resolved
+explanation language. They enrich that observation and never scan a whole chat or
+infer extra unknown vocabulary. Missing explanation preferences fall back to the
+target language, never an inferred first language. OpenAI sends `store:false`;
+DeepSeek uses its own documented JSON transport without unsupported OpenAI fields.
+
+No live DeepSeek or OpenAI key was available during implementation. Provider
+transports and worker behavior were tested using deterministic fixtures plus an
+isolated local PostgreSQL database; real output quality, completion time and API
+cost have not been measured. Changing the background vendor does not establish
+the separate <=20% foreground response-time target.
 
 ## Worker behavior
 

@@ -27,7 +27,8 @@ work must not become a prerequisite for answering a simple vocabulary question.
 
 The development branch adds [lightweight capture and durable backend enrichment](backend-node/ENRICHMENT.md).
 With a supporting backend, Codex submits only the observed target and necessary context;
-the server records it immediately and prepares the study note asynchronously. This requires
+the server records it immediately and prepares the study note asynchronously through its
+selected provider (DeepSeek by default, with model/vendor adapters). This requires
 the Node migration and server-side provider configuration before deployment. See the
 [baseline and measured comparison](docs/capture-performance.md) for scope and limitations.
 

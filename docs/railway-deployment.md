@@ -104,6 +104,9 @@ Configure these variables on the **API service**:
 | `AUTH_AUDIENCE` | `https://language-memory-api.up.railway.app/mcp` |
 | `AUTH_JWKS_URL` | `https://language-memory.ca.auth0.com/.well-known/jwks.json`; confirm the tenant's `jwks_uri`. |
 | `AUTH_REQUIRED_SCOPES` | `memory:read memory:write` unless deliberately changed everywhere. |
+| `SAYROVE_ENRICHMENT_PROVIDER` | `deepseek` by default; explicit `openai` or `openai-compatible` supported. |
+| `SAYROVE_ENRICHMENT_MODEL` | `deepseek-flash` by default for DeepSeek; configure the selected vendor's model. |
+| `DEEPSEEK_API_KEY` | Backend secret for DeepSeek; never expose in the web app or desktop plugin. |
 | `CLOUD_ALLOW_INSECURE_LOCAL` | `false`. |
 | `HOST` | `0.0.0.0`. |
 | `PORT` | Use Railway's injected port, or explicitly set `8080` and match the public target port. |
@@ -118,6 +121,10 @@ that reference. Use the same final public address in the remote plugin manifest.
 The application requires every authentication variable at startup. An invented
 issuer/JWKS URL may satisfy syntax validation but does not provide working login.
 Do not use placeholder domains or a shared bearer token to claim completion.
+
+For other suppliers, endpoint/key selection and extension contracts are documented in
+[backend enrichment](../backend-node/ENRICHMENT.md). Missing credentials leave raw
+captures pending; configure the API service before enabling note generation.
 
 ## Deploy and verify
 

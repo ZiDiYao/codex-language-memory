@@ -313,7 +313,14 @@ export class Repository {
           VALUES($1,$2,$3,$4,$5,$6)`, [this.tenantId, point.id, requestId, occurredAt, input.context, source]);
         let state = 'ready';
         if (point.note == null) {
-          await client.query(`INSERT INTO lm_enrichment_jobs(tenant_id,point_id,request_id,input)
+          // Tenant locking also serializes worker claims. An identical pending job
+          // will read current preferences when claimed, so one job can serve these
+          // separate real encounters. Processing/completed jobs have a prior
+          // settings/content snapshot and are deliberately not reused here.
+          const pending = (await client.query(`SELECT id FROM lm_enrichment_jobs
+            WHERE tenant_id=$1 AND point_id=$2 AND state='pending' AND input=$3::jsonb LIMIT 1`,
+          [this.tenantId, point.id, json(input)])).rows[0];
+          if (!pending) await client.query(`INSERT INTO lm_enrichment_jobs(tenant_id,point_id,request_id,input)
             VALUES($1,$2,$3,$4::jsonb)`, [this.tenantId, point.id, requestId, json(input)]);
           state = 'pending';
         }
