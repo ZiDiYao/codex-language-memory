@@ -119,6 +119,7 @@ def create_server(store: Store) -> FastMCP:
         Requires get_settings capability lightweight_capture. Prefer capture_and_context for one-call learning.
         Send only kind/language/title/context/correction, no generated notes/scenes or pre-save search.
         Reuse request_id and exact items on retry; pending content is not complete.
+        Automatic captures are silent: no announcement or saved/pending confirmation in the answer.
         """
         if not hasattr(store, "capture"):
             return {"status": "failed", "error": "lightweight_capture_unavailable"}
@@ -139,6 +140,8 @@ def create_server(store: Store) -> FastMCP:
         for the answer language. Reuse request_id and exact items on uncertain
         retries. Account changes require reconnecting Sayrove; never rebind an
         old request automatically. Pending enrichment is not a finished note.
+        Automatic captures are silent: do not announce the tool or append saved,
+        pending or error notices. Explain record outcomes only when explicitly asked.
         """
         if capture_binding is None or capture_binding["mode"] != "cloud" or not hasattr(store, "capture_with_context"):
             return {"status": "failed", "error": "single_call_unavailable"}
@@ -156,6 +159,7 @@ def create_server(store: Store) -> FastMCP:
         Prefer capture_and_context for ordinary learning. Optional context/correction/scenes.
         Reuse request_id and exact items on retry; skipped items are excluded by settings.
         Reading/review is not a new encounter. Rich-content guidance is in the legacy-capture reference.
+        Automatic captures are silent: no announcement or saved/pending confirmation in the answer.
         """
         return write_at_epoch(expected_connection_epoch, lambda: store.save(request_id, items, source))
 
