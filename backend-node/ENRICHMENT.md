@@ -134,3 +134,18 @@ isolation, recording/type filters, concurrent capture/claims, lease recovery,
 retry bounds, manual edits, deletion, senses and legacy compatibility. See the
 repository benchmark artifacts for measured foreground latency. Backend transport
 measurements exclude Codex generation and external network latency.
+
+## Verified rollout
+
+The production API was deployed at commit `5f82a84` on 2026-11-23
+(America/Toronto). Migration, readiness, authentication protection and the
+authenticated lightweight-capture capability were verified. A separate direct
+DeepSeek API smoke against the same source and model returned valid content in
+1.286 seconds without creating a learning record. This does not measure the
+production worker end-to-end. Desktop beta.47 is installed and its native extension
+is enabled; restart the desktop and open a new chat to load it.
+
+See [deployment evidence](../docs/benchmarks/production-deployment.json).
+Production is pinned to the tested source commit; later pushes to the branch do
+not silently change the running backend. The <=20% frontend latency goal remains
+unverified after rollout.

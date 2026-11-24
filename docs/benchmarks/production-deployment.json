@@ -1,0 +1,54 @@
+{
+  "deployed_on_client_date": "2026-11-23",
+  "client_timezone": "America/Toronto",
+  "project_id": "e9f1c5a0-3676-4991-b189-2b57e00d65ac",
+  "environment": "production",
+  "environment_id": "428dc040-47b5-46b6-9a15-02bf95d042fd",
+  "service": "codex-language-memory",
+  "service_id": "15ac610f-c14d-46c9-a83e-8fc4a8cdc4d8",
+  "deployment_id": "df63c3c6-8f23-4859-a603-af1825be725c",
+  "deployment_status": "SUCCESS",
+  "source_commit": "5f82a846a8b005fdf544d959c60cba515526bb59",
+  "source_branch": "codex/lightweight-capture",
+  "commit_pinned": true,
+  "api_origin": "https://language-memory-api.up.railway.app",
+  "healthz_status": 200,
+  "readyz_status": 200,
+  "unauthenticated_settings_status": 401,
+  "authenticated_settings_capability_lightweight_capture": true,
+  "replicas": {
+    "running": 1,
+    "crashed": 0
+  },
+  "pending_environment_changes": false,
+  "predeploy_log": "Database migrated: 0001_remote_storage",
+  "node_schema_revision": "0003_lightweight_capture",
+  "schema_revision_verification": "Current deployed readyz checks the Node migration marker and enrichment table",
+  "provider": "deepseek",
+  "model": "deepseek-flash",
+  "required_variable_names_confirmed": [
+    "DEEPSEEK_API_KEY",
+    "SAYROVE_ENRICHMENT_PROVIDER",
+    "SAYROVE_ENRICHMENT_MODEL"
+  ],
+  "provider_live_smoke": {
+    "location": "local verified source, direct official API, separate from production worker",
+    "http_status": 200,
+    "validated_examples": 2,
+    "elapsed_ms": 1286,
+    "learning_records_written": 0
+  },
+  "desktop_install": {
+    "version": "0.2.0-beta.47",
+    "extension_installed": true,
+    "extension_enabled": true,
+    "old_release_preserved": true,
+    "restart_required": true
+  },
+  "foreground_latency": "Not remeasured after production deployment; the <=20% goal is not established",
+  "limits": [
+    "No fabricated captures were inserted into the production learning library",
+    "Direct provider smoke is not a production worker end-to-end timing",
+    "Current running desktop process needs restart/new chat to load the updated tools and skill"
+  ]
+}
