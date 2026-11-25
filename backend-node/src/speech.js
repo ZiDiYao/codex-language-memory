@@ -7,6 +7,53 @@ export class SpeechError extends Error {
 const MAX_TEXT = 500;
 const AUDIO_TYPES = new Set(['audio/wav', 'audio/x-wav', 'audio/mpeg', 'audio/mp3']);
 const DEEPSEEK_LANGUAGES = new Set(['zh', 'yue', 'en', 'ja', 'ko', 'ms', 'ar', 'id', 'th', 'vi']);
+const WAV_STREAM_SIZES = new Set([0x7ffffffe, 0x7fffffff, 0xfffffffe, 0xffffffff]);
+
+/** Finalize bounded PCM16 WAV streams without disguising finite-size corruption. */
+export function normalizePcmWav(bytes, maxBytes = 2 * 1024 * 1024) {
+  if (!Buffer.isBuffer(bytes) || bytes.length < 44 || bytes.length > maxBytes
+      || bytes.toString('ascii', 0, 4) !== 'RIFF' || bytes.toString('ascii', 8, 12) !== 'WAVE')
+    throw new SpeechError();
+  const riffSize = bytes.readUInt32LE(4);
+  const streamingRiff = WAV_STREAM_SIZES.has(riffSize);
+  if (!streamingRiff && riffSize + 8 !== bytes.length) throw new SpeechError();
+  let offset = 12, format, data, streamingData = false;
+  while (offset < bytes.length) {
+    if (offset + 8 > bytes.length) throw new SpeechError();
+    const id = bytes.toString('ascii', offset, offset + 4);
+    const declaredSize = bytes.readUInt32LE(offset + 4);
+    const start = offset + 8;
+    const unknownSize = id === 'data' && WAV_STREAM_SIZES.has(declaredSize);
+    // A streaming data chunk runs to EOF. Other chunks must always declare a
+    // finite, fully present payload, including their RIFF word-alignment pad.
+    const size = unknownSize ? bytes.length - start : declaredSize;
+    const end = start + size;
+    const next = end + (size % 2);
+    if (end > bytes.length || next > bytes.length) throw new SpeechError();
+    if (id === 'fmt ') {
+      if (format || data || (size !== 16 && size !== 18)) throw new SpeechError();
+      const codec = bytes.readUInt16LE(start), channels = bytes.readUInt16LE(start + 2);
+      const sampleRate = bytes.readUInt32LE(start + 4), byteRate = bytes.readUInt32LE(start + 8);
+      const blockAlign = bytes.readUInt16LE(start + 12), bits = bytes.readUInt16LE(start + 14);
+      if (codec !== 1 || ![1, 2].includes(channels) || bits !== 16
+          || sampleRate < 8000 || sampleRate > 192000 || blockAlign !== channels * 2
+          || byteRate !== sampleRate * blockAlign || (size === 18 && bytes.readUInt16LE(start + 16) !== 0))
+        throw new SpeechError();
+      format = { blockAlign };
+    } else if (id === 'data') {
+      if (!format || data || !size || size % format.blockAlign) throw new SpeechError();
+      data = { sizeOffset: offset + 4, size };
+      streamingData = unknownSize;
+    }
+    offset = next;
+  }
+  if (!format || !data) throw new SpeechError();
+  if (!streamingRiff && !streamingData) return bytes;
+  const normalized = Buffer.from(bytes);
+  if (streamingRiff) normalized.writeUInt32LE(bytes.length - 8, 4);
+  if (streamingData) normalized.writeUInt32LE(data.size, data.sizeOffset);
+  return normalized;
+}
 
 function endpoint(baseUrl, path) {
   let url;
@@ -48,14 +95,9 @@ export function createSpeechProvider({ provider, apiKey, model, voice, baseUrl, 
       }
       signal?.throwIfAborted();
       if (!length || (declared != null && Number(declared) !== length)) throw new SpeechError();
-      const bytes = Buffer.concat(chunks);
+      let bytes = Buffer.concat(chunks);
       if (deepseek) {
-        if (bytes.length < 44 || bytes.toString('ascii', 0, 4) !== 'RIFF' || bytes.toString('ascii', 8, 12) !== 'WAVE')
-          throw new SpeechError();
-        // Streaming WAV can use an unknown RIFF size. Validate a finite size
-        // when supplied, and never accept a known truncated response.
-        const riffSize = bytes.readUInt32LE(4);
-        if (riffSize > 0 && riffSize < 0xffffff00 && riffSize + 8 !== bytes.length) throw new SpeechError();
+        bytes = normalizePcmWav(bytes, maxBytes);
       } else if (!(bytes.toString('ascii', 0, 3) === 'ID3' || (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0))) {
         throw new SpeechError();
       }

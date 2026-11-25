@@ -9,8 +9,11 @@ rejected. No query parameters or request body are accepted.
 A successful response is audio bytes with `audio/wav` (DeepSeek) or `audio/mpeg`
 (compatible providers), `Cache-Control: private, no-store`, `nosniff`, and
 `X-Sayrove-Speech-Source: ai`. The client fetches with its bearer token and plays
-the returned bytes using HTML audio. Standalone pages use a Blob URL; native
-MCP Apps use a bounded `data:audio` source permitted by the default media policy.
+the returned bytes using Web Audio, activating its reusable audio context in the
+original speaker click before waiting for the backend. On browsers without Web
+Audio, standalone pages use a Blob URL and native MCP Apps use a bounded
+`data:audio` source explicitly declared in the resource CSP. A blocked playback
+keeps its prepared audio for a second click rather than fetching it again.
 No public audio URL, provider credential, or local operating-system voice is needed.
 The listening UI should identify the pronunciation as AI-generated.
 
@@ -67,7 +70,9 @@ Defaults are two global synthesis jobs, one job per tenant, and 30 new synthesis
 requests per minute per tenant. Cached playback does not consume this budget.
 Each synthesis has a 15-second deadline and a 2-MiB decoded-audio limit. Known
 WAV/content-length truncation, bad MIME types, redirects and provider failures
-are rejected and never cached. Disconnecting the final listener cancels provider
+are rejected and never cached. Recognized streaming RIFF/data length sentinels
+are finalized using the validated PCM16 payload size; finite-size corruption is
+never repaired. Disconnecting the final listener cancels provider
 work; shutdown also aborts active jobs.
 
 Errors remain JSON: `speech_unavailable` (503), `speech_busy` (429),

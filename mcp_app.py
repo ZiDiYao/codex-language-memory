@@ -98,7 +98,9 @@ def register_app(server, store):
     transport = AppTransport(store)
 
     @server.resource(APP_URI, name="Sayrove", mime_type="text/html;profile=mcp-app", meta={
-        "ui": {"prefersBorder": False, "csp": {"connectDomains": [], "resourceDomains": []}},
+        # The HTMLAudio fallback consumes authenticated bytes as data: media.
+        # Declare this source explicitly rather than depending on host defaults.
+        "ui": {"prefersBorder": False, "csp": {"connectDomains": [], "resourceDomains": ["data:"]}},
         "openai/ui": {"preferredDisplayMode": "fullscreen", "availableDisplayModes": ["fullscreen"]},
     })
     def app_resource() -> str:

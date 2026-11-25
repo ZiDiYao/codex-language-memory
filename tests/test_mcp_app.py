@@ -92,6 +92,7 @@ class AppProtocolTests(unittest.IsolatedAsyncioTestCase):
                 resource = (await session.read_resource(APP_URI)).contents[0]
                 self.assertEqual(resource.mimeType, "text/html;profile=mcp-app")
                 self.assertEqual(resource.meta["ui"]["csp"]["connectDomains"], [])
+                self.assertEqual(resource.meta["ui"]["csp"]["resourceDomains"], ["data:"])
                 self.assertEqual(resource.text, APP_FILE.read_text())
                 original = (APP / "web/index.html").read_text().split("<body>", 1)[1]
                 self.assertEqual(resource.text.split("<body>", 1)[1], original)

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createSpeechProvider, createSpeechService } from '../src/speech.js';
+import { createSpeechProvider, createSpeechService, normalizePcmWav } from '../src/speech.js';
 import { loadConfig } from '../src/config.js';
 
 const principal = { issuer: 'https://issuer.example/', subject: 'alice' };
@@ -17,6 +17,76 @@ export function wav() {
 }
 const waveResponse = () => new Response(wav(), { headers: { 'Content-Type': 'audio/wav', 'Content-Length': '48' } });
 const options = { provider: 'deepseek', apiKey: 'fixture-deepseek', voice: 'stella' };
+
+test('completed PCM WAV streams get real RIFF/data lengths without changing audio samples', async () => {
+  for (const riffSize of [40, 0x7ffffffe, 0x7fffffff, 0xfffffffe, 0xffffffff]) {
+    for (const dataSize of [4, 0x7ffffffe, 0x7fffffff, 0xfffffffe, 0xffffffff]) {
+      const source = wav();
+      source.writeUInt32LE(riffSize, 4); source.writeUInt32LE(dataSize, 40);
+      source.writeInt16LE(-32768, 44); source.writeInt16LE(32767, 46);
+      const original = Buffer.from(source);
+      const normalized = normalizePcmWav(source);
+      assert.equal(normalized.readUInt32LE(4), normalized.length - 8);
+      assert.equal(normalized.readUInt32LE(40), 4);
+      assert.equal(normalized.readUInt32LE(40) / normalized.readUInt16LE(32), 2, 'duration uses actual PCM frames');
+      assert.deepEqual(normalized.subarray(8, 40), source.subarray(8, 40));
+      assert.deepEqual(normalized.subarray(44), source.subarray(44));
+      assert.deepEqual(source, original, 'normalization cannot mutate an upstream-owned buffer');
+    }
+  }
+  // The deployed DeepSeek sample has both 0xffffffff fields. Exercise the
+  // provider boundary as well: normalization precedes caching/HTTP delivery.
+  const streamed = wav(); streamed.writeUInt32LE(0xffffffff, 4); streamed.writeUInt32LE(0xffffffff, 40);
+  const provider = createSpeechProvider({ ...options, fetchImpl: async () => new Response(streamed, {
+    headers: { 'Content-Type': 'audio/wav', 'Content-Length': String(streamed.length) },
+  }) });
+  assert.deepEqual((await provider({ text: 'fixture' })).bytes, wav());
+});
+
+test('WAV normalization walks bounded chunks instead of assuming fixed data offsets', () => {
+  const chunk = (id, payload) => {
+    const header = Buffer.alloc(8); header.write(id); header.writeUInt32LE(payload.length, 4);
+    return Buffer.concat([header, payload, Buffer.alloc(payload.length % 2)]);
+  };
+  const fmt = Buffer.concat([wav().subarray(20, 36), Buffer.alloc(2)]);
+  const leading = chunk('JUNK', Buffer.from([1, 2, 3]));
+  const format = chunk('fmt ', fmt);
+  const samples = Buffer.from([0, 128, 255, 127]);
+  const header = Buffer.alloc(12); header.write('RIFF'); header.write('WAVE', 8);
+  const streamedData = chunk('data', samples); streamedData.writeUInt32LE(0xffffffff, 4);
+  const streamed = Buffer.concat([header, leading, format, streamedData]); streamed.writeUInt32LE(0xffffffff, 4);
+  const normalized = normalizePcmWav(streamed);
+  const dataSizeOffset = 12 + leading.length + format.length + 4;
+  assert.equal(normalized.readUInt32LE(dataSizeOffset), samples.length);
+  assert.equal(normalized.readUInt32LE(4), normalized.length - 8);
+  assert.deepEqual(normalized.subarray(12, dataSizeOffset), streamed.subarray(12, dataSizeOffset));
+  assert.deepEqual(normalized.subarray(dataSizeOffset + 4), samples);
+  const finite = Buffer.concat([header, leading, format, chunk('data', samples), chunk('LIST', Buffer.from('INFO'))]);
+  finite.writeUInt32LE(finite.length - 8, 4);
+  assert.deepEqual(normalizePcmWav(finite), finite, 'finite metadata and RIFF padding remain intact');
+});
+
+test('finite WAV corruption and unsupported/incomplete PCM are rejected rather than repaired', () => {
+  const cases = [];
+  const changed = (offset, value, width = 4) => {
+    const bytes = wav(); bytes[width === 2 ? 'writeUInt16LE' : 'writeUInt32LE'](value, offset); cases.push(bytes);
+  };
+  changed(4, 0); changed(4, 38); changed(4, 42); changed(4, 0xffffff00);
+  changed(40, 0); changed(40, 2); changed(40, 3); changed(40, 6); changed(40, 0xffffff00);
+  changed(16, 14); changed(16, 18); changed(16, 0xffffffff);
+  changed(20, 3, 2); changed(22, 0, 2); changed(22, 3, 2);
+  changed(24, 0); changed(28, 1); changed(32, 4, 2); changed(34, 8, 2);
+  const noData = wav(); noData.write('JUNK', 36); cases.push(noData);
+  const noFmt = wav(); noFmt.write('JUNK', 12); cases.push(noFmt);
+  const oddStream = wav().subarray(0, 47); oddStream.writeUInt32LE(0xffffffff, 4); oddStream.writeUInt32LE(0xffffffff, 40); cases.push(oddStream);
+  const partialTail = Buffer.concat([wav(), Buffer.from([1, 2])]); partialTail.writeUInt32LE(partialTail.length - 8, 4); cases.push(partialTail);
+  const duplicateData = Buffer.concat([wav(), wav().subarray(36)]); duplicateData.writeUInt32LE(duplicateData.length - 8, 4); cases.push(duplicateData);
+  const fmtAfterData = Buffer.concat([wav().subarray(0, 12), wav().subarray(36), wav().subarray(12, 36)]); cases.push(fmtAfterData);
+  for (const bytes of cases) {
+    assert.throws(() => normalizePcmWav(bytes), { code: 'speech_unavailable', status: 503 });
+  }
+  assert.throws(() => normalizePcmWav(wav(), 47), { code: 'speech_unavailable' });
+});
 
 test('speech is opt-in and DeepSeek never borrows another vendor credential', () => {
   const disabled = loadConfig({ ...base, DEEPSEEK_API_KEY: 'text-key' });

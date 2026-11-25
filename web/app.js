@@ -51,13 +51,24 @@ const pronunciation = new PronunciationController({
     }
     speechButton = state ? editors.get(state.recordId)?.card.querySelector(".entry-listen") : null;
     if (speechButton) {
-      speechButton.setAttribute("aria-pressed", "true");
+      speechButton.setAttribute("aria-pressed", String(state.phase !== "ready"));
       speechButton.setAttribute("aria-busy", String(state.phase === "loading"));
       speechButton.classList.toggle("is-speaking", state.phase === "playing");
     }
+    if (state?.phase === "playing" && $("#notice").dataset.i18n === "speechTapToPlay") conceal($("#notice"));
+  },
+  onDiagnostic(diagnostic) {
+    if (!speechButton) return;
+    speechButton.dataset.speechStage = diagnostic.stage;
+    speechButton.dataset.speechEngine = diagnostic.engine;
+    if (diagnostic.errorName) speechButton.dataset.speechError = diagnostic.errorName;
+    else delete speechButton.dataset.speechError;
+    if (diagnostic.mediaCode) speechButton.dataset.speechMediaCode = String(diagnostic.mediaCode);
+    else delete speechButton.dataset.speechMediaCode;
   },
   onError(error) {
     if (["cloud_not_connected", "account_changed"].includes(error.message)) localProfile?.session.refresh();
+    if (error.message === "speechTapToPlay") { notice("speechTapToPlay"); return; }
     showError(error);
   },
 });
