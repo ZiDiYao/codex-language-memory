@@ -2,10 +2,8 @@
 
 import base64
 import json
-import secrets
 import sqlite3
 from pathlib import Path
-from threading import Lock
 from typing import Any, Literal
 
 from mcp.types import Icon, ToolAnnotations
@@ -14,7 +12,8 @@ from pydantic import ValidationError
 from dashboard_actions import dispatch
 from cloud_audio import audio_response
 from desktop_actions import connection_error
-from exports import ExportError, ExportRequest, build_export, export_scope
+from exports import ExportError
+from export_transport import ExportTransport
 
 APP_URI = "ui://language-memory/sidebar-v1.html"
 APP_FILE = Path(__file__).parent / "web" / "mcp-app.html"
@@ -30,8 +29,8 @@ class AppTransport:
 
     def __init__(self, store):
         self.store = store
-        self.pending_exports = {}
-        self.lock = Lock()
+        self.exports = ExportTransport(store)
+        self.pending_exports = self.exports.pending
 
     def request(self, route, payload):
         try:
@@ -61,31 +60,13 @@ class AppTransport:
         return {"status": 200, "data": dispatch(self.store, payload)}
 
     def _export(self, payload):
-        selection = ExportRequest.model_validate(payload)
-        exported = build_export(self.store, selection)
-        if len(exported.data) > 24 * 1024 * 1024:
-            raise ExportError("Export too large; select a shorter date range.")
-        token = secrets.token_urlsafe(24)
-        with self.lock:
-            # Keep only receipt metadata, not large files, awaiting acknowledgement.
-            while len(self.pending_exports) >= 16:
-                self.pending_exports.pop(next(iter(self.pending_exports)))
-            self.pending_exports[token] = (selection, exported.receipt)
-        return {"status": 200, "file": {
+        return self.exports.prepare(payload, lambda exported, token: {"status": 200, "file": {
             "blob": base64.b64encode(exported.data).decode(), "mime_type": exported.mime_type,
             "filename": exported.filename, "count": exported.count, "receipt": token,
-        }}
+        }})
 
     def _complete_export(self, payload):
-        if set(payload) != {"receipt"} or not isinstance(payload["receipt"], str):
-            raise ValueError("Invalid receipt")
-        with self.lock:
-            pending = self.pending_exports.get(payload["receipt"])
-            if pending:
-                selection, receipt = pending
-                self.store.export_receipt(export_scope(selection), receipt)
-                del self.pending_exports[payload["receipt"]]
-        return {"status": 200, "data": {"status": "ok"}}
+        return {"status": 200, "data": self.exports.complete(payload)}
 
     def _audio(self, payload):
         status, body, mime = audio_response(self.store, payload)

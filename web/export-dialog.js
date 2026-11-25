@@ -37,6 +37,13 @@ export class ExportDialog {
     });
   }
 
+  invalidate() {
+    this.generation++;
+    this.sceneVersion++;
+    this.historyVersion = (this.historyVersion || 0) + 1;
+    this.prepared = this.preview = this.history = null;
+  }
+
   relabel() {
     const options = (name, label, entries) => {
       this.pickers[name].setLabel(this.t(label));

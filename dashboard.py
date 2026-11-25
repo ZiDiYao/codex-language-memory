@@ -15,7 +15,8 @@ from pydantic import ValidationError
 from dashboard_actions import dispatch
 from cloud_audio import audio_response
 from desktop_actions import connection_error
-from exports import ExportError, ExportRequest, build_export, record_export
+from exports import ExportError
+from export_transport import ExportTransport
 from store import Store
 
 
@@ -46,13 +47,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # URLs contain a local access token and must stay out of logs.
         pass
 
-    def respond(self, status, body, content_type="application/json; charset=utf-8", filename=None, count=None):
+    def respond(self, status, body, content_type="application/json; charset=utf-8", filename=None, count=None, receipt=None):
         data = body if isinstance(body, bytes) else json.dumps(body).encode()
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         if filename:
             self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
             self.send_header("X-Record-Count", str(count))
+        if receipt:
+            self.send_header("X-Export-Receipt", receipt)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("Referrer-Policy", "no-referrer")
@@ -82,7 +85,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         route = self.route()
-        if route not in {"api", "export", "audio"}:
+        if route not in {"api", "export", "export_complete", "audio"}:
             self.respond(404, {"error": "not_found"})
             return
         origin = f"http://127.0.0.1:{self.server.server_port}"
@@ -95,6 +98,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             request = self.read_request()
             if route == "export":
                 self.export(request)
+            elif route == "export_complete":
+                self.respond(200, self.server.exports.complete(request))
             elif route == "audio":
                 self.respond(*audio_response(self.server.store, request))
             else:
@@ -117,15 +122,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(length))
 
     def export(self, request):
-        selection = ExportRequest.model_validate(request)
-        exported = build_export(self.server.store, selection)
-        self.respond(200, exported.data, exported.mime_type, exported.filename, exported.count)
-        # Remember only a successfully written response. The browser may still
-        # cancel saving it; the server cannot inspect its disk.
-        try:
-            record_export(self.server.store, selection, exported)
-        except sqlite3.Error:
-            pass  # A delivered file remains valid if history is unavailable.
+        exported, receipt = self.server.exports.prepare(request)
+        self.respond(200, exported.data, exported.mime_type, exported.filename, exported.count, receipt)
 
 
 class DashboardServer(ThreadingHTTPServer):
@@ -133,6 +131,7 @@ class DashboardServer(ThreadingHTTPServer):
 
     def __init__(self, store, prefix):
         self.store = store
+        self.exports = ExportTransport(store)
         self.prefix = prefix
         super().__init__(("127.0.0.1", 0), DashboardHandler)
 

@@ -154,6 +154,9 @@ export const messages = {
     exporting: "Preparing your file…",
     exported: "Exported {count} records",
     exportEmpty: "No records match these filters.",
+    exportChanged: "The records changed during export. Please try again.",
+    exportTooLarge: "Too many records to export at once. Choose a shorter date range.",
+    exportTimeout: "Export timed out. Choose a shorter date range and try again.",
     pdfFontMissing:
       "A font for this language is missing. Ask Codex to configure PDF fonts, or choose Word or Excel.",
     examples: "Examples",
@@ -316,6 +319,9 @@ export const messages = {
     exporting: "正在生成文件…",
     exported: "已导出 {count} 条记录",
     exportEmpty: "当前筛选条件下没有可导出的记录。",
+    exportChanged: "导出期间记录发生变化，请重试。",
+    exportTooLarge: "一次导出的记录过多，请缩小日期范围。",
+    exportTimeout: "导出超时，请缩小日期范围后重试。",
     pdfFontMissing:
       "缺少适合此语言的 PDF 字体。请让 Codex 配置字体，或选择 Word、Excel。",
     examples: "例句",
@@ -484,6 +490,9 @@ export const messages = {
     exporting: "ファイルを作成中…",
     exported: "{count} 件をエクスポートしました",
     exportEmpty: "条件に一致する記録がありません。",
+    exportChanged: "書き出し中に記録が変更されました。もう一度お試しください。",
+    exportTooLarge: "記録が多すぎます。期間を短くしてください。",
+    exportTimeout: "書き出しがタイムアウトしました。期間を短くして再試行してください。",
     pdfFontMissing:
       "この言語の PDF フォントがありません。Codex に設定を依頼するか、Word または Excel を選んでください。",
     examples: "例文",
@@ -650,6 +659,9 @@ export const messages = {
     exporting: "파일 준비 중…",
     exported: "기록 {count}개를 내보냈습니다",
     exportEmpty: "필터에 맞는 기록이 없습니다.",
+    exportChanged: "내보내는 동안 기록이 변경되었습니다. 다시 시도해 주세요.",
+    exportTooLarge: "한 번에 내보낼 기록이 너무 많습니다. 날짜 범위를 줄여 주세요.",
+    exportTimeout: "내보내기 시간이 초과되었습니다. 날짜 범위를 줄이고 다시 시도해 주세요.",
     pdfFontMissing:
       "이 언어의 PDF 글꼴이 없습니다. Codex에 글꼴 설정을 요청하거나 Word 또는 Excel을 선택하세요.",
     examples: "예문",
@@ -817,6 +829,9 @@ export const messages = {
     exporting: "Préparation du fichier…",
     exported: "{count} points exportés",
     exportEmpty: "Aucun point ne correspond aux filtres.",
+    exportChanged: "Les notes ont changé pendant l’export. Veuillez réessayer.",
+    exportTooLarge: "Trop de notes à exporter à la fois. Réduisez la période.",
+    exportTimeout: "L’export a expiré. Réduisez la période et réessayez.",
     pdfFontMissing:
       "Une police manque pour cette langue dans le PDF. Demandez à Codex de la configurer ou choisissez Word ou Excel.",
     examples: "Exemples",
@@ -983,6 +998,9 @@ export const messages = {
     exporting: "Preparando el archivo…",
     exported: "Se exportaron {count} registros",
     exportEmpty: "No hay registros que coincidan con los filtros.",
+    exportChanged: "Los registros cambiaron durante la exportación. Inténtalo de nuevo.",
+    exportTooLarge: "Hay demasiados registros. Selecciona un período más corto.",
+    exportTimeout: "La exportación agotó el tiempo de espera. Reduce el período e inténtalo de nuevo.",
     pdfFontMissing:
       "Falta una fuente para este idioma en el PDF. Pide a Codex que la configure o elige Word o Excel.",
     examples: "Ejemplos",

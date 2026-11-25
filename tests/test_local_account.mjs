@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { accountCanRead, accountErrorKey, accountStatus, authorizationUrl, createLocalProfile, LocalAccountSession } from "../web/local-profile.js";
-import { request, setAccountEpoch } from "../web/transport.js";
+import { request, saveDownload, setAccountEpoch } from "../web/transport.js";
 
 const initial = { mode: "cloud", state: "signed_out", epoch: 0, capabilities: { export: false, speech: true } };
 const connected = { mode: "cloud", state: "connected", epoch: 2, capabilities: { export: false, speech: true } };
@@ -173,6 +173,36 @@ test("desktop data requests bind the observed account epoch while account action
     await request("api", { action: "activity/events", arguments: { events: [] } });
     assert.equal(calls[5].payload.expected_epoch, 7);
     assert.equal(calls[6].payload.expected_epoch, 7);
+    await request("export", { format: "json" });
+    await request("export_complete", { receipt: "opaque" });
+    assert.equal(calls[7].payload.expected_epoch, 7);
+    assert.equal(calls[8].payload.expected_epoch, 7);
+  } finally {
+    setAccountEpoch(null);
+    if (previousHost) globalThis.languageMemoryHost = previousHost; else delete globalThis.languageMemoryHost;
+    if (previousRuntime) globalThis.languageMemoryRuntime = previousRuntime; else delete globalThis.languageMemoryRuntime;
+  }
+});
+
+test("a late export response or account switch during file preparation cannot download another account's data", async () => {
+  const previousHost = globalThis.languageMemoryHost, previousRuntime = globalThis.languageMemoryRuntime;
+  let downloaded = 0;
+  try {
+    delete globalThis.languageMemoryRuntime;
+    const pending = deferred();
+    globalThis.languageMemoryHost = { request: () => pending.promise, download: () => { downloaded++; } };
+    setAccountEpoch(7);
+    const loading = request("export", { format: "json" });
+    setAccountEpoch(8);
+    pending.resolve(Response.json({ records: [] }));
+    await assert.rejects(loading, /account_changed/);
+    const reading = deferred();
+    globalThis.languageMemoryHost.request = async () => ({ headers: new Headers(), blob: () => reading.promise });
+    const response = await request("export", { format: "json" });
+    const preparing = saveDownload(response);
+    setAccountEpoch(9); reading.resolve(new Blob(["private fixture"]));
+    await assert.rejects(preparing, /account_changed/);
+    assert.equal(downloaded, 0);
   } finally {
     setAccountEpoch(null);
     if (previousHost) globalThis.languageMemoryHost = previousHost; else delete globalThis.languageMemoryHost;

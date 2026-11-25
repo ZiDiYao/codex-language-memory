@@ -218,7 +218,6 @@ class DesktopRoutingTests(unittest.TestCase):
         routed = RoutingStore(ForbiddenLocal(), account)
         operations = [lambda: routed.history(1), routed.learning_profile,
             lambda: routed.learning_preferences("en", LearnerPreferences(learning_goal="Not written locally")),
-            routed.export_records, lambda: routed.export_receipt("receipt", {"count": 1}),
             lambda: routed.path, lambda: routed.database, lambda: routed.db,
             lambda: routed.require_local("study"), lambda: routed.review(_db=object()),
             lambda: routed._record_review(object(), 1, "review-no-local", Review(result="skipped")),

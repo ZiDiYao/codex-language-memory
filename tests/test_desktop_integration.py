@@ -253,7 +253,7 @@ class DesktopProtocolIntegrationTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result, {"status": 401, "data": {"error": "cloud_not_connected"}})
         self.assertEqual(self.account.calls, [])
 
-    async def test_cloud_guided_study_profile_history_and_exports_are_explicitly_unavailable(self):
+    async def test_unsupported_conversational_features_stay_hidden_and_page_exports_require_an_epoch(self):
         tools = {tool.name for tool in await self.server.list_tools()}
         for name, arguments in (("get_study", {}), ("get_learning_profile", {}), ("get_point_history", {"record_id": 900}),
             ("update_learning_preferences", {"patch": {"learning_goal": "Everyday conversation"}}),
@@ -262,10 +262,10 @@ class DesktopProtocolIntegrationTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(name=name), self.assertRaisesRegex(ToolError, "Unknown tool"):
                 await self.call(name, arguments)
         bridge = AppTransport(self.store)
-        self.assertEqual(bridge.request("export", {"format": "json"}), {"status": 400, "data": {"error": "cloud_feature_unavailable"}})
+        self.assertEqual(bridge.request("export", {"format": "json"}), {"status": 409, "data": {"error": "connection_epoch_required"}})
         for action in ("exports/preview", "exports/history"):
-            self.assertEqual(bridge.request("api", {"action": action, "arguments": {}, "expected_epoch": 7}),
-                             {"status": 400, "data": {"error": "cloud_feature_unavailable"}})
+            self.assertEqual(bridge.request("api", {"action": action, "arguments": {}}),
+                             {"status": 409, "data": {"error": "connection_epoch_required"}})
         self.assertEqual(self.account.calls, [])
 
     async def test_local_legacy_mcp_writes_still_work_without_cloud_epoch(self):

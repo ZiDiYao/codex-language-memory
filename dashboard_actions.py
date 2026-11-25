@@ -95,6 +95,6 @@ def dispatch(store: Store, request):
         raise ValueError("Invalid account epoch")
     binder = getattr(store, "expect_epoch", None)
     if binder is not None:
-        with binder(expected, require_cloud=name in {"settings/update", "points/update", "points/delete", "activity/read", "activity/events"}):
+        with binder(expected, require_cloud=name in {"settings/update", "points/update", "points/delete", "activity/read", "activity/events", "exports/preview", "exports/history"}):
             return ACTIONS[name].call(store, request["arguments"])
     return ACTIONS[name].call(store, request["arguments"])

@@ -176,10 +176,10 @@ const explanationLanguagePicker = new Picker($("#explanation-language"), {
   label: "Explanation language",
   onChange: (explanation_language) => saveSettings({ explanation_language: explanation_language || null }),
 });
-const exportDialog = available.export ? new ExportDialog($("#export-dialog"), {
+const exportDialog = new ExportDialog($("#export-dialog"), {
   t, api, languageName, download, flushEditors, feedback, errorKey,
   getFilters: filters, getCatalog: () => catalog, getLocale: () => locale,
-}) : null;
+});
 $("#export-open").hidden = !available.export;
 
 function renderLanguagePreferences() {
@@ -709,7 +709,9 @@ async function synchronize() {
   }
 }
 async function download(format, selection) {
+  const source = sourceRevision;
   if (!(await flushEditors())) return;
+  if (source !== sourceRevision || accountPaused || accountDraftBlocked) return;
   const buttons = [...document.querySelectorAll("[data-format], #export-back")];
   buttons.forEach((button) => {
     button.disabled = true;
@@ -717,16 +719,19 @@ async function download(format, selection) {
   feedback(".export-feedback", "exporting");
   try {
     const response = await request("export", { format, ...selection });
+    if (source !== sourceRevision || accountPaused) return;
     if (!response.ok) {
       const data = await response.json();
       throw new Error(data.error);
     }
     await saveDownload(response);
+    if (source !== sourceRevision || accountPaused) return;
     await closeDialog($("#export-dialog"));
     notice("exported", false, {
       count: response.headers.get("X-Record-Count"),
     });
   } catch (error) {
+    if (source !== sourceRevision) return;
     feedback(".export-feedback", errorKey(error), true);
   } finally {
     buttons.forEach((button) => {
@@ -870,6 +875,7 @@ if (localAccount) {
     },
     async onSourceChange(status, previous) {
       activity.invalidate();
+      exportDialog.invalidate();
       setAccountEpoch(status.epoch);
       if (previous && hasDirtyEditors()) {
         accountDraftBlocked = true;

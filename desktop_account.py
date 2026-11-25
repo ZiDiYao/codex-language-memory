@@ -545,7 +545,7 @@ class AccountManager:
                 state = dict(stored)
             cloud = state["mode"] == "cloud"
             result = {key: state[key] for key in ("mode", "state", "epoch")}
-            result["capabilities"] = {"export": not cloud, "speech": not cloud or state["state"] == "connected", "study": not cloud}
+            result["capabilities"] = {"export": not cloud or state["state"] == "connected", "speech": not cloud or state["state"] == "connected", "study": not cloud}
             if self._login_epoch == state["epoch"] and state["state"] == "connecting" and self._authorization:
                 result["authorization_url"] = self._authorization
             if state.get("error"):
@@ -954,6 +954,59 @@ class AccountManager:
         finally:
             _account_context.reset(token)
 
+    async def _remote_export_page(self, epoch, path, *, params, budget, max_bytes):
+        from exports import ExportError
+        token = _account_context.set(True)
+        try:
+            async with asyncio.timeout(budget):
+                access = await self._activity_token(epoch, refresh=True, budget=budget)
+                identity, _ = _token_identity(OAuthToken(access_token=access, token_type="Bearer"))
+                self._assert_epoch(epoch)
+                values = {key: str(value).lower() if type(value) is bool else value
+                          for key, value in (params or {}).items() if value is not None}
+                async with self._shared_client().stream("GET", API_ORIGIN + path, auth=None, params=values,
+                        headers={"Authorization": "Bearer " + access, "Accept": "application/json",
+                                 "Accept-Encoding": "identity"}) as response:
+                    if response.status_code in (401, 403):
+                        raise AccountError("authentication_required")
+                    if response.status_code >= 500:
+                        raise AccountError("cloud_unavailable")
+                    if response.status_code != 200:
+                        raise AccountError("cloud_request_failed")
+                    if response.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
+                        raise AccountError("invalid_cloud_response")
+                    try:
+                        declared = int(response.headers.get("content-length", "0"))
+                    except ValueError:
+                        raise AccountError("invalid_cloud_response") from None
+                    if declared < 0:
+                        raise AccountError("invalid_cloud_response")
+                    if declared > max_bytes:
+                        raise ExportError("exportTooLarge")
+                    chunks, size = [], 0
+                    async for chunk in response.aiter_bytes(chunk_size=16384):
+                        size += len(chunk)
+                        if size > max_bytes:
+                            raise ExportError("exportTooLarge")
+                        chunks.append(chunk)
+                    if not size or (declared and response.headers.get("content-encoding", "identity") == "identity" and size != declared):
+                        raise AccountError("invalid_cloud_response")
+                    result = json.loads(b"".join(chunks))
+                    if not isinstance(result, dict):
+                        raise AccountError("invalid_cloud_response")
+                self._assert_epoch(epoch)
+                return {"data": result, "identity": identity, "epoch": epoch, "source_bytes": size}
+        except ExportError:
+            raise
+        except Exception as error:
+            safe = _account_error(error)
+            if safe.code in {"authentication_required", "account_changed", "credential_store_unavailable",
+                             "credential_store_denied", "credential_store_interaction_required", "credential_store_app_identity"}:
+                self._failure(epoch, safe.code, safe.credential_os_status)
+            raise safe from None
+        finally:
+            _account_context.reset(token)
+
     def _failure(self, epoch, code, credential_os_status=None):
         with self.state.locked() as state:
             if state["epoch"] != epoch or state["mode"] != "cloud":
@@ -1002,7 +1055,9 @@ class AccountManager:
             _account_context.reset(token)
 
     async def _remote(self, epoch, *, name=None, arguments=None, path=None, params=None, method="GET", body=None,
-                      budget=None, capture_context=False, audio=False, activity=False):
+                      budget=None, capture_context=False, audio=False, activity=False, export_page=False, max_bytes=None):
+        if export_page:
+            return await self._remote_export_page(epoch, path, params=params, budget=budget, max_bytes=max_bytes)
         if audio:
             return await self._remote_audio(epoch, path, budget=budget)
         if activity:
@@ -1036,7 +1091,7 @@ class AccountManager:
                             "fetched_at": time.time(), "reuse_for_seconds": 60,
                             "automatic_timeout_ms": round(self.capture_timeout * 1000),
                             "last_capture_timing": self._last_capture_timing,
-                            "unsupported": ["learning_profile", "learning_preferences", "point_history", "study_sessions", "exports"]}}
+                            "unsupported": ["learning_profile", "learning_preferences", "point_history", "study_sessions"]}}
                     elif path is None and name in ("get_settings", "list_scenes", "find_points", "save_points", "capture_points", "capture_and_context"):
                         routes = {"get_settings": "/v1/settings", "list_scenes": "/v1/scenes", "find_points": "/v1/points", "save_points": "/v1/captures", "capture_points": "/v1/observations", "capture_and_context": "/v1/observations/context"}
                         writing = name in ("save_points", "capture_points", "capture_and_context")
@@ -1094,7 +1149,7 @@ class AccountManager:
             return result
         except FutureTimeout:
             future.cancel()
-            raise AccountError("capture_budget_exceeded" if "budget" in kwargs and not kwargs.get("activity") else "cloud_unavailable") from None
+            raise AccountError("capture_budget_exceeded" if "budget" in kwargs and not kwargs.get("activity") and not kwargs.get("export_page") else "cloud_unavailable") from None
 
     def capture_context(self, *, expected_epoch=None):
         return self._call(name="get_settings", capture_context=True, expected_epoch=expected_epoch, budget=self.capture_timeout)
@@ -1132,6 +1187,21 @@ class AccountManager:
         if type(record_id) is not int or not 0 < record_id <= 9007199254740991:
             raise AccountError("unsupported_cloud_operation")
         return self._call(path=f"/v1/points/{record_id}/audio", audio=True, expected_epoch=expected_epoch)
+
+    def request_export_page(self, path, params=None, *, expected_epoch, budget, max_bytes):
+        from cloud_exports import ExportPageQuery, MAX_SOURCE_BYTES, EXPORT_BUDGET
+        if (path not in ("/v1/points", "/v1/changes") or type(expected_epoch) is not int or expected_epoch < 0
+                or type(budget) not in (int, float)
+                or not 0 < budget <= EXPORT_BUDGET or type(max_bytes) is not int or not 0 < max_bytes <= MAX_SOURCE_BYTES):
+            raise AccountError("unsupported_cloud_operation")
+        if path == "/v1/changes":
+            if params:
+                raise AccountError("unsupported_cloud_operation")
+            values = None
+        else:
+            values = ExportPageQuery.model_validate(params if params is not None else {}).model_dump(exclude_none=True)
+        return self._call(path=path, params=values, export_page=True, budget=budget,
+                          max_bytes=max_bytes, expected_epoch=expected_epoch)
 
     def close(self):
         """Release this process's callback/worker, without signing other clients out."""

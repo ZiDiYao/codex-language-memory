@@ -297,8 +297,12 @@ class RoutingStore:
                               cloud=lambda _epoch: self._unsupported("learning_profile"))
 
     def export_records(self, *, kinds=None, date_field="created_at", start_at=None, end_at=None, **filters):
+        from cloud_exports import export_records
         return self._dispatch("export_records", keywords=dict(kinds=kinds, date_field=date_field,
-            start_at=start_at, end_at=end_at, **filters), cloud=lambda _epoch: self._unsupported("export"))
+            start_at=start_at, end_at=end_at, **filters), cloud=lambda epoch: export_records(self._account,
+                expected_epoch=epoch, kinds=kinds, date_field=date_field, start_at=start_at, end_at=end_at, **filters), migrate=False)
 
     def export_receipt(self, scope, receipt=None):
-        return self._dispatch("export_receipt", arguments=(scope, receipt), cloud=lambda _epoch: self._unsupported("export"))
+        from cloud_exports import export_receipt
+        return self._dispatch("export_receipt", arguments=(scope, receipt), cloud=lambda epoch:
+            export_receipt(self._account, scope, receipt, expected_epoch=epoch), migrate=False)

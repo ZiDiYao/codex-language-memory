@@ -38,12 +38,14 @@ export function createHostTransport(app) {
       }
       return Response.json(reply.data, { status: reply.status });
     },
-    async download(blob, filename, receipt) {
+    async download(blob, filename, receipt, { expectedEpoch, assertCurrent = () => {} } = {}) {
+      assertCurrent();
       if (app.getHostCapabilities()?.downloadFile) {
         const bytes = new Uint8Array(await blob.arrayBuffer());
         let binary = "";
         for (let start = 0; start < bytes.length; start += 8192)
           binary += String.fromCharCode(...bytes.subarray(start, start + 8192));
+        assertCurrent();
         const result = await app.downloadFile({ contents: [{ type: "resource", resource: {
           uri: `file:///${encodeURIComponent(filename)}`, mimeType: blob.type, blob: btoa(binary),
         } }] });
@@ -60,7 +62,11 @@ export function createHostTransport(app) {
       }
       // Keep the same delivery semantics as the loopback download endpoint.
       // Receipt failure must not misreport an already delivered file as failed.
-      await call("export_complete", { receipt }).catch(() => {});
+      // The original account may have changed while the host's save dialog was
+      // open. A delivered file cannot be recalled, but its receipt stays bound.
+      try { assertCurrent(); } catch { return; }
+      await call("export_complete", { receipt,
+        ...(expectedEpoch === undefined ? {} : { expected_epoch: expectedEpoch }) }).catch(() => {});
     },
   };
 }

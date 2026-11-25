@@ -86,6 +86,22 @@ test("host errors and malformed replies cannot masquerade as saved changes", asy
   }
 });
 
+test("export delivery retains its original epoch and cannot acknowledge after an account changes", async () => {
+  const calls = [];
+  let epoch = 7, delivered = 0;
+  const host = createHostTransport({
+    getHostCapabilities: () => ({ downloadFile: {} }),
+    downloadFile: async () => { delivered++; return { isError: false }; },
+    callServerTool: async ({ arguments: args }) => { calls.push(args); return { structuredContent: { status: 200, data: { status: "ok" } } }; },
+  });
+  const assertCurrent = () => { if (epoch !== 7) throw new Error("account_changed"); };
+  await host.download(new Blob(["fixture"]), "notes.json", "receipt-a", { expectedEpoch: 7, assertCurrent });
+  assert.deepEqual(calls, [{ route: "export_complete", payload: { receipt: "receipt-a", expected_epoch: 7 } }]);
+  const delayed = { type: "application/json", arrayBuffer: async () => { epoch = 8; return new ArrayBuffer(1); } };
+  await assert.rejects(host.download(delayed, "notes.json", "receipt-b", { expectedEpoch: 7, assertCurrent }), /account_changed/);
+  assert.equal(delivered, 1); assert.equal(calls.length, 1);
+});
+
 test("native sign-in links use the host SDK and preserve declined-link errors", async () => {
   const links = [];
   let declined = false;
