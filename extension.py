@@ -51,6 +51,26 @@ def disable_extension(locations):
         atomic_write(locations.config, tomlkit.dumps(document).encode(), expected=before, compare=True)
 
 
+def publish_assets(package, source):
+    """Replace only this extension's managed assets, including old-release removal."""
+    assets = source / "assets"
+    source.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".assets-", dir=source) as temporary:
+        staged, previous = Path(temporary) / "new", Path(temporary) / "previous"
+        incoming = package / "assets"
+        if incoming.exists():
+            shutil.copytree(incoming, staged)
+        if assets.exists() or assets.is_symlink():
+            assets.rename(previous)
+        try:
+            if staged.exists():
+                staged.rename(assets)
+        except OSError:
+            if previous.exists() or previous.is_symlink():
+                previous.rename(assets)
+            raise
+
+
 def connect_extension(locations, *, runner=run_codex):
     if locations != type(locations).default():
         # Native CLI registration always uses its own real profile; never point it at test data.
@@ -72,6 +92,9 @@ def connect_extension(locations, *, runner=run_codex):
     if before:
         atomic_write(locations.base / "backups/before-extension.toml", before)
     manifest = read_json(locations.current / "plugin.json")
+    # Stage before publishing the manifest or notifying Codex. A copy failure
+    # leaves the active icon resources and old manifest available together.
+    publish_assets(locations.current, source)
     atomic_write(source / "plugin.json", json.dumps(manifest, indent=2).encode())
     skill = source / "skills/language-memory"
     skill.parent.mkdir(parents=True, exist_ok=True)

@@ -1,2 +1,6 @@
 interface:
   display_name: "Sayrove"
+  short_description: "Quietly remember language gaps and review saved notes."
+  icon_small: "./assets/sayrove-mark.svg"
+  icon_large: "./assets/sayrove-mark.svg"
+  brand_color: "#222222"

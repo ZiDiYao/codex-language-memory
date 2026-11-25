@@ -1,6 +1,7 @@
 import json
 import shlex
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import tomlkit
@@ -37,6 +38,22 @@ class ExtensionTests(unittest.TestCase):
             del document["plugins"][PLUGIN]
             self.locations.config.write_text(tomlkit.dumps(document))
         return {}
+
+    def icon_package(self, version, content, *, obsolete=False):
+        package = self.fixture.make_package(version)
+        assets = package / "assets"
+        assets.mkdir()
+        (assets / "sayrove-mark.svg").write_text(content)
+        if obsolete:
+            (assets / "old-icon.svg").write_text("old icon")
+        (package / "plugin.json").write_text(json.dumps({
+            "name": "language-memory", "version": version,
+            "extensions": {"com.openai": {"interface": {
+                "logo": "./assets/sayrove-mark.svg", "composerIcon": "./assets/sayrove-mark.svg",
+            }}},
+        }))
+        self.fixture.seal(package, version)
+        return package
 
     def test_native_connection_upgrade_and_removal_keep_learning_data(self):
         connect_extension(self.locations, runner=self.runner)
@@ -97,6 +114,91 @@ class ExtensionTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 connect_extension(self.locations, runner=self.runner)
         self.assertEqual(published.read_bytes(), before)
+        self.assertEqual(self.fixture.snapshot(), self.snapshot)
+
+    def test_native_manifest_assets_exist_before_codex_registration(self):
+        package = self.icon_package("0.2.0-beta.2", '<svg width="64" height="64">Sayrove</svg>')
+        self.fixture.install(package)
+        published = self.locations.base / "extension"
+        def registered(arguments):
+            if arguments[0] == "add":
+                manifest = json.loads((published / "plugin.json").read_text())
+                interface = manifest["extensions"]["com.openai"]["interface"]
+                for name in ("logo", "composerIcon"):
+                    self.assertEqual((published / interface[name]).read_bytes(),
+                                     (package / interface[name]).read_bytes())
+            return self.runner(arguments)
+        connect_extension(self.locations, runner=registered)
+        self.assertEqual(self.fixture.snapshot(), self.snapshot)
+
+    def test_native_assets_follow_upgrade_without_touching_other_extension_files(self):
+        package = self.icon_package("0.2.0-beta.2", "first icon", obsolete=True)
+        self.fixture.install(package)
+        connect_extension(self.locations, runner=self.runner)
+        published = self.locations.base / "extension"
+        unrelated = published / "keep-this.txt"
+        unrelated.write_text("Unrelated extension data")
+        upgrade = self.icon_package("0.2.0-beta.3", "replacement icon")
+        self.fixture.install(upgrade)
+        connect_extension(self.locations, runner=self.runner)
+        self.assertEqual((published / "assets/sayrove-mark.svg").read_text(), "replacement icon")
+        self.assertFalse((published / "assets/old-icon.svg").exists())
+        self.assertEqual(unrelated.read_text(), "Unrelated extension data")
+        self.assertEqual(self.fixture.snapshot(), self.snapshot)
+
+    def test_rollback_to_release_without_assets_removes_stale_icons(self):
+        connect_extension(self.locations, runner=self.runner)
+        package = self.icon_package("0.2.0-beta.2", "new icon")
+        self.fixture.install(package)
+        connect_extension(self.locations, runner=self.runner)
+        published = self.locations.base / "extension"
+        self.assertTrue((published / "assets/sayrove-mark.svg").is_file())
+        rollback(self.locations, runner=self.fixture.runner)
+        connect_extension(self.locations, runner=self.runner)
+        self.assertFalse((published / "assets").exists())
+        self.assertNotIn("extensions", json.loads((published / "plugin.json").read_text()))
+        self.assertEqual(self.fixture.snapshot(), self.snapshot)
+
+    def test_failed_asset_staging_keeps_old_assets_and_does_not_reload_codex(self):
+        package = self.icon_package("0.2.0-beta.2", "working icon")
+        self.fixture.install(package)
+        connect_extension(self.locations, runner=self.runner)
+        published = self.locations.base / "extension"
+        previous_manifest = (published / "plugin.json").read_bytes()
+        upgrade = self.icon_package("0.2.0-beta.3", "unpublished icon")
+        self.fixture.install(upgrade)
+        calls = []
+        def runner(arguments):
+            calls.append(arguments)
+            return self.runner(arguments)
+        with patch("extension.shutil.copytree", side_effect=OSError("Asset staging failed")):
+            with self.assertRaises(OSError):
+                connect_extension(self.locations, runner=runner)
+        self.assertEqual(calls, [])
+        self.assertEqual((published / "plugin.json").read_bytes(), previous_manifest)
+        self.assertEqual((published / "assets/sayrove-mark.svg").read_text(), "working icon")
+        self.assertEqual(self.fixture.snapshot(), self.snapshot)
+
+    def test_failed_asset_publication_restores_previous_assets(self):
+        package = self.icon_package("0.2.0-beta.2", "working icon")
+        self.fixture.install(package)
+        connect_extension(self.locations, runner=self.runner)
+        published = self.locations.base / "extension"
+        previous_manifest = (published / "plugin.json").read_bytes()
+        upgrade = self.icon_package("0.2.0-beta.3", "unpublished icon")
+        self.fixture.install(upgrade)
+        rename = Path.rename
+        def fail_publication(path, target):
+            if path.name == "new" and path.parent.name.startswith(".assets-"):
+                raise OSError("Asset publication failed")
+            return rename(path, target)
+        calls = []
+        with patch("extension.Path.rename", fail_publication):
+            with self.assertRaises(OSError):
+                connect_extension(self.locations, runner=lambda arguments: calls.append(arguments))
+        self.assertEqual(calls, [])
+        self.assertEqual((published / "plugin.json").read_bytes(), previous_manifest)
+        self.assertEqual((published / "assets/sayrove-mark.svg").read_text(), "working icon")
         self.assertEqual(self.fixture.snapshot(), self.snapshot)
 
     def test_unrelated_extension_is_not_overwritten(self):

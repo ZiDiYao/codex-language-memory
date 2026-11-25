@@ -95,6 +95,8 @@ def main():
     package.mkdir()
     shutil.copytree(frozen / "language-memory", package / "runtime", symlinks=True)
     shutil.copytree(ROOT / ".agents/skills/language-memory", package / "skills/language-memory")
+    (package / "assets").mkdir()
+    shutil.copyfile(ROOT / "web/assets/sayrove-mark.svg", package / "assets/sayrove-mark.svg")
     for filename in ("plugin.json", "mcp.json", "START-HERE.txt"):
         shutil.copyfile(ROOT / "packaging" / filename, package / filename)
     plugin = json.loads((package / "plugin.json").read_text())

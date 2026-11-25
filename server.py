@@ -1,11 +1,12 @@
 """Local stdio MCP entry point for Codex Language Memory."""
 
 import os
+import base64
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from mcp.server.fastmcp import FastMCP
-from mcp.types import ToolAnnotations
+from mcp.types import Icon, ToolAnnotations
 from pydantic import Field
 
 from store import (CaptureMode, Kind, Language, LearnerPreferences, Limit, Patch, RecordId, RequestId, Review, SceneName,
@@ -27,7 +28,13 @@ class LearningObservation(StrictModel):
 
 
 def create_server(store: Store) -> FastMCP:
-    server = FastMCP("language_memory")
+    # The client cannot read a local filesystem path from MCP metadata. Embed
+    # the small existing brand mark in serverInfo once, outside tool schemas.
+    mark = (Path(__file__).parent / "web/assets/sayrove-mark.svg").read_bytes()
+    server = FastMCP("language_memory", icons=[Icon(
+        src="data:image/svg+xml;base64," + base64.b64encode(mark).decode("ascii"),
+        mimeType="image/svg+xml", sizes=["64x64"],
+    )])
     cloud_capable = getattr(store, "account", None) is not None
     read_only = ToolAnnotations(readOnlyHint=True, openWorldHint=cloud_capable)
     local_write = ToolAnnotations(destructiveHint=False, openWorldHint=cloud_capable)

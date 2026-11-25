@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "language-memory",
-  "version": "0.2.0-beta.49",
+  "version": "0.2.0-beta.50",
   "description": "Sayrove cloud language-learning memory and review.",
   "author": {"name": "ZiDiYao"},
   "repository": "https://github.com/ZiDiYao/codex-language-memory",
@@ -12,6 +12,8 @@
         "displayName": "Sayrove",
         "shortDescription": "Remember learning gaps and practice with Codex.",
         "developerName": "ZiDiYao",
+        "logo": "./assets/sayrove-mark.svg",
+        "composerIcon": "./assets/sayrove-mark.svg",
         "defaultPrompt": ["Quiz me on one of my words.", "Open my language learning page."]
       }
     }
