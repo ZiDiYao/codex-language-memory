@@ -63,8 +63,7 @@
                 <div class="profile-section-heading">
                   <h3 id="local-profile-activity-title" data-i18n="profileActivity">Learning activity</h3>
                   <div class="activity-controls">
-                    <select class="activity-year" data-activity-year aria-label="Year" disabled></select>
-                    <button type="button" class="activity-refresh subtle" data-activity-action="refresh" aria-label="Refresh" title="Refresh"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M16 7a6 6 0 1 0 .1 5M16 3v4h-4"/></svg><span class="sr-only" data-i18n="activityRefresh">Refresh</span></button>
+                    <div id="local-profile-activity-year" class="activity-year" data-activity-year></div>
                   </div>
                 </div>
                 <p class="activity-range" data-activity-range hidden></p>
@@ -74,13 +73,13 @@
                   <div class="activity-chart">
                     <div class="activity-months" data-activity-months aria-hidden="true"></div>
                     <div class="activity-weekdays" data-activity-weekdays aria-hidden="true"></div>
-                    <div class="profile-heatmap" data-activity-grid role="group" aria-labelledby="local-profile-activity-title" aria-describedby="local-profile-activity-detail local-profile-activity-help"></div>
+                    <div class="profile-heatmap" data-activity-grid role="group" aria-labelledby="local-profile-activity-title" aria-describedby="local-profile-activity-detail"></div>
                   </div>
-                  <div class="activity-legend" data-activity-legend role="img"><span data-i18n="activityLess">Less</span><i data-level="0" aria-hidden="true"></i><i data-level="1" aria-hidden="true"></i><i data-level="2" aria-hidden="true"></i><i data-level="3" aria-hidden="true"></i><i data-level="4" aria-hidden="true"></i><span data-i18n="activityMore">More</span></div>
-                  <p id="local-profile-activity-detail" class="activity-detail" data-activity-detail role="status" aria-live="polite" data-i18n="activitySelectDay">Point to a day or use the arrow keys for details.</p>
-                  <p class="help activity-summary" data-activity-summary></p>
+                  <div class="activity-footer">
+                    <p id="local-profile-activity-detail" class="activity-detail" data-activity-detail role="status" aria-live="polite" data-i18n="activitySelectDay">Point to a day or use the arrow keys for details.</p>
+                    <div class="activity-legend" data-activity-legend role="img"><span data-i18n="activityLess">Less</span><i data-level="0" aria-hidden="true"></i><i data-level="1" aria-hidden="true"></i><i data-level="2" aria-hidden="true"></i><i data-level="3" aria-hidden="true"></i><i data-level="4" aria-hidden="true"></i><span data-i18n="activityMore">More</span></div>
+                  </div>
                 </div>
-                <p id="local-profile-activity-help" class="help activity-help" data-activity-help data-i18n="activityWeights">Words &amp; phrases 70% · app activity 30%</p>
               </section>
               </div>
               <footer id="local-profile-footer" class="cloud-profile-footer profile-footer" hidden>

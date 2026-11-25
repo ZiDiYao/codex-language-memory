@@ -1,4 +1,5 @@
 import { messages } from "./i18n.js";
+import { Picker } from "./picker.js";
 
 const DAY = 86400000;
 function calendarDate(value) {
@@ -64,20 +65,23 @@ export function createActivityView(root, { getLanguage = () => "en", onYearChang
   if (!root) throw new TypeError("Activity view is missing");
   const $ = (name) => root.querySelector(`[data-activity-${name}]`);
   const grid = $("grid"), calendar = $("calendar"), range = $("range"), status = $("status"), detail = $("detail");
-  const summary = $("summary"), help = $("help");
-  const months = $("months"), weekdays = $("weekdays"), yearSelect = $("year"), legend = $("legend");
+  const months = $("months"), weekdays = $("weekdays"), yearHost = $("year"), legend = $("legend");
   const retry = root.querySelector('[data-activity-action="retry"]');
-  const refresh = root.querySelector('[data-activity-action="refresh"]');
   let model = null, labels = new Map(), yearChoices = [], annualNavigation = false;
   const text = (key, values) => activityText(getLanguage(), key, values);
   const number = (value) => new Intl.NumberFormat(localeFor(getLanguage())).format(value);
   const dateLabel = (value) => new Intl.DateTimeFormat(localeFor(getLanguage()), { dateStyle: "medium", timeZone: "UTC" }).format(calendarDate(value));
+  const yearPicker = yearHost ? new Picker(yearHost, {
+    label: text("activityYear"),
+    onChange: (value) => { if (Number(value) !== model?.year) onYearChange(Number(value)); },
+  }) : null;
+  root.closest("dialog")?.addEventListener("close", () => yearPicker?.close());
   const busy = (value) => {
     root.setAttribute("aria-busy", String(value));
-    if (refresh) refresh.disabled = value;
-    if (yearSelect) yearSelect.disabled = value || !annualNavigation || yearChoices.length < 2;
+    if (value) yearPicker?.close();
+    if (yearPicker) yearPicker.button.disabled = value || !annualNavigation || !yearChoices.length;
   };
-  yearSelect?.addEventListener("change", () => onYearChange(Number(yearSelect.value)));
+  const showDetail = (label) => { detail.textContent = detail.title = label; };
   function showStatus(key, error = false) {
     status.textContent = key ? text(key) : "";
     status.hidden = !key;
@@ -85,12 +89,12 @@ export function createActivityView(root, { getLanguage = () => "en", onYearChang
   }
   function showDay(node) {
     const label = labels.get(node?.dataset.activityDate);
-    if (label) detail.textContent = label;
+    if (label) showDetail(label);
   }
   grid.addEventListener("pointerover", (event) => showDay(event.target.closest?.("[data-activity-date]")));
   grid.addEventListener("focusin", (event) => showDay(event.target.closest?.("[data-activity-date]")));
   grid.addEventListener("focusout", (event) => {
-    if (!grid.contains(event.relatedTarget)) detail.textContent = text("activitySelectDay");
+    if (!grid.contains(event.relatedTarget)) showDetail(text("activitySelectDay"));
   });
   grid.addEventListener("keydown", (event) => {
     const node = event.target.closest?.("[data-activity-date]");
@@ -119,23 +123,25 @@ export function createActivityView(root, { getLanguage = () => "en", onYearChang
     grid.replaceChildren();
     months?.replaceChildren();
     weekdays?.replaceChildren();
+    yearPicker?.close();
     if (!preserveYears) {
-      yearSelect?.replaceChildren();
+      yearPicker?.setOptions([]);
+      yearPicker?.setValue("");
       yearChoices = []; annualNavigation = false;
-    } else if (yearSelect && Number.isInteger(year)) yearSelect.value = String(year);
+    } else if (Number.isInteger(year)) yearPicker?.setValue(String(year));
     calendar.hidden = range.hidden = true;
-    range.textContent = summary.textContent = "";
-    detail.textContent = text("activitySelectDay");
+    range.textContent = "";
+    showDetail(text("activitySelectDay"));
     showStatus("activityUnavailable");
     retry.hidden = true;
     busy(false);
-    if (refresh) refresh.disabled = true;
   }
   function error(error) {
     busy(false);
     showStatus(error?.message === "activityYearUnavailable" ? "activityYearUnavailable" : "activityError", true);
     retry.hidden = false;
   }
+  busy(false);
   return {
     clear,
     loading(value = true) {
@@ -207,29 +213,19 @@ export function createActivityView(root, { getLanguage = () => "en", onYearChang
         }
         return span;
       }));
-      if (yearSelect) {
+      if (yearPicker) {
         const years = [...new Set([next.year, ...next.availableYears])].sort((a, b) => b - a);
         yearChoices = years; annualNavigation = next.annual;
-        yearSelect.replaceChildren(...years.map((year) => {
-          const option = root.ownerDocument.createElement("option");
-          option.value = String(year); option.textContent = number(year).replace(/[,\s]/g, "");
-          return option;
-        }));
-        yearSelect.value = String(next.year);
-        yearSelect.setAttribute("aria-label", text("activityYear"));
-        yearSelect.title = text("activityYear");
+        yearPicker.setOptions(years.map((year) => ({ value: String(year), label: number(year).replace(/[,\s]/g, "") })));
+        yearPicker.setValue(String(next.year));
+        yearPicker.setLabel(text("activityYear"));
       }
-      if (refresh) { refresh.title = text("activityRefresh"); refresh.setAttribute("aria-label", text("activityRefresh")); }
       if (legend) legend.setAttribute("aria-label", text("activityLegendLabel"));
       range.textContent = `${dateLabel(value.start_date)} – ${dateLabel(value.end_date)} · ${value.timezone}`;
       range.hidden = next.annual;
       calendar.hidden = false;
       grid.setAttribute("aria-label", `${range.textContent}${next.annual ? "" : " · " + text("activityPartialYear")}`);
-      summary.textContent = text("activitySummary", { days: number(next.totals.active), learning: number(next.totals.learning),
-        interactions: number(next.totals.interaction) });
-      detail.textContent = focused && labels.has(focused) ? labels.get(focused) : text("activitySelectDay");
-      help.textContent = text("activityWeights");
-      help.title = text("activityScoreHelp");
+      showDetail(focused && labels.has(focused) ? labels.get(focused) : text("activitySelectDay"));
       showStatus(!next.annual ? "activityPartialYear" : next.totals.active ? null : "activityEmpty");
       retry.hidden = true;
       busy(false);

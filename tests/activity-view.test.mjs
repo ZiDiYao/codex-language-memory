@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
-import { activityCalendar, activityText, createActivityView } from "../web/activity-view.js";
+globalThis.matchMedia ??= () => ({ matches: true, addEventListener() {}, removeEventListener() {} });
+globalThis.getComputedStyle ??= () => ({ opacity: "1", transform: "none" });
+const { activityCalendar, activityText, createActivityView } = await import("../web/activity-view.js");
 
 function fixture(end = "2026-11-24") {
   const endAt = Date.parse(`${end}T00:00:00Z`), startAt = endAt - 181 * 86400000;
@@ -70,7 +72,7 @@ test("malformed, duplicate, incomplete and impossible dates cannot become invent
 class Element {
   constructor(document) {
     this.ownerDocument = document; this.children = []; this.dataset = {}; this.attributes = new Map(); this.events = new Map();
-    this.style = { setProperty() {} }; this.classList = { toggle() {} }; this.textContent = "";
+    this.style = { setProperty() {} }; this.classList = { toggle() {}, add() {} }; this.textContent = "";
   }
   append(...nodes) { for (const node of nodes) {
     if (node.fragment) this.append(...node.children);
@@ -80,6 +82,8 @@ class Element {
   setAttribute(key, value) { this.attributes.set(key, value); }
   addEventListener(type, handler) { this.events.set(type, handler); }
   matches(selector) {
+    const attribute = selector.match(/^\[([\w-]+)="([^"]+)"\]$/);
+    if (attribute && !attribute[1].startsWith("data-")) return this.attributes.get(attribute[1]) === attribute[2];
     const match = selector.match(/^\[data-([\w-]+)(?:="([^"]+)")?\]$/);
     const key = match?.[1].replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
     return Boolean(match && this.dataset[key] !== undefined && (match[2] === undefined || this.dataset[key] === match[2]));
@@ -92,14 +96,17 @@ class Element {
   fire(type, target = this, fields = {}) { this.events.get(type)?.({ target, preventDefault() {}, ...fields }); }
 }
 function dom() {
-  const document = { activeElement: null, createElement: () => new Element(document),
+  const document = { activeElement: null, addEventListener() {}, createElement: () => new Element(document),
     createDocumentFragment: () => Object.assign(new Element(document), { fragment: true }) };
+  globalThis.document = document;
   const root = new Element(document);
-  for (const name of ["grid", "calendar", "range", "status", "detail", "summary", "help", "months", "weekdays", "year", "legend"])
+  for (const name of ["grid", "calendar", "range", "status", "detail", "months", "weekdays", "year", "legend"])
     root.append(Object.assign(new Element(document), { dataset: { [`activity${name[0].toUpperCase()}${name.slice(1)}`]: "" } }));
-  for (const action of ["refresh", "retry"]) root.append(Object.assign(new Element(document), { dataset: { activityAction: action } }));
+  root.append(Object.assign(new Element(document), { dataset: { activityAction: "retry" } }));
   const node = (name) => root.querySelector(`[data-activity-${name}]`);
-  return { root, node, document };
+  const yearButton = () => node("year").children[0];
+  const yearList = () => node("year").children[1];
+  return { root, node, document, yearButton, yearList };
 }
 
 test("real zero days, localized details, keyboard navigation and account clearing stay accessible", () => {
@@ -121,7 +128,7 @@ test("real zero days, localized details, keyboard navigation and account clearin
   assert.match(node("detail").textContent, /Nov 17, 2026/);
   language = "zh";
   view.render(data);
-  assert.match(node("summary").textContent, /0 天有活动/);
+  assert.match(node("detail").textContent, /2026年11月17日/);
   assert.equal(document.activeElement.dataset.activityDate, "2026-11-17", "relabel preserves focused date");
   view.error(new Error("private provider detail"));
   assert.doesNotMatch(node("status").textContent, /private/);
@@ -131,11 +138,11 @@ test("real zero days, localized details, keyboard navigation and account clearin
   view.clear();
   assert.equal(node("grid").children.length, 0);
   assert.equal(node("calendar").hidden, true);
-  assert.equal(node("summary").textContent, "");
+  assert.equal(node("detail").title, node("detail").textContent);
 });
 
 test("annual view labels months/weekdays, disables future cells and selects years without losing navigation on errors", () => {
-  const { root, node, document } = dom();
+  const { root, node, document, yearButton, yearList } = dom();
   const years = [];
   const view = createActivityView(root, { onYearChange: (year) => years.push(year) });
   view.render(annual());
@@ -144,8 +151,8 @@ test("annual view labels months/weekdays, disables future cells and selects year
   assert.equal(node("months").children.at(-1).children[0].textContent, "Dec");
   assert.equal(node("weekdays").children.length, 7);
   assert.equal(node("weekdays").children[1].children[0].textContent, "Mon");
-  assert.equal(node("year").value, "2026");
-  assert.equal(node("year").disabled, false);
+  assert.equal(yearButton().children[0].textContent, "2026");
+  assert.equal(yearButton().disabled, false);
   assert.equal(node("range").hidden, true, "annual navigation does not waste a row on the old rolling range");
   const cells = node("grid").querySelectorAll("[data-activity-date]");
   const today = cells.find((cell) => cell.dataset.activityDate === "2026-11-24");
@@ -156,24 +163,53 @@ test("annual view labels months/weekdays, disables future cells and selects year
   today.focus();
   node("grid").fire("keydown", today, { key: "End" });
   assert.equal(document.activeElement, today, "End skips all future cells");
-  node("year").value = "2024";
-  node("year").fire("change");
+  yearList().children[2].fire("click");
   assert.deepEqual(years, [2024]);
   view.clear({ preserveYears: true, year: 2024 });
   view.error(new Error("unavailable"));
   assert.equal(node("grid").children.length, 0);
-  assert.equal(node("year").children.length, 3);
-  assert.equal(node("year").disabled, false);
+  assert.equal(yearList().children.length, 3);
+  assert.equal(yearButton().disabled, false);
   view.clear();
-  assert.equal(node("year").children.length, 0, "account clearing drops previous tenant year choices");
+  assert.equal(yearList().children.length, 0, "account clearing drops previous tenant year choices");
+  assert.equal(yearButton().disabled, true);
 });
 
 test("a retained historical selection can still return to current year if its last record was deleted", () => {
-  const { root, node } = dom();
+  const { root, yearButton, yearList } = dom();
   const view = createActivityView(root);
   view.render({ ...annual(2024), available_years: [2026] });
-  assert.equal(node("year").children.length, 2);
-  assert.equal(node("year").disabled, false);
+  assert.equal(yearList().children.length, 2);
+  assert.equal(yearButton().disabled, false);
+});
+
+test("a single available year opens a real menu, closes without reloading and clears safely", async () => {
+  const { root, yearButton, yearList, document } = dom();
+  const changes = [];
+  const view = createActivityView(root, { onYearChange: (year) => changes.push(year) });
+  assert.equal(yearButton().disabled, true);
+  view.render({ ...annual(), available_years: [2026] });
+  assert.equal(yearButton().disabled, false);
+  yearButton().fire("click");
+  assert.equal(yearButton().attributes.get("aria-expanded"), "true");
+  assert.equal(yearList().hidden, false);
+  assert.equal(yearList().children.length, 1);
+  assert.equal(yearList().children[0].children[0].textContent, "2026");
+  assert.equal(document.activeElement, yearList().children[0]);
+  yearList().children[0].fire("click");
+  await Promise.resolve();
+  assert.equal(yearButton().attributes.get("aria-expanded"), "false");
+  assert.deepEqual(changes, [], "choosing the current year does not fetch it again");
+  yearButton().fire("keydown", yearButton(), { key: "ArrowDown" });
+  assert.equal(yearButton().attributes.get("aria-expanded"), "true");
+  view.loading();
+  assert.equal(yearButton().disabled, true);
+  assert.equal(yearButton().attributes.get("aria-expanded"), "false");
+  view.loading(false);
+  yearButton().fire("click");
+  view.clear();
+  assert.equal(yearButton().attributes.get("aria-expanded"), "false");
+  assert.equal(yearList().children.length, 0);
 });
 
 test("both profile and settings use one bounded shell with an internal scrolling body", async () => {

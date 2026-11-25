@@ -28,19 +28,19 @@ test("desktop and web share a real lazy activity view while web keeps only its S
   const shared = source.match(/<!-- profile-shared:start -->([\s\S]*?)<!-- profile-shared:end -->/)[1];
   const web = cloudProfileMarkup(source);
   for (const markup of [shared, web]) {
-    for (const key of ["profileAccount", "profileActivity", "activityWeights", "activityLoading"])
+    for (const key of ["profileAccount", "profileActivity", "activityLoading"])
       assert.ok(markup.includes(`data-i18n="${key}"`));
     assert.equal((markup.match(/data-activity-view/g) || []).length, 1);
     const heatmap = markup.match(/<div class="profile-heatmap"[^>]*>([\s\S]*?)<\/div>/)[1];
     assert.equal(heatmap.trim(), "", "no activity cells or counts are invented before the server responds");
     assert.doesNotMatch(markup, /profileComingSoon|profileActivityHelp/);
-    assert.match(markup, /data-activity-action="refresh"/);
+    assert.doesNotMatch(markup, /data-activity-action="refresh"|data-activity-summary|data-activity-help|activityWeights/);
     assert.match(markup, /data-activity-action="retry"/);
     assert.match(markup, /class="dialog-body"/);
     assert.doesNotMatch(markup, /accountCloud|<input\b/);
-    const selects = markup.match(/<select\b[^>]*>/g) || [];
-    assert.equal(selects.length, 1);
-    assert.match(selects[0], /data-activity-year/);
+    assert.equal((markup.match(/data-activity-year/g) || []).length, 1);
+    assert.match(markup, /<div id="(?:local|cloud)-profile-activity-year" class="activity-year" data-activity-year>/);
+    assert.doesNotMatch(markup, /<select\b/);
   }
   assert.equal((web.match(/<dialog\b/g) || []).length, 1);
   assert.ok(web.includes('aria-controls="cloud-profile"'));
