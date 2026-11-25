@@ -243,6 +243,20 @@ class RoutingStore:
         return self._dispatch("audio", cloud=lambda epoch: self._response(
             self._account.request_audio(identifier, expected_epoch=epoch)), migrate=False)
 
+    def activity(self, timezone="UTC"):
+        if self._snapshot()["mode"] != "cloud":
+            raise CloudFeatureUnavailable("learning_activity")
+        return self._dispatch("activity", cloud=lambda epoch: self._response(
+            self._account.request_api("GET", "/v1/activity", params={"timezone": timezone},
+                                      expected_epoch=epoch)), migrate=False)
+
+    def activity_events(self, batch):
+        if self._snapshot()["mode"] != "cloud":
+            raise CloudFeatureUnavailable("learning_activity")
+        return self._dispatch("activity_events", cloud=lambda epoch: self._response(
+            self._account.request_api("POST", "/v1/activity/events", json=batch,
+                                      expected_epoch=epoch)), migrate=False)
+
     def update(self, record_id, patch: Patch, expected_revision=None):
         return self._dispatch("update", arguments=(record_id, patch, expected_revision), cloud=lambda epoch: self._tool(
             "update_point", {"record_id": record_id, "patch": patch.model_dump(mode="json", exclude_unset=True),

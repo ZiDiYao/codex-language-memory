@@ -1038,3 +1038,41 @@ for (const [locale, values] of Object.entries(profileMessages)) {
   Object.assign(messages[locale], Object.fromEntries(profileKeys.map((key, index) => [key, values[index]])));
   for (const [code, key] of Object.entries(publicAccountErrors)) messages[locale][code] = messages[locale][key];
 }
+
+const activityKeys = ["activityRefresh", "activityRetry", "activityLoading", "activityRefreshing", "activityError",
+  "activityUnavailable", "activityEmpty", "activitySelectDay", "activityLess", "activityMore", "activityWeights",
+  "activityScoreHelp", "activitySummary", "activityDayDetail"];
+const activityMessages = {
+  en: ["Refresh", "Try again", "Loading activity…", "Updating activity…", "Activity could not be loaded. Try again.",
+    "Activity is unavailable right now.", "No activity in this period yet.", "Point to a day or use the arrow keys for details.", "Less", "More",
+    "Words & phrases 70% · app activity 30%", "Daily score: 70% from word/phrase learning and 30% from app activity. Five learning encounters and ten interactions reach the daily maximum.",
+    "{days} active days · {learning} word/phrase encounters · {interactions} interactions",
+    "{date} · {learning} word/phrase encounters · {interactions} interactions · {score}/100"],
+  zh: ["刷新", "重试", "正在读取学习活动…", "正在更新学习活动…", "暂时无法读取学习活动，请重试。",
+    "学习活动暂时不可用。", "这段时间还没有学习活动。", "悬停日期或使用方向键查看详情。", "少", "多",
+    "词句学习 70% · 应用互动 30%", "每日分数由词句学习贡献 70%、应用互动贡献 30%。每天 5 次词句学习和 10 次互动可达到满分。",
+    "{days} 天有活动 · {learning} 次词句学习 · {interactions} 次互动",
+    "{date} · {learning} 次词句学习 · {interactions} 次互动 · {score}/100 分"],
+  ja: ["更新", "再試行", "学習履歴を読み込み中…", "学習履歴を更新中…", "学習履歴を読み込めませんでした。もう一度お試しください。",
+    "学習履歴は現在利用できません。", "この期間の学習履歴はまだありません。", "日付にポインターを合わせるか、矢印キーで詳細を確認できます。", "少", "多",
+    "単語・表現 70% · アプリ操作 30%", "1日のスコアは単語・表現の学習が70%、アプリ操作が30%です。学習5回と操作10回で上限に達します。",
+    "活動日数 {days}日 · 単語・表現の学習 {learning}回 · 操作 {interactions}回",
+    "{date} · 単語・表現の学習 {learning}回 · 操作 {interactions}回 · {score}/100点"],
+  ko: ["새로고침", "다시 시도", "학습 활동을 불러오는 중…", "학습 활동을 업데이트하는 중…", "학습 활동을 불러올 수 없습니다. 다시 시도하세요.",
+    "지금은 학습 활동을 이용할 수 없습니다.", "이 기간에는 아직 학습 활동이 없습니다.", "날짜에 마우스를 올리거나 방향키로 세부 정보를 확인하세요.", "적음", "많음",
+    "단어·표현 학습 70% · 앱 활동 30%", "일일 점수는 단어·표현 학습 70%, 앱 활동 30%로 구성됩니다. 학습 5회와 상호작용 10회로 만점에 도달합니다.",
+    "활동 {days}일 · 단어·표현 학습 {learning}회 · 상호작용 {interactions}회",
+    "{date} · 단어·표현 학습 {learning}회 · 상호작용 {interactions}회 · {score}/100점"],
+  fr: ["Actualiser", "Réessayer", "Chargement de l’activité…", "Actualisation de l’activité…", "Impossible de charger l’activité. Réessayez.",
+    "L’activité est momentanément indisponible.", "Aucune activité pour cette période.", "Survolez un jour ou utilisez les flèches pour voir les détails.", "Moins", "Plus",
+    "Mots et expressions 70 % · activité 30 %", "Le score quotidien provient à 70 % de l’apprentissage de mots et expressions et à 30 % des actions dans l’application. Cinq rencontres d’apprentissage et dix interactions donnent le maximum.",
+    "{days} jours actifs · {learning} rencontres d’apprentissage · {interactions} interactions",
+    "{date} · {learning} rencontres d’apprentissage · {interactions} interactions · {score}/100"],
+  es: ["Actualizar", "Reintentar", "Cargando actividad…", "Actualizando actividad…", "No se pudo cargar la actividad. Inténtalo de nuevo.",
+    "La actividad no está disponible ahora mismo.", "Todavía no hay actividad en este período.", "Pasa el cursor sobre un día o usa las flechas para ver los detalles.", "Menos", "Más",
+    "Palabras y expresiones 70 % · actividad 30 %", "La puntuación diaria procede en un 70 % del aprendizaje de palabras y expresiones y en un 30 % de la actividad en la aplicación. Cinco encuentros de aprendizaje y diez interacciones alcanzan el máximo.",
+    "{days} días activos · {learning} encuentros de aprendizaje · {interactions} interacciones",
+    "{date} · {learning} encuentros de aprendizaje · {interactions} interacciones · {score}/100"],
+};
+for (const [locale, values] of Object.entries(activityMessages))
+  Object.assign(messages[locale], Object.fromEntries(activityKeys.map((key, index) => [key, values[index]])));

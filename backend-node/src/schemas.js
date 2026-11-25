@@ -88,7 +88,16 @@ const observations = z.object({ request_id: requestId, items: z.array(z.record(z
   source: z.enum(['automatic','explicit']).default('automatic') }).strict();
 const pointUpdate = z.object({ patch, expected_revision: defaultNull(revision) }).strict();
 const reviewAttempt = z.object({ record_id: recordId, request_id: requestId, review }).strict();
-export const schemas = { observation, observations, point, patch, review, settings, settingsPatch, query, sceneQuery, reviewQuery, capture, pointUpdate, reviewAttempt,
+const activityTimezone = string({ trim: false, max: 80, pattern: /^[A-Za-z][A-Za-z0-9_+\/-]*$/u }).transform((value, context) => {
+  try { return new Intl.DateTimeFormat('en', { timeZone: value }).resolvedOptions().timeZone; }
+  catch { context.addIssue({ code: 'custom', message: 'invalid_request' }); return z.NEVER; }
+});
+const activityQuery = z.object({ timezone: activityTimezone.default('UTC') }).strict();
+const activityEvent = z.object({ event_id: z.string().uuid().transform(value => value.toLowerCase()),
+  kind: z.enum(['button', 'pronunciation']), occurred_at: z.string().max(40).datetime({ offset: true }),
+}).strict();
+const activityEvents = z.object({ events: z.array(activityEvent).min(1).max(20) }).strict();
+export const schemas = { activityQuery, activityEvents, observation, observations, point, patch, review, settings, settingsPatch, query, sceneQuery, reviewQuery, capture, pointUpdate, reviewAttempt,
   KnowledgePoint: point, Patch: patch, Review: review, LearningSettings: settings, SettingsPatch: settingsPatch,
   Query: query, SceneQuery: sceneQuery, ReviewQuery: reviewQuery, Capture: capture, PointUpdate: pointUpdate, ReviewAttempt: reviewAttempt,
 };

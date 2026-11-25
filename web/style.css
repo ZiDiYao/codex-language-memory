@@ -371,7 +371,26 @@ dialog {
 }
 dialog.profile-dialog,
 #settings-dialog {
-  width: min(800px, calc(100vw - 32px));
+  width: min(560px, calc(100vw - 32px));
+  height: min(650px, calc(100dvh - 40px));
+  max-width: none;
+  max-height: none;
+  overflow: hidden;
+}
+dialog.profile-dialog[open],
+#settings-dialog[open] { display: flex; flex-direction: column; }
+dialog.profile-dialog > .dialog-heading,
+#settings-dialog > .dialog-heading,
+.profile-footer { flex: none; }
+.dialog-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 0 2px;
+  margin: 0 -2px;
 }
 dialog::backdrop {
   background: #0007;
@@ -692,9 +711,49 @@ summary[aria-expanded="true"] .entry-last-seen { display: none; }
 .profile-feedback { margin-top: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .profile-activity { border-top: 1px solid var(--line); }
 .profile-section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-.profile-coming-soon { color: var(--muted); font-size: 10px; border: 1px solid var(--line); padding: 2px 6px; border-radius: 5px; }
-.profile-heatmap { display: grid; grid-template-columns: repeat(26, minmax(0, 1fr)); gap: 3px; width: 100%; min-width: 0; margin: 16px 0 12px; }
-.profile-heatmap > span { min-width: 0; aspect-ratio: 1; border-radius: 2px; background: var(--line); opacity: .55; }
+.activity-refresh, .activity-retry { padding: 4px 8px; font-size: 11px; }
+.activity-range { margin-top: 12px; color: var(--muted); font-size: 11px; }
+.activity-calendar { width: 100%; max-width: 320px; margin-top: 16px; }
+.profile-heatmap {
+  --activity-cell: clamp(7px, 1.6vw, 9px);
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-columns: repeat(var(--activity-columns, 27), var(--activity-cell));
+  grid-template-rows: repeat(7, var(--activity-cell));
+  gap: 2px;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  padding: 2px;
+  margin: -2px;
+}
+.activity-cell, .activity-pad, .activity-legend i { width: var(--activity-cell, 9px); height: var(--activity-cell, 9px); border-radius: 2px; }
+.activity-cell { min-width: 0; min-height: 0; padding: 0; border: 0; cursor: default; transition: outline-color 100ms var(--ease); }
+.activity-cell[data-level="0"], .activity-legend [data-level="0"] { background: var(--line); }
+.activity-cell[data-level="1"], .activity-legend [data-level="1"] { background: #b4d9bc; }
+.activity-cell[data-level="2"], .activity-legend [data-level="2"] { background: #79b98c; }
+.activity-cell[data-level="3"], .activity-legend [data-level="3"] { background: #42865b; }
+.activity-cell[data-level="4"], .activity-legend [data-level="4"] { background: #23563a; }
+.activity-cell:hover, .activity-cell:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
+.activity-pad { visibility: hidden; }
+.activity-legend { display: flex; justify-content: flex-end; align-items: center; gap: 3px; margin-top: 10px; color: var(--muted); font-size: 10px; }
+.activity-legend span:first-child { margin-inline-end: 3px; }
+.activity-legend span:last-child { margin-inline-start: 3px; }
+.activity-detail { min-height: 3em; margin-top: 12px; color: var(--muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.activity-summary { line-height: 1.6; }
+.activity-help { margin-top: 12px; line-height: 1.6; }
+.activity-status { margin-top: 14px; }
+.activity-status.error { color: var(--error); }
+.activity-retry { margin-top: 8px; }
+@media (prefers-color-scheme: dark) {
+  .activity-cell[data-level="1"], .activity-legend [data-level="1"] { background: #244b35; }
+  .activity-cell[data-level="2"], .activity-legend [data-level="2"] { background: #33724a; }
+  .activity-cell[data-level="3"], .activity-legend [data-level="3"] { background: #50a46a; }
+  .activity-cell[data-level="4"], .activity-legend [data-level="4"] { background: #87ce99; }
+}
+@media (max-width: 520px) {
+  dialog.profile-dialog, #settings-dialog { width: calc(100vw - 24px); height: min(650px, calc(100dvh - 24px)); padding: 16px; }
+}
 .profile-activity > .help { line-height: 1.6; }
 .cloud-profile-footer { border-top: 1px solid var(--line); padding-top: 18px; }
 .cloud-profile-logout { width: 100%; padding: 8px 10px; font-size: 12px; }

@@ -22,6 +22,8 @@ from store import Store
 ASSETS = {
     "": ("index.html", "text/html; charset=utf-8"),
     "app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "activity.js": ("activity.js", "text/javascript; charset=utf-8"),
+    "activity-view.js": ("activity-view.js", "text/javascript; charset=utf-8"),
     "transport.js": ("transport.js", "text/javascript; charset=utf-8"),
     "motion.js": ("motion.js", "text/javascript; charset=utf-8"),
     "entry-editor.js": ("entry-editor.js", "text/javascript; charset=utf-8"),

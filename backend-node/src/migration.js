@@ -25,7 +25,7 @@ export async function migrate(pool, { baseOnly = false } = {}) {
       }
     } else {
       // Refuse to stamp or modify an unversioned, partially populated database.
-      for (const table of [...tables, 'lm_node_migrations', 'lm_desktop_imports']) {
+      for (const table of [...tables, 'lm_node_migrations', 'lm_desktop_imports', 'lm_enrichment_jobs', 'lm_activity_events']) {
         if ((await client.query('SELECT to_regclass($1) AS name', [table])).rows[0].name != null) {
           throw new Error('Unversioned database contains language memory tables');
         }
@@ -43,7 +43,7 @@ export async function migrate(pool, { baseOnly = false } = {}) {
         migrated = true;
       } else {
         const revisions = (await client.query('SELECT revision FROM lm_node_migrations')).rows;
-        if (revisions.length !== 1 || !['0002_desktop_imports', NODE_SCHEMA_REVISION].includes(revisions[0].revision)
+        if (revisions.length !== 1 || !['0002_desktop_imports', '0003_lightweight_capture', NODE_SCHEMA_REVISION].includes(revisions[0].revision)
             || (await client.query("SELECT to_regclass('lm_desktop_imports') AS name")).rows[0].name == null)
           throw new Error('Unsupported Node extension revision');
       }
@@ -55,6 +55,15 @@ export async function migrate(pool, { baseOnly = false } = {}) {
         migrated = true;
       } else if ((await client.query("SELECT to_regclass('lm_enrichment_jobs') AS name")).rows[0].name == null) {
         throw new Error('Missing enrichment table');
+      }
+      const activityHead = (await client.query('SELECT revision FROM lm_node_migrations')).rows[0]?.revision;
+      if (activityHead === '0003_lightweight_capture') {
+        if ((await client.query("SELECT to_regclass('lm_activity_events') AS name")).rows[0].name != null)
+          throw new Error('Unversioned activity table');
+        await client.query(await readFile(new URL('../migrations/0004_activity_events.sql', import.meta.url), 'utf8'));
+        migrated = true;
+      } else if ((await client.query("SELECT to_regclass('lm_activity_events') AS name")).rows[0].name == null) {
+        throw new Error('Missing activity table');
       }
     }
     await client.query('COMMIT');

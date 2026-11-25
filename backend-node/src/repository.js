@@ -5,6 +5,7 @@ import { validatePoint, validatePatch, validateReview, settingsWithDefaults,
   validateSettingsPatch, validateRequestId, validateDatabaseText, validateObservation, ValidationError } from './schemas.js';
 import { ALGORITHM, advance, memorySnapshot, recallRating } from './learning.js';
 import { importDesktopSnapshot } from './desktop-import.js';
+import { readActivity, recordActivityEvents } from './activity.js';
 
 const json = (value) => JSON.stringify(value);
 const now = () => timestamp(new Date());
@@ -75,6 +76,14 @@ export class Repository {
 
   async import_desktop(snapshot) {
     return importDesktopSnapshot(this, snapshot);
+  }
+
+  async activity(query = {}) {
+    return this.transaction(false, client => readActivity(client, this.tenantId, query));
+  }
+
+  async activity_events(events) {
+    return this.transaction(true, client => recordActivityEvents(client, this.tenantId, events));
   }
 
   async settings(patch = null) {

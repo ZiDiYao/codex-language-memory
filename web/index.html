@@ -39,6 +39,7 @@
                 <h2 id="local-profile-title" data-i18n="accountProfile">Profile</h2>
                 <button id="local-profile-close" type="button" class="sr-only-focusable" data-i18n="close">Close</button>
               </div>
+              <div class="dialog-body">
               <section class="profile-account profile-section" aria-labelledby="local-profile-account-title">
                 <h3 id="local-profile-account-title" data-i18n="profileAccount">Account</h3>
                 <div class="profile-account-row">
@@ -58,22 +59,23 @@
                 <p id="local-profile-feedback" class="profile-feedback help error" role="status" hidden></p>
                 <!-- desktop-auth:end -->
               </section>
-              <section class="profile-activity profile-section" aria-labelledby="local-profile-activity-title">
+              <section class="profile-activity profile-section" data-activity-view aria-labelledby="local-profile-activity-title">
                 <div class="profile-section-heading">
                   <h3 id="local-profile-activity-title" data-i18n="profileActivity">Learning activity</h3>
-                  <span class="profile-coming-soon" data-i18n="profileComingSoon">Coming soon</span>
+                  <button type="button" class="activity-refresh subtle" data-activity-action="refresh" data-i18n="activityRefresh">Refresh</button>
                 </div>
-                <div class="profile-heatmap" aria-hidden="true">
-                  <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-                  <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-                  <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-                  <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-                  <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-                  <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-                  <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                <p class="activity-range" data-activity-range hidden></p>
+                <p class="help activity-status" data-activity-status role="status" aria-live="polite" data-i18n="activityLoading">Loading activity…</p>
+                <button type="button" class="activity-retry subtle" data-activity-action="retry" data-i18n="activityRetry" hidden>Try again</button>
+                <div class="activity-calendar" data-activity-calendar hidden>
+                  <div class="profile-heatmap" data-activity-grid role="group" aria-labelledby="local-profile-activity-title" aria-describedby="local-profile-activity-detail local-profile-activity-help"></div>
+                  <div class="activity-legend" aria-hidden="true"><span data-i18n="activityLess">Less</span><i data-level="0"></i><i data-level="1"></i><i data-level="2"></i><i data-level="3"></i><i data-level="4"></i><span data-i18n="activityMore">More</span></div>
+                  <p id="local-profile-activity-detail" class="activity-detail" data-activity-detail role="status" aria-live="polite" data-i18n="activitySelectDay">Point to a day or use the arrow keys for details.</p>
+                  <p class="help activity-summary" data-activity-summary></p>
                 </div>
-                <p class="help" data-i18n="profileActivityHelp">Your learning activity will appear here when this feature is available.</p>
+                <p id="local-profile-activity-help" class="help activity-help" data-activity-help data-i18n="activityWeights">Words &amp; phrases 70% · app activity 30%</p>
               </section>
+              </div>
               <footer id="local-profile-footer" class="cloud-profile-footer profile-footer" hidden>
                 <button id="local-profile-disconnect" type="button" class="subtle cloud-profile-logout" data-account-action data-i18n="accountLogout" hidden>Sign out</button>
               </footer>
@@ -160,6 +162,7 @@
         <h2 id="settings-title" data-i18n="settingsTitle"></h2>
         <button type="button" class="dialog-close sr-only-focusable" data-i18n="close">Close</button>
       </div>
+      <div class="dialog-body">
       <p class="help" data-i18n="settingsHelp"></p>
       <div class="setting">
         <span class="field-label" data-i18n="uiLanguage"></span>
@@ -215,6 +218,7 @@
       </fieldset>
       <p class="help" data-i18n="limitsHelp"></p>
       <div class="settings-feedback help" role="status"></div>
+      </div>
     </dialog>
     <dialog id="export-dialog" aria-labelledby="export-title">
       <div class="dialog-heading">

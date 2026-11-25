@@ -112,7 +112,7 @@ export class LocalAccountSession {
 }
 
 /** app.js owns common dialog Escape/backdrop behavior. */
-export function createLocalProfile({ root, t, openDialog, closeDialog, ...options }) {
+export function createLocalProfile({ root, t, openDialog, closeDialog, activity, ...options }) {
   const $ = (id) => root.querySelector(`#local-profile-${id}`);
   const trigger = $("open");
   const panel = $("dialog");
@@ -141,9 +141,16 @@ export function createLocalProfile({ root, t, openDialog, closeDialog, ...option
   };
   const session = new LocalAccountSession({ ...options, onState: render,
     onError(key) { feedbackKey = key === "accountFailure" && session.status?.error ? null : key; render(session.status, session.pending); options.onError?.(key); } });
-  trigger.addEventListener("click", () => { feedbackKey = null; render(session.status, session.pending); openDialog(panel); trigger.setAttribute("aria-expanded", "true"); session.refresh(); });
+  trigger.addEventListener("click", () => {
+    feedbackKey = null; render(session.status, session.pending); openDialog(panel); trigger.setAttribute("aria-expanded", "true");
+    if (accountCanRead(session.status)) activity?.open(); else activity?.invalidate();
+    session.refresh();
+  });
   $("close").addEventListener("click", () => closeDialog(panel));
-  panel.addEventListener("close", () => { trigger.setAttribute("aria-expanded", "false"); trigger.focus({ preventScroll: true }); });
+  panel.addEventListener("close", () => { activity?.close(); trigger.setAttribute("aria-expanded", "false"); trigger.focus({ preventScroll: true }); });
+  panel.addEventListener("click", (event) => {
+    if (event.target.closest?.("[data-activity-action]") && accountCanRead(session.status)) activity?.refresh();
+  });
   for (const [id, action] of [["connect", "account/connect"], ["disconnect", "account/disconnect"]])
     $(id).addEventListener("click", () => { feedbackKey = null; session.change(action); });
   $("authorize").addEventListener("click", () => session.authorize());

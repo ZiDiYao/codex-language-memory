@@ -14,17 +14,24 @@ export function loginRedirectOptions(mode = "login") {
 }
 
 /** Use the same modal motion as Settings; app.js owns Escape/backdrop dismissal. */
-export function createCloudProfile({ trigger, panel, closeButton, primary, secondary, statusNode, t, openDialog, closeDialog }) {
+export function createCloudProfile({ trigger, panel, closeButton, primary, secondary, statusNode, t, openDialog, closeDialog,
+  activity = () => globalThis.languageMemoryRuntime?.activity }) {
+  const currentActivity = () => typeof activity === "function" ? activity() : activity;
   const close = () => closeDialog(panel);
   trigger.addEventListener("click", () => {
     openDialog(panel);
     trigger.setAttribute("aria-expanded", "true");
+    currentActivity()?.open();
   });
   panel.addEventListener("close", () => {
+    currentActivity()?.close();
     trigger.setAttribute("aria-expanded", "false");
     trigger.focus({ preventScroll: true });
   });
   closeButton.addEventListener("click", () => close());
+  panel.addEventListener("click", (event) => {
+    if (event.target.closest?.("[data-activity-action]")) currentActivity()?.refresh();
+  });
   return {
     close,
     setStatus(key) {

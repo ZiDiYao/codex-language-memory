@@ -3,6 +3,7 @@ import { handleMcpRequest } from "./mcp.js";
 import { parse, ValidationError } from "./schemas.js";
 import { MAX_DESKTOP_IMPORT_BODY } from "./desktop-import.js";
 import { SpeechError } from "./speech.js";
+import { ACTIVITY_MAX_BODY } from "./activity.js";
 
 export const MAX_BODY = 1024 * 1024;
 const REST_METHODS = Object.freeze({
@@ -11,6 +12,7 @@ const REST_METHODS = Object.freeze({
   "/v1/scenes": ["GET"], "/v1/review-queue": ["GET"], "/v1/reviews": ["POST"],
   "/v1/languages": ["GET"], "/v1/changes": ["GET"],
   "/v1/desktop-imports": ["POST"],
+  "/v1/activity": ["GET"], "/v1/activity/events": ["POST"],
 });
 const restMethods = (path) => REST_METHODS[path] ?? (/^\/v1\/points\/\d+$/.test(path) ? ["GET", "PATCH", "DELETE"]
   : /^\/v1\/points\/\d+\/audio$/.test(path) ? ["GET"] : null);
@@ -158,13 +160,23 @@ export function createApp({ config, repositoryFactory, verifyToken, readiness, s
         if (url.search) throw new APIError(422, "invalid_request");
         result = await call("import_desktop", await readJson(request, MAX_DESKTOP_IMPORT_BODY));
       }
-      else if (path === "/v1/settings" && request.method === "GET") result = { ...await call("settings"), _capabilities: { lightweight_capture: true, capture_context: true, cloud_speech: speech?.enabled === true } };
+      else if (path === "/v1/settings" && request.method === "GET") result = { ...await call("settings"), _capabilities: { lightweight_capture: true, capture_context: true, cloud_speech: speech?.enabled === true, activity: true } };
       else if (path === "/v1/settings" && request.method === "PATCH") result = await call("settings", parse("settingsPatch", await readJson(request)));
       else if (["/v1/languages", "/v1/changes"].includes(path) && request.method === "GET") {
         if (url.search) throw new APIError(422, "invalid_request");
         result = await call(path === "/v1/languages" ? "languages" : "versions");
       }
       else if (path === "/v1/points" && request.method === "GET") result = await call("query", queryArguments(url.searchParams, "query"));
+      else if (path === "/v1/activity" && request.method === "GET") {
+        if (request.headers['transfer-encoding'] || (request.headers['content-length'] && request.headers['content-length'] !== '0'))
+          throw new APIError(422, "invalid_request");
+        result = await call("activity", queryArguments(url.searchParams, "activityQuery"));
+      }
+      else if (path === "/v1/activity/events" && request.method === "POST") {
+        if (url.search) throw new APIError(422, "invalid_request");
+        const args = parse("activityEvents", await readJson(request, ACTIVITY_MAX_BODY));
+        result = await call("activity_events", args.events);
+      }
       else if (path === "/v1/observations" && request.method === "POST") {
         const args = parse("observations", await readJson(request));
         result = await call("observe", args.request_id, args.items, args.source);

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFile } from "node:fs/promises";
-import { loginRedirectOptions, profileDetails } from "../web/cloud-profile.js";
+import { createCloudProfile, loginRedirectOptions, profileDetails } from "../web/cloud-profile.js";
 import { cloudProfileMarkup } from "../scripts/profile_markup.mjs";
 
 test("profile identity never falls back to raw account IDs or invented personal details", () => {
@@ -23,16 +23,20 @@ test("create-account intent changes only the hosted signup hint without requesti
   assert.deepEqual(loginRedirectOptions("unexpected"), { appState: { returnTo: "/" } });
 });
 
-test("desktop and web share account and neutral activity sections while web keeps only its SSO sign-out action", async () => {
+test("desktop and web share a real lazy activity view while web keeps only its SSO sign-out action", async () => {
   const source = await readFile(new URL("../web/index.html", import.meta.url), "utf8");
   const shared = source.match(/<!-- profile-shared:start -->([\s\S]*?)<!-- profile-shared:end -->/)[1];
   const web = cloudProfileMarkup(source);
   for (const markup of [shared, web]) {
-    for (const key of ["profileAccount", "profileActivity", "profileComingSoon", "profileActivityHelp"])
+    for (const key of ["profileAccount", "profileActivity", "activityWeights", "activityLoading"])
       assert.ok(markup.includes(`data-i18n="${key}"`));
-    const heatmap = markup.match(/<div class="profile-heatmap" aria-hidden="true">([\s\S]*?)<\/div>/)[1];
-    assert.equal(heatmap.replaceAll("<span></span>", "").trim(), "");
-    assert.ok(heatmap.match(/<span><\/span>/g).length > 0);
+    assert.equal((markup.match(/data-activity-view/g) || []).length, 1);
+    const heatmap = markup.match(/<div class="profile-heatmap"[^>]*>([\s\S]*?)<\/div>/)[1];
+    assert.equal(heatmap.trim(), "", "no activity cells or counts are invented before the server responds");
+    assert.doesNotMatch(markup, /profileComingSoon|profileActivityHelp/);
+    assert.match(markup, /data-activity-action="refresh"/);
+    assert.match(markup, /data-activity-action="retry"/);
+    assert.match(markup, /class="dialog-body"/);
     assert.doesNotMatch(markup, /accountCloud|<input\b|<select\b/);
   }
   assert.equal((web.match(/<dialog\b/g) || []).length, 1);
@@ -43,4 +47,19 @@ test("desktop and web share account and neutral activity sections while web keep
   assert.doesNotMatch(web, /local-profile-|data-account-action|id="cloud-profile-connect"|id="cloud-profile-authorize"/);
   assert.doesNotMatch(web.match(/<button\b[^>]*id="cloud-logout"[^>]*>/)[0], /\bhidden\b/);
   assert.throws(() => cloudProfileMarkup("<main></main>"));
+});
+
+test("cloud profile resolves the current activity controller lazily and closes reads with the dialog", () => {
+  const node = () => ({ handlers: new Map(), addEventListener(type, callback) { this.handlers.set(type, callback); },
+    setAttribute() {}, focus() {}, fire(type, event = {}) { this.handlers.get(type)?.(event); } });
+  const trigger = node(), panel = node(), closeButton = node();
+  let activity, opens = 0, closes = 0, refreshes = 0;
+  createCloudProfile({ trigger, panel, closeButton, primary: node(), secondary: node(), statusNode: node(),
+    t: (key) => key, openDialog() {}, closeDialog() {}, activity: () => activity });
+  trigger.fire("click");
+  activity = { open() { ++opens; }, close() { ++closes; }, refresh() { ++refreshes; } };
+  trigger.fire("click");
+  panel.fire("click", { target: { closest: () => ({ dataset: { activityAction: "refresh" } }) } });
+  panel.fire("close");
+  assert.deepEqual({ opens, closes, refreshes }, { opens: 1, closes: 1, refreshes: 1 });
 });

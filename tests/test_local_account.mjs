@@ -169,6 +169,10 @@ test("desktop data requests bind the observed account epoch while account action
     delete globalThis.languageMemoryRuntime;
     await request("audio", { record_id: 4 });
     assert.deepEqual(calls[4], { route: "audio", payload: { record_id: 4, expected_epoch: 7 } });
+    await request("api", { action: "activity/read", arguments: { timezone: "America/Toronto" } });
+    await request("api", { action: "activity/events", arguments: { events: [] } });
+    assert.equal(calls[5].payload.expected_epoch, 7);
+    assert.equal(calls[6].payload.expected_epoch, 7);
   } finally {
     setAccountEpoch(null);
     if (previousHost) globalThis.languageMemoryHost = previousHost; else delete globalThis.languageMemoryHost;
@@ -211,4 +215,28 @@ test("signed-out cloud profiles offer Sign in, connected profiles offer Sign out
   assert.equal(node("#local-profile-feedback").textContent, "accountKeychainUnlock");
   await profile.session.accept({ ...initial, can_connect: false });
   assert.equal(node("#local-profile-connect").hidden, true);
+});
+
+test("desktop profile reads activity only on a connected open and closes or explicitly refreshes it", async () => {
+  const nodes = new Map(), calls = [];
+  const node = (selector) => {
+    if (!nodes.has(selector)) nodes.set(selector, { hidden: false, handlers: new Map(), querySelectorAll: () => [],
+      addEventListener(type, handler) { this.handlers.set(type, handler); }, setAttribute() {}, focus() {},
+      fire(type, event = {}) { this.handlers.get(type)?.(event); } });
+    return nodes.get(selector);
+  };
+  const profile = createLocalProfile({ root: { querySelector: node }, t: (key) => key,
+    openDialog() {}, closeDialog() {}, call: async () => connected, beforeChange: async () => true,
+    onPause() {}, onSourceChange: async () => {}, openExternal: async () => {}, schedule: () => 1, cancel() {},
+    activity: { open() { calls.push("open"); }, close() { calls.push("close"); },
+      refresh() { calls.push("refresh"); }, invalidate() { calls.push("invalidate"); } } });
+  await profile.session.accept(initial);
+  node("#local-profile-open").fire("click");
+  assert.deepEqual(calls, ["invalidate"]);
+  await profile.session.accept(connected);
+  node("#local-profile-open").fire("click");
+  node("#local-profile-dialog").fire("click", { target: { closest: () => ({ dataset: { activityAction: "refresh" } }) } });
+  node("#local-profile-dialog").fire("close");
+  assert.deepEqual(calls, ["invalidate", "open", "refresh", "close"]);
+  profile.session.dispose();
 });

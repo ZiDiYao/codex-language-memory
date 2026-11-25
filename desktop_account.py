@@ -887,6 +887,73 @@ class AccountManager:
         finally:
             _account_context.reset(token)
 
+    async def _activity_token(self, epoch, *, refresh, budget):
+        # UI counters must not serialize a capture behind their network request.
+        # Use one short, serialized credential snapshot and a fixed bearer; only
+        # an explicit activity read may refresh an expired token.
+        async with self.state.operation(min(budget, 2 if refresh else .15)):
+            self._assert_epoch(epoch)
+            storage = KeychainTokenStorage(self.credentials, self.state, epoch, request_scoped=True)
+            client = await storage.get_client_info()
+            current = await storage.get_tokens()
+            if client is not None and current is not None:
+                identity, expiry = _token_identity(current)
+                with storage._envelope() as envelope:
+                    if envelope.get("identity") != identity:
+                        raise AccountError("authentication_required")
+                if min(storage.expires_at, expiry) > time.time() + 30:
+                    self._assert_epoch(epoch)
+                    return current.access_token
+            if not refresh:
+                raise AccountError("account_busy")
+            provider = await self._provider(epoch)
+            await self._rest(provider, "GET", "/v1/settings")
+            current = provider.context.current_tokens
+            if current is None or not current.access_token:
+                raise AccountError("authentication_required")
+            self._assert_epoch(epoch)
+            return current.access_token
+
+    async def _remote_activity(self, epoch, path, *, method, params=None, body=None, budget=None):
+        token = _account_context.set(True)
+        budget = self.request_timeout if budget is None else budget
+        try:
+            async with asyncio.timeout(budget):
+                access = await self._activity_token(epoch, refresh=method == "GET", budget=budget)
+                self._assert_epoch(epoch)
+                async with self._shared_client().stream(method, API_ORIGIN + path, auth=None,
+                        params=params, headers={"Authorization": "Bearer " + access, "Accept": "application/json"},
+                        **({"json": body} if body is not None else {})) as response:
+                    if response.status_code in (401, 403):
+                        raise AccountError("authentication_required")
+                    if response.status_code >= 500:
+                        raise AccountError("cloud_unavailable")
+                    if response.status_code != 200:
+                        raise AccountError("cloud_request_failed")
+                    if response.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
+                        raise AccountError("invalid_cloud_response")
+                    chunks, size = [], 0
+                    async for chunk in response.aiter_bytes(chunk_size=8192):
+                        size += len(chunk)
+                        if size > 131072:
+                            raise AccountError("invalid_cloud_response")
+                        chunks.append(chunk)
+                    result = json.loads(b"".join(chunks))
+                    if not isinstance(result, dict):
+                        raise AccountError("invalid_cloud_response")
+                self._assert_epoch(epoch)
+                return result
+        except Exception as error:
+            safe = _account_error(error)
+            # Optional UI counters must not turn a timeout/busy state into an
+            # account error. Real authentication/account failures still apply.
+            if safe.code in {"authentication_required", "account_changed", "credential_store_unavailable",
+                             "credential_store_denied", "credential_store_interaction_required", "credential_store_app_identity"}:
+                self._failure(epoch, safe.code, safe.credential_os_status)
+            raise safe from None
+        finally:
+            _account_context.reset(token)
+
     def _failure(self, epoch, code, credential_os_status=None):
         with self.state.locked() as state:
             if state["epoch"] != epoch or state["mode"] != "cloud":
@@ -935,9 +1002,11 @@ class AccountManager:
             _account_context.reset(token)
 
     async def _remote(self, epoch, *, name=None, arguments=None, path=None, params=None, method="GET", body=None,
-                      budget=None, capture_context=False, audio=False):
+                      budget=None, capture_context=False, audio=False, activity=False):
         if audio:
             return await self._remote_audio(epoch, path, budget=budget)
+        if activity:
+            return await self._remote_activity(epoch, path, method=method, params=params, body=body, budget=budget)
         token = _account_context.set(True)
         budget = self.request_timeout if budget is None else budget
         started = time.perf_counter()
@@ -1025,7 +1094,7 @@ class AccountManager:
             return result
         except FutureTimeout:
             future.cancel()
-            raise AccountError("capture_budget_exceeded" if "budget" in kwargs else "cloud_unavailable") from None
+            raise AccountError("capture_budget_exceeded" if "budget" in kwargs and not kwargs.get("activity") else "cloud_unavailable") from None
 
     def capture_context(self, *, expected_epoch=None):
         return self._call(name="get_settings", capture_context=True, expected_epoch=expected_epoch, budget=self.capture_timeout)
@@ -1040,6 +1109,16 @@ class AccountManager:
 
     def request_api(self, method, path, params=None, json=None, *, expected_epoch=None):
         import re
+        if method == "GET" and path == "/v1/activity" and json is None:
+            from activity import ActivityScope
+            scope = ActivityScope.model_validate(params if params is not None else {})
+            return self._call(path=path, method=method, params=scope.model_dump(), activity=True,
+                              expected_epoch=expected_epoch, budget=5)
+        if method == "POST" and path == "/v1/activity/events" and not params:
+            from activity import ActivityEvents
+            batch = ActivityEvents.model_validate(json)
+            return self._call(path=path, method=method, body=batch.model_dump(mode="json"), activity=True,
+                              expected_epoch=expected_epoch, budget=2)
         if method == "POST" and path == "/v1/desktop-imports" and not params:
             return self._call(path=path, method=method, body=_import_payload(json), expected_epoch=expected_epoch)
         valid = path in ("/v1/changes", "/v1/languages", "/v1/settings") if isinstance(path, str) else False

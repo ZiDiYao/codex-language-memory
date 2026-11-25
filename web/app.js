@@ -10,6 +10,8 @@ import { ExportDialog } from "./export-dialog.js";
 import { request, saveDownload, capabilities, openExternal, setAccountEpoch } from "./transport.js";
 import { createLocalProfile, accountCanRead } from "./local-profile.js";
 import { PronunciationController } from "./pronunciation.js";
+import { ActivityController, isStudyClick } from "./activity.js";
+import { createActivityView } from "./activity-view.js";
 
 const $ = (selector) => document.querySelector(selector);
 const pageSize = 20;
@@ -33,7 +35,20 @@ let settingsWriteError;
 let noticeTimer;
 const displayed = new Map();
 const editors = new Map();
+const activityRoot = $("[data-activity-view]");
+const activityView = activityRoot ? createActivityView(activityRoot, {
+  getLanguage: () => locale,
+}) : null;
+const activity = new ActivityController({
+  request: (action, args) => api(action, args),
+  canUse: () => ready && settings?._capabilities?.activity === true && !accountPaused && !accountDraftBlocked && !runtime?.isPaused?.(),
+  onData: (data) => activityView?.render(data),
+  onLoading: (loading) => activityView?.loading(loading),
+  onError: (error) => activityView?.error(error),
+  onClear: () => activityView?.clear(),
+});
 let speechButton;
+let speechActivityPhase;
 const pronunciation = new PronunciationController({
   sourceMode: globalThis.languageMemoryHost ? "data" : "blob",
   canPlay: () => speechAvailable() && !accountPaused && !accountDraftBlocked && !runtime?.isPaused?.(),
@@ -44,6 +59,8 @@ const pronunciation = new PronunciationController({
     return response;
   },
   onState(state) {
+    if (state?.phase === "playing" && speechActivityPhase !== "playing") activity.record("pronunciation");
+    speechActivityPhase = state?.phase;
     if (speechButton) {
       speechButton.setAttribute("aria-pressed", "false");
       speechButton.removeAttribute("aria-busy");
@@ -193,6 +210,7 @@ function renderKinds() {
   nav.setAttribute("aria-label", t("kind"));
   nav.replaceChildren(...["", "word", "expression", "grammar"].map((kind) => {
     const button = element("button", t(kind || "all"), "type-tab");
+    button.dataset.studyActivity = "";
     button.type = "button";
     button.setAttribute("aria-pressed", String(kind === selectedKind));
     button.addEventListener("click", () => changeFilter("kind", kind));
@@ -280,10 +298,12 @@ async function flushEditors() {
   return true;
 }
 if (runtime) {
+  runtime.activity = activity;
   runtime.stopPronunciation = () => pronunciation.stop();
   runtime.beforeAccountChange = async () => {
     if (!(await flushEditors())) return false;
     pronunciation.stop();
+    activity.invalidate();
     return true;
   };
 }
@@ -321,6 +341,7 @@ function applyLocale() {
   refreshEditorLocales();
   exportDialog?.relabel();
   localProfile?.relabel();
+  activity.relabel();
 }
 function refreshEditorLocales() {
   for (const editor of editors.values()) {
@@ -409,7 +430,9 @@ function card(record, expanded = false) {
   details.dataset.id = record.id;
   details.open = expanded;
   const summary = element("summary");
+  summary.dataset.studyActivity = "";
   const body = element("div", undefined, "entry-body");
+  body.dataset.studyActivity = "";
   const heading = element("div", undefined, "entry-heading");
   const title = element("h3");
   const listenButton = element("button", undefined, "icon-button entry-listen");
@@ -479,6 +502,7 @@ function card(record, expanded = false) {
       notice("deleted");
     },
   });
+  editor.node.dataset.studyActivity = "";
   statusButtons.forEach((button) => button.addEventListener("click", async (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -787,7 +811,10 @@ new IntersectionObserver(maybeLoadMore, { rootMargin: "250px" }).observe(
 window.addEventListener("beforeunload", (event) => {
   if (hasDirtyEditors()) { event.preventDefault(); event.returnValue = ""; }
 });
-window.addEventListener("pagehide", () => pronunciation.stop());
+window.addEventListener("pagehide", () => { pronunciation.stop(); activity.invalidate(); });
+document.querySelectorAll("#settings-open, #settings-fields, #ui-language, #language, #scene, #status, #search-clear, #retry-load")
+  .forEach((node) => { node.dataset.studyActivity = ""; });
+document.addEventListener("click", (event) => { if (isStudyClick(event)) activity.record("button"); }, { capture: true });
 document.addEventListener("visibilitychange", synchronize);
 window.addEventListener("focus", synchronize);
 setInterval(synchronize, 3000);
@@ -804,6 +831,7 @@ async function initialize(promptSettings = true) {
     applyLocale();
     localePicker.button.disabled = false;
     ready = true;
+    if (activityRoot?.closest("dialog")?.open) void activity.open();
     await loadScenes();
     await loadRecords(true);
     if (promptSettings && !settings.first_language) openDialog($("#settings-dialog"));
@@ -813,7 +841,7 @@ async function initialize(promptSettings = true) {
 }
 if (localAccount) {
   localProfile = createLocalProfile({
-    root: document, t, openDialog, closeDialog, openExternal,
+    root: document, t, openDialog, closeDialog, openExternal, activity,
     call: (action) => api(action),
     beforeChange: async () => {
       if (accountDraftBlocked || !(await flushEditors())) return false;
@@ -829,6 +857,7 @@ if (localAccount) {
         historyFeed.loading = false;
         clearTimeout(searchTimer);
         pronunciation.stop();
+        activity.invalidate();
       }
       accountPaused = next;
       $("#records-panel").inert = next && !accountDraftBlocked;
@@ -840,6 +869,7 @@ if (localAccount) {
       }
     },
     async onSourceChange(status, previous) {
+      activity.invalidate();
       setAccountEpoch(status.epoch);
       if (previous && hasDirtyEditors()) {
         accountDraftBlocked = true;

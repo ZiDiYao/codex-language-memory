@@ -5,6 +5,7 @@ from typing import Annotated, Callable
 
 from pydantic import Field
 
+from activity import ActivityEvents, ActivityScope
 from exports import ExportSelection, export_history, preview_export
 from desktop_actions import ACCOUNT_ACTIONS, account_action
 import speech
@@ -50,9 +51,19 @@ class Action:
         return self.execute(store, self.arguments.model_validate(arguments))
 
 
+def _activity_call(store, name, *arguments):
+    operation = getattr(store, name, None)
+    if not callable(operation):
+        from desktop_store import CloudFeatureUnavailable
+        raise CloudFeatureUnavailable("learning_activity")
+    return operation(*arguments)
+
+
 # Keep the allowlist, argument schema and operation together. No arbitrary Store
 # method names or paths from a client are ever executed.
 ACTIONS = {
+    "activity/read": Action(ActivityScope, lambda store, scope: _activity_call(store, "activity", scope.timezone)),
+    "activity/events": Action(ActivityEvents, lambda store, batch: _activity_call(store, "activity_events", batch.model_dump(mode="json"))),
     "speech/play": Action(PointReference, lambda store, point: speech.play(store, point.record_id)),
     "speech/status": Action(StrictModel, lambda store, _: speech.status()),
     "changes/read": Action(StrictModel, lambda store, _: store.versions()),
@@ -84,6 +95,6 @@ def dispatch(store: Store, request):
         raise ValueError("Invalid account epoch")
     binder = getattr(store, "expect_epoch", None)
     if binder is not None:
-        with binder(expected, require_cloud=name in {"settings/update", "points/update", "points/delete"}):
+        with binder(expected, require_cloud=name in {"settings/update", "points/update", "points/delete", "activity/read", "activity/events"}):
             return ACTIONS[name].call(store, request["arguments"])
     return ACTIONS[name].call(store, request["arguments"])

@@ -12,6 +12,25 @@ function target(action, arguments_) {
     case "settings/update": return { method: "PATCH", path: "/v1/settings", body: arguments_ };
     case "languages/list": return get("/v1/languages");
     case "changes/read": return get("/v1/changes");
+    case "activity/read": {
+      if (Object.keys(arguments_).some((key) => key !== "timezone") || typeof arguments_.timezone !== "string" ||
+          !/^[A-Za-z][A-Za-z0-9_+./-]{0,79}$/.test(arguments_.timezone)) throw new Error("invalid");
+      return { ...get("/v1/activity"), query: { timezone: arguments_.timezone } };
+    }
+    case "activity/events": {
+      if (Object.keys(arguments_).some((key) => key !== "events") || !Array.isArray(arguments_.events) ||
+          !arguments_.events.length || arguments_.events.length > 20) throw new Error("invalid");
+      const events = arguments_.events.map((event) => {
+        if (!event || typeof event !== "object" || Array.isArray(event) ||
+            Object.keys(event).some((key) => !["event_id", "kind", "occurred_at"].includes(key)) ||
+            typeof event.event_id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(event.event_id) ||
+            !["button", "pronunciation"].includes(event.kind) || typeof event.occurred_at !== "string" ||
+            !Number.isFinite(Date.parse(event.occurred_at)) || new Date(event.occurred_at).toISOString() !== event.occurred_at)
+          throw new Error("invalid");
+        return { event_id: event.event_id, kind: event.kind, occurred_at: event.occurred_at };
+      });
+      return { method: "POST", path: "/v1/activity/events", body: { events } };
+    }
     case "points/query": return { ...get("/v1/points"), query: arguments_ };
     case "scenes/list": return { ...get("/v1/scenes"), query: arguments_ };
     case "points/read": return get("/v1/points/" + identifier(arguments_.record_id));

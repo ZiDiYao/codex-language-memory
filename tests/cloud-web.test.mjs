@@ -72,6 +72,32 @@ test("an API 401 pauses all requests and never retries an autosave under another
   assert.deepEqual(notifications, ["authenticationRequired"]);
 });
 
+test("activity routes send only timezone or bounded interaction events under the authenticated account", async () => {
+  const { session } = sessionFixture();
+  const calls = [];
+  const transport = createCloudTransport({ apiBaseUrl: "https://memory.example", session, fetchImpl: async (url, options) => {
+    calls.push({ url, options });
+    return Response.json({ status: "accepted" });
+  } });
+  await transport.request("api", { action: "activity/read", arguments: { timezone: "America/Toronto" } });
+  const event = { event_id: "00000000-0000-4000-8000-000000000001", kind: "button", occurred_at: "2026-11-24T20:00:00.000Z" };
+  await transport.request("api", { action: "activity/events", arguments: { events: [event] } });
+  assert.equal(calls[0].url, "https://memory.example/v1/activity?timezone=America%2FToronto");
+  assert.equal(calls[0].options.method, "GET");
+  assert.equal(calls[0].options.body, undefined);
+  assert.equal(calls[1].url, "https://memory.example/v1/activity/events");
+  assert.equal(calls[1].options.method, "POST");
+  assert.deepEqual(JSON.parse(calls[1].options.body), { events: [event] });
+  assert.equal(calls[1].options.headers.Authorization, "Bearer " + uiToken("alice"));
+  assert.equal(calls[1].options.credentials, "omit");
+  for (const args of [{ events: [] }, { events: Array(21).fill(event) }, { events: [{ ...event, text: "private note" }] },
+    { events: [{ ...event, kind: "profile" }] }, { events: [{ ...event, occurred_at: "today" }] }, { events: [event], user_id: "another" }])
+    await assert.rejects(transport.request("api", { action: "activity/events", arguments: args }), /invalid/);
+  await assert.rejects(transport.request("api", { action: "activity/read", arguments: { timezone: "UTC", user_id: "another" } }), /invalid/);
+  await assert.rejects(transport.request("api", { action: "activity/read", arguments: { timezone: "https://private.example/context" } }), /invalid/);
+  assert.equal(calls.length, 2);
+});
+
 test("cloud pronunciation retrieves stored-record audio with bearer auth and no text, query, cookies or download", async () => {
   const { session } = sessionFixture();
   const calls = [];
