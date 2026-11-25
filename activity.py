@@ -10,6 +10,7 @@ class ActivityScope(StrictModel):
     # The backend is authoritative for the supported IANA timezone names.
     timezone: Annotated[str, Field(strict=True, min_length=1, max_length=80,
         pattern=r"^[A-Za-z0-9_+.-]+(?:/[A-Za-z0-9_+.-]+){0,3}$")] = "UTC"
+    year: Annotated[int, Field(strict=True, ge=1970, le=9999)] | None = None
 
 
 class ActivityEvent(StrictModel):

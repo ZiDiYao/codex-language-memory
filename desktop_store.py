@@ -243,11 +243,11 @@ class RoutingStore:
         return self._dispatch("audio", cloud=lambda epoch: self._response(
             self._account.request_audio(identifier, expected_epoch=epoch)), migrate=False)
 
-    def activity(self, timezone="UTC"):
+    def activity(self, timezone="UTC", year=None):
         if self._snapshot()["mode"] != "cloud":
             raise CloudFeatureUnavailable("learning_activity")
         return self._dispatch("activity", cloud=lambda epoch: self._response(
-            self._account.request_api("GET", "/v1/activity", params={"timezone": timezone},
+            self._account.request_api("GET", "/v1/activity", params={"timezone": timezone, **({"year": year} if year is not None else {})},
                                       expected_epoch=epoch)), migrate=False)
 
     def activity_events(self, batch):

@@ -1094,3 +1094,15 @@ const activityMessages = {
 };
 for (const [locale, values] of Object.entries(activityMessages))
   Object.assign(messages[locale], Object.fromEntries(activityKeys.map((key, index) => [key, values[index]])));
+
+const activityYearKeys = ["activityYear", "activityFutureDay", "activityLegendLabel", "activityPartialYear", "activityYearUnavailable"];
+const activityYearMessages = {
+  en: ["Year", "{date} · Future date", "Activity intensity from dark to bright silver. Dashed cells are future dates.", "Only the available recent period is shown.", "This server does not support the selected year yet."],
+  zh: ["年份", "{date} · 未来日期", "银灰从暗到亮表示活动增加，虚线格是未来日期。", "目前仅显示已有的近期数据。", "当前服务暂不支持查询所选年份。"],
+  ja: ["年", "{date} · 未来の日付", "暗い銀色から明るい銀色ほど活動が多く、破線は未来の日付です。", "現在取得できる直近の期間だけを表示しています。", "このサーバーは選択した年にまだ対応していません。"],
+  ko: ["연도", "{date} · 미래 날짜", "밝은 은색일수록 활동이 많고 점선 칸은 미래 날짜입니다.", "현재 확인할 수 있는 최근 기간만 표시합니다.", "현재 서버는 선택한 연도 조회를 지원하지 않습니다."],
+  fr: ["Année", "{date} · Date future", "Du gris argenté sombre au clair selon l’activité. Les cases en pointillés sont des dates futures.", "Seule la période récente disponible est affichée.", "Ce serveur ne prend pas encore en charge l’année sélectionnée."],
+  es: ["Año", "{date} · Fecha futura", "Del gris plata oscuro al claro según la actividad. Los cuadros discontinuos son fechas futuras.", "Solo se muestra el período reciente disponible.", "Este servidor aún no admite el año seleccionado."],
+};
+for (const [locale, values] of Object.entries(activityYearMessages))
+  Object.assign(messages[locale], Object.fromEntries(activityYearKeys.map((key, index) => [key, values[index]])));

@@ -37,7 +37,10 @@ test("desktop and web share a real lazy activity view while web keeps only its S
     assert.match(markup, /data-activity-action="refresh"/);
     assert.match(markup, /data-activity-action="retry"/);
     assert.match(markup, /class="dialog-body"/);
-    assert.doesNotMatch(markup, /accountCloud|<input\b|<select\b/);
+    assert.doesNotMatch(markup, /accountCloud|<input\b/);
+    const selects = markup.match(/<select\b[^>]*>/g) || [];
+    assert.equal(selects.length, 1);
+    assert.match(selects[0], /data-activity-year/);
   }
   assert.equal((web.match(/<dialog\b/g) || []).length, 1);
   assert.ok(web.includes('aria-controls="cloud-profile"'));

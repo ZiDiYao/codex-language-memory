@@ -93,7 +93,7 @@ function queryArguments(search, model) {
     if (Object.hasOwn(values, key)) throw new APIError(422, "invalid_request");
     values[key] = value;
   }
-  for (const key of ["limit", "offset"]) if (Object.hasOwn(values, key)) {
+  for (const key of ["limit", "offset", "year"]) if (Object.hasOwn(values, key)) {
     if (!/^[+-]?\d+$/.test(values[key]) || !Number.isSafeInteger(Number(values[key]))) throw new APIError(422, "invalid_request");
     values[key] = Number(values[key]);
   }

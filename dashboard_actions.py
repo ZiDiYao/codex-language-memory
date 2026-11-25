@@ -51,18 +51,19 @@ class Action:
         return self.execute(store, self.arguments.model_validate(arguments))
 
 
-def _activity_call(store, name, *arguments):
+def _activity_call(store, name, *arguments, **keywords):
     operation = getattr(store, name, None)
     if not callable(operation):
         from desktop_store import CloudFeatureUnavailable
         raise CloudFeatureUnavailable("learning_activity")
-    return operation(*arguments)
+    return operation(*arguments, **keywords)
 
 
 # Keep the allowlist, argument schema and operation together. No arbitrary Store
 # method names or paths from a client are ever executed.
 ACTIONS = {
-    "activity/read": Action(ActivityScope, lambda store, scope: _activity_call(store, "activity", scope.timezone)),
+    "activity/read": Action(ActivityScope, lambda store, scope: _activity_call(store, "activity", scope.timezone,
+        **({"year": scope.year} if scope.year is not None else {}))),
     "activity/events": Action(ActivityEvents, lambda store, batch: _activity_call(store, "activity_events", batch.model_dump(mode="json"))),
     "speech/play": Action(PointReference, lambda store, point: speech.play(store, point.record_id)),
     "speech/status": Action(StrictModel, lambda store, _: speech.status()),

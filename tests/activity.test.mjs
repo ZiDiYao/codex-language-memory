@@ -12,6 +12,14 @@ function heatmap(timezone = "America/Toronto") {
       learning_count: 0, interaction_count: 0, score: 0, level: 0,
     })) };
 }
+function annualActivity(year, timezone = "America/Toronto", today = "2026-11-24") {
+  const start = Date.UTC(year, 0, 1), end = Date.UTC(year, 11, 31);
+  return { timezone, year, today, available_years: [Number(today.slice(0, 4)), 2024],
+    start_date: `${year}-01-01`, end_date: `${year}-12-31`,
+    days: Array.from({ length: (end - start) / 86400000 + 1 }, (_, offset) => ({
+      date: new Date(start + offset * 86400000).toISOString().slice(0, 10), learning_count: 0, interaction_count: 0, score: 0, level: 0,
+    })) };
+}
 function fixture(options = {}) {
   const requests = [], data = [], errors = [], loading = [], timers = new Map();
   let time = instant, counter = 0, timerId = 0, clears = 0;
@@ -191,7 +199,7 @@ test("activity reads are lazy, single-flight on open and cached relabel never fe
   const first = f.controller.open();
   assert.equal(f.controller.open(), first);
   await first;
-  assert.deepEqual(f.requests, [{ action: "activity/read", args: { timezone: "America/Toronto" } }]);
+  assert.deepEqual(f.requests, [{ action: "activity/read", args: { timezone: "America/Toronto", year: 2026 } }]);
   f.controller.relabel();
   assert.equal(f.data.length, 2);
   assert.equal(f.requests.length, 1);
@@ -313,4 +321,95 @@ test("only genuine marked study controls count; speaker, profile/auth, disabled,
   for (const options of [{ marked: false }, { speaker: true }, { disabled: true }, { inert: true }, { trusted: false }, { control: false }])
     assert.equal(isStudyClick(event(options)), false);
   assert.equal(isStudyClick({ isTrusted: true, target: {} }), false);
+});
+
+test("year selection reads full leap years, clears stale day data and rejects an older response", async () => {
+  const old = deferred(), latest = deferred();
+  const requests = [], cleared = [];
+  const f = fixture({ onClear: (options) => cleared.push(options), request: (action, args) => {
+    requests.push(args.year);
+    return args.year === 2025 ? old.promise : args.year === 2024 ? latest.promise : Promise.resolve(annualActivity(2026));
+  } });
+  await f.controller.open();
+  const first = f.controller.selectYear(2025);
+  assert.equal(f.controller.cache, null);
+  await tick();
+  const second = f.controller.selectYear(2024);
+  latest.resolve(annualActivity(2024));
+  await second;
+  old.resolve(annualActivity(2025));
+  await first;
+  assert.deepEqual(requests, [2026, 2025, 2024]);
+  assert.equal(f.controller.cache.year, 2024);
+  assert.equal(f.controller.cache.days.length, 366);
+  assert.deepEqual(cleared, [{ preserveYears: true, year: 2025 }, { preserveYears: true, year: 2024 }]);
+  assert.deepEqual(f.data.map((data) => data.year), [2026, 2024]);
+});
+
+test("account invalidation resets selected year and suppresses late previous-account history", async () => {
+  const pending = deferred();
+  const requests = [];
+  const f = fixture({ request: (action, args) => { requests.push(args.year);
+    return args.year === 2024 ? pending.promise : Promise.resolve(annualActivity(2026));
+  } });
+  await f.controller.open();
+  const old = f.controller.selectYear(2024);
+  await tick();
+  f.controller.invalidate();
+  assert.equal(f.controller.selectedYear, null);
+  await f.controller.open();
+  pending.resolve(annualActivity(2024));
+  await old;
+  assert.deepEqual(requests, [2026, 2024, 2026]);
+  assert.equal(f.controller.cache.year, 2026);
+  assert.deepEqual(f.data.map((data) => data.year), [2026, 2026]);
+});
+
+test("legacy182 responses remain partial current-year data and never impersonate a selected historical year", async () => {
+  const f = fixture();
+  assert.equal(await f.controller.open(), true);
+  assert.equal(f.controller.cache.year, undefined);
+  assert.equal(await f.controller.selectYear(2024), false);
+  assert.equal(f.controller.cache, null);
+  assert.equal(f.data.length, 1);
+  assert.deepEqual(f.errors, ["activityYearUnavailable"]);
+});
+
+test("a timezone change cannot retain a selection that became a future year", async () => {
+  let timezone = "Pacific/Auckland";
+  const years = [];
+  const f = fixture({ now: () => Date.parse("2026-12-31T12:00:00Z"), timezone: () => timezone,
+    request: async (_action, args) => { years.push(args.year);
+      return annualActivity(args.year, timezone, timezone === "Pacific/Auckland" ? "2027-01-01" : "2026-12-31");
+    } });
+  await f.controller.open(); f.controller.close();
+  timezone = "America/Toronto";
+  await f.controller.open();
+  assert.deepEqual(years, [2027, 2026]);
+  assert.equal(f.controller.selectedYear, 2026);
+});
+
+test("reopening in a new timezone replaces an in-flight year scope and discards the old result", async () => {
+  let timezone = "Pacific/Auckland";
+  const pending = deferred(), requests = [];
+  const f = fixture({ now: () => Date.parse("2026-12-31T12:00:00Z"), timezone: () => timezone,
+    request: (_action, args) => {
+      requests.push(args);
+      return args.timezone === "Pacific/Auckland" ? pending.promise :
+        Promise.resolve(annualActivity(args.year, args.timezone, "2026-12-31"));
+    } });
+  const old = f.controller.open();
+  await tick();
+  f.controller.close();
+  timezone = "America/Toronto";
+  const current = f.controller.open();
+  assert.notEqual(current, old);
+  assert.equal(f.controller.open(), current, "the new matching scope still shares its in-flight request");
+  await current;
+  pending.resolve(annualActivity(2027, "Pacific/Auckland", "2027-01-01"));
+  await old;
+  assert.deepEqual(requests, [{ timezone: "Pacific/Auckland", year: 2027 }, { timezone: "America/Toronto", year: 2026 }]);
+  assert.deepEqual(f.data.map((data) => [data.timezone, data.year]), [["America/Toronto", 2026]]);
+  assert.equal(f.controller.selectedYear, 2026);
+  assert.equal(f.controller.cache.year, 2026);
 });

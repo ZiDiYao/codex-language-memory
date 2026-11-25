@@ -44,6 +44,8 @@ test('activity REST reads and batches use the verified tenant without adding for
   const reply = await f.call('/v1/activity?timezone=America%2FToronto', { subject: 'alice' });
   assert.equal(reply.status, 200); assert.equal(reply.headers.get('cache-control'), 'no-store');
   const data = await reply.json(); assert.equal(data.days.length, 182); assert.equal(data.timezone, 'America/Toronto');
+  assert.equal(data.year, null); assert.match(data.today, /^\d{4}-\d{2}-\d{2}$/);
+  assert.deepEqual(data.available_years, [Number(data.today.slice(0, 4))]);
   assert.equal(data.totals.learning_count, 0); assert.equal(data.totals.interaction_count, 0);
   const events = [event()];
   const saved = await f.call('/v1/activity/events', { method: 'POST', subject: 'bob', body: { events } });
@@ -51,6 +53,20 @@ test('activity REST reads and batches use the verified tenant without adding for
   assert.equal(f.calls[0].principal.subject, 'alice'); assert.equal(f.calls[1].principal.subject, 'bob');
   assert.deepEqual(f.calls[1].events, events);
   assert.equal((await (await f.call('/v1/settings')).json())._capabilities.activity, true);
+  assert.deepEqual(f.logs, []);
+});
+
+test('activity year query is parsed as an integer and past empty calendar years remain queryable', async t => {
+  const f = await fixture(t);
+  const reply = await f.call('/v1/activity?timezone=UTC&year=2024');
+  assert.equal(reply.status, 200);
+  const data = await reply.json();
+  assert.equal(data.year, 2024); assert.equal(data.start_date, '2024-01-01'); assert.equal(data.end_date, '2024-12-31');
+  assert.equal(data.days.length, 366); assert.equal(data.totals.active_days, 0);
+  assert.equal(f.calls[0].query.year, 2024);
+  assert.equal((await f.call('/v1/activity?year=1970')).status, 200);
+  for (const year of ['1969', '2024.5', 'not-a-year', '1e3', '', '2024&year=2025', String(new Date().getUTCFullYear() + 1)])
+    assert.equal((await f.call('/v1/activity?timezone=UTC&year=' + year)).status, 422);
   assert.deepEqual(f.logs, []);
 });
 

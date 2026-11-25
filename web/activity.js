@@ -40,11 +40,31 @@ export class ActivityController {
     this.queue = [];
     this.opened = false;
     this.cache = null;
+    this.selectedYear = null;
+    this.cachedYear = null;
     this.pendingRead = null;
+    this.pendingScope = null;
     this.writing = false;
     this.writeSettled = null;
     this.writeWaiters = new Set();
     this.timer = null;
+  }
+
+  currentYear(timezone = this.timezone()) {
+    return Number(new Intl.DateTimeFormat("en", { year: "numeric", timeZone: timezone }).format(new Date(this.now())));
+  }
+
+  selectYear(year) {
+    if (!Number.isInteger(year) || year < 1970 || year > this.currentYear()) return Promise.resolve(false);
+    if (year === this.selectedYear && this.pendingRead) return this.pendingRead;
+    this.selectedYear = year;
+    ++this.readVersion;
+    this.cache = null;
+    this.cachedYear = null;
+    this.pendingRead = null;
+    this.pendingScope = null;
+    this.onClear({ preserveYears: true, year });
+    return this.refresh();
   }
 
   record(kind) {
@@ -120,12 +140,18 @@ export class ActivityController {
   open() {
     this.opened = true;
     if (!this.canUse()) { this.onClear(); return Promise.resolve(false); }
+    const timezone = this.timezone();
+    const currentYear = this.currentYear(timezone);
+    const year = this.selectedYear == null || this.selectedYear > currentYear ? currentYear : this.selectedYear;
+    if (this.pendingRead) return this.pendingScope?.timezone === timezone && this.pendingScope?.year === year
+      ? this.pendingRead : this.refresh();
     if (!this.queue.length && !this.writeSettled && this.cacheLifetime > 0 && this.cache &&
-        this.cachedTimezone === this.timezone() && this.now() - this.cachedAt < this.cacheLifetime) {
+        this.cachedTimezone === timezone && this.cachedYear === year &&
+        this.now() - this.cachedAt < this.cacheLifetime) {
       this.onData(this.cache);
       return Promise.resolve(true);
     }
-    return this.pendingRead || this.refresh();
+    return this.refresh();
   }
 
   refresh() {
@@ -133,6 +159,12 @@ export class ActivityController {
     const generation = this.generation;
     const version = ++this.readVersion;
     const timezone = this.timezone();
+    const currentYear = this.currentYear(timezone);
+    const year = this.selectedYear == null || this.selectedYear > currentYear ? currentYear : this.selectedYear;
+    if (this.selectedYear != null && this.selectedYear !== year) {
+      this.cache = null; this.cachedYear = null; this.onClear();
+    }
+    this.selectedYear = year;
     if (this.opened) this.onLoading(true);
     const reading = (async () => {
       await Promise.resolve();
@@ -140,32 +172,40 @@ export class ActivityController {
         if (generation !== this.generation || version !== this.readVersion || !this.canUse()) return false;
         if (!(await this.settleBeforeRead(generation, version))) return false;
         if (generation !== this.generation || version !== this.readVersion || !this.canUse()) return false;
-        const data = await this.request("activity/read", { timezone });
+        const data = await this.request("activity/read", { timezone, year });
         if (generation !== this.generation || version !== this.readVersion || !this.canUse()) return false;
-        if (!data || typeof data.timezone !== "string" || !Array.isArray(data.days) || data.days.length !== 182)
+        if (!data || typeof data.timezone !== "string" || !Array.isArray(data.days))
           throw new Error("activityUnavailable");
+        const legacy = data.year == null && data.days.length === 182;
+        const length = (Date.UTC(year + 1, 0, 1) - Date.UTC(year, 0, 1)) / 86400000;
+        if (legacy ? year !== this.currentYear() || data.end_date?.slice(0, 4) !== String(year)
+          : data.year !== year || data.days.length !== length || data.start_date !== `${year}-01-01` || data.end_date !== `${year}-12-31`)
+          throw new Error(legacy ? "activityYearUnavailable" : "activityUnavailable");
         this.cache = data;
         this.cachedTimezone = timezone;
+        this.cachedYear = year;
         this.cachedAt = this.now();
         if (this.opened) this.onData(data);
         return true;
-      } catch {
+      } catch (error) {
         if (generation === this.generation && version === this.readVersion && this.opened && this.canUse())
-          this.onError(new Error("activityUnavailable"));
+          this.onError(new Error(error?.message === "activityYearUnavailable" ? "activityYearUnavailable" : "activityUnavailable"));
         return false;
       } finally {
         if (generation === this.generation && version === this.readVersion) {
           this.pendingRead = null;
+          this.pendingScope = null;
           if (this.opened) this.onLoading(false);
         }
       }
     })();
     this.pendingRead = reading;
+    this.pendingScope = { timezone, year };
     return reading;
   }
 
   close() { this.opened = false; this.onLoading(false); }
-  relabel() { if (this.opened && this.cache) this.onData(this.cache); }
+  relabel() { if (this.opened && this.cache && this.cachedYear === this.selectedYear) this.onData(this.cache); }
 
   invalidate() {
     ++this.generation;
@@ -174,7 +214,10 @@ export class ActivityController {
     this.timer = null;
     this.queue = [];
     this.cache = null;
+    this.selectedYear = null;
+    this.cachedYear = null;
     this.pendingRead = null;
+    this.pendingScope = null;
     this.writing = false;
     this.writeSettled = null;
     for (const cancelWait of this.writeWaiters) cancelWait();

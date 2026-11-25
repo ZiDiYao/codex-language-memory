@@ -27,7 +27,8 @@ async function capture(pool, repo, request, title, kind, occurred) {
 }
 const event = (occurred_at, kind = 'button', event_id = randomUUID()) => ({ event_id, kind, occurred_at });
 const record = (repo, events, now) => repo.transaction(true, client => recordActivityEvents(client, repo.tenantId, events, now));
-const read = (repo, timezone, now) => repo.transaction(false, client => readActivity(client, repo.tenantId, { timezone }, now));
+const read = (repo, timezone, now, year) => repo.transaction(false, client => readActivity(client, repo.tenantId,
+  { timezone, ...(year === undefined ? {} : { year }) }, now));
 
 dbtest('0003 upgrades additively to activity0004 and concurrent migrators preserve encounter evidence', async t => {
   const { pool, repo } = await fixture(t, { migrateNow: false });
@@ -78,6 +79,44 @@ dbtest('activity buckets use tenant-local calendar dates across DST and count on
   assert.equal(other.totals.learning_count, 1); assert.equal(other.totals.interaction_count, 0);
   assert.equal((await pool.query('SELECT count(*)::integer n FROM lm_encounters WHERE tenant_id=$1', [alice.tenantId])).rows[0].n, 6,
     'UI clicks and heatmap reads never insert learning encounters');
+});
+
+dbtest('calendar-year ranges, earliest evidence years and empty/future days remain tenant and timezone scoped', async t => {
+  const { pool, repo } = await fixture(t);
+  const alice = repo('year-alice'), bob = repo('year-bob'), uiOnly = repo('year-ui-only'), empty = repo('year-empty');
+  await capture(pool, alice, 'year-boundary-first', 'rinse', 'word', '2024-01-01T00:30:00Z');
+  await capture(pool, alice, 'year-final-second', 'last day', 'expression', '2024-12-31T23:59:59.999999Z');
+  await capture(pool, alice, 'year-next-boundary', 'new year', 'expression', '2025-01-01T00:00:00Z');
+  await capture(pool, alice, 'year-current-today', 'current', 'word', '2026-11-24T10:00:00Z');
+  await capture(pool, alice, 'year-future-ignored', 'future fixture', 'word', '2026-12-31T10:00:00Z');
+  await capture(pool, alice, 'year-grammar-excluded', 'grammar fixture', 'grammar', '2010-06-01T12:00:00Z');
+  await capture(pool, bob, 'year-other-tenant-old', 'private fixture', 'word', '2020-06-01T12:00:00Z');
+  const interaction = new Date('2022-07-01T12:00:00Z');
+  await record(uiOnly, [event(interaction.toISOString())], interaction);
+  const now = new Date('2026-11-24T12:00:00Z');
+  const utc = await read(alice, 'UTC', now, 2024);
+  assert.equal(utc.year, 2024); assert.equal(utc.days.length, 366); assert.equal(utc.today, '2026-11-24');
+  assert.deepEqual(utc.available_years, [2026, 2025, 2024]);
+  assert.equal(utc.days[0].learning_count, 1); assert.equal(utc.days.at(-1).learning_count, 1);
+  assert.equal(utc.totals.learning_count, 2, 'Jan1 is inclusive and next Jan1 is outside the requested year');
+  const local = await read(alice, 'America/Toronto', now, 2023);
+  assert.deepEqual(local.available_years, [2026, 2025, 2024, 2023]);
+  assert.equal(local.days.length, 365); assert.equal(local.days.at(-1).date, '2023-12-31');
+  assert.equal(local.days.at(-1).learning_count, 1, 'earliest-year metadata uses local rather than UTC year');
+  const current = await read(alice, 'UTC', now, 2026);
+  assert.equal(current.days.find(day => day.date === '2026-11-24').learning_count, 1);
+  assert.deepEqual(current.days.at(-1), { date: '2026-12-31', learning_count: 0, interaction_count: 0, score: 0, level: 0 });
+  assert.equal(current.totals.learning_count, 1);
+  const emptyPast = await read(alice, 'UTC', now, 2021);
+  assert.equal(emptyPast.totals.active_days, 0); assert.equal(emptyPast.days.length, 365);
+  assert.deepEqual(emptyPast.available_years, [2026, 2025, 2024]);
+  assert.deepEqual((await read(uiOnly, 'UTC', now, 2022)).available_years, [2026, 2025, 2024, 2023, 2022]);
+  const noHistory = await read(empty, 'UTC', now, 1970);
+  assert.deepEqual(noHistory.available_years, [2026]); assert.equal(noHistory.days.length, 365);
+  assert.equal(noHistory.totals.active_days, 0);
+  assert.deepEqual((await read(bob, 'UTC', now, 2020)).available_years, [2026, 2025, 2024, 2023, 2022, 2021, 2020]);
+  const legacy = await read(alice, 'UTC', now);
+  assert.equal(legacy.days.length, 182); assert.equal(legacy.year, null); assert.equal(legacy.end_date, legacy.today);
 });
 
 dbtest('batched clicks retain the same five-second buckets as individual requests and accepted UUID retries deduplicate', async t => {

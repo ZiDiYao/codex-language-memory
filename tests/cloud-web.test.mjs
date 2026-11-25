@@ -119,6 +119,20 @@ test("cloud pronunciation retrieves stored-record audio with bearer auth and no 
   assert.equal(calls.length, 1);
 });
 
+test("cloud yearly activity uses the selected integer year without adding client account identifiers", async () => {
+  const { session } = sessionFixture();
+  const calls = [];
+  const transport = createCloudTransport({ apiBaseUrl: "https://memory.example", session, fetchImpl: async (url, options) => {
+    calls.push({ url, options }); return Response.json({ year: 2024, days: [] });
+  } });
+  await transport.request("api", { action: "activity/read", arguments: { timezone: "America/Toronto", year: 2024 } });
+  assert.equal(calls[0].url, "https://memory.example/v1/activity?timezone=America%2FToronto&year=2024");
+  assert.equal(calls[0].options.body, undefined);
+  for (const year of [true, "2024", null, 1969, 10000, 2024.5])
+    await assert.rejects(transport.request("api", { action: "activity/read", arguments: { timezone: "UTC", year } }), /invalid/);
+  assert.equal(calls.length, 1);
+});
+
 test("late cloud audio is rejected after account invalidation and a 401 pauses without retry", async () => {
   const { session } = sessionFixture();
   const pending = deferred();

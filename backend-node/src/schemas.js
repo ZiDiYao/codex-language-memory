@@ -92,7 +92,9 @@ const activityTimezone = string({ trim: false, max: 80, pattern: /^[A-Za-z][A-Za
   try { return new Intl.DateTimeFormat('en', { timeZone: value }).resolvedOptions().timeZone; }
   catch { context.addIssue({ code: 'custom', message: 'invalid_request' }); return z.NEVER; }
 });
-const activityQuery = z.object({ timezone: activityTimezone.default('UTC') }).strict();
+const activityQuery = z.object({ timezone: activityTimezone.default('UTC'),
+  year: z.number().int().min(1970).max(9999).optional(),
+}).strict();
 const activityEvent = z.object({ event_id: z.string().uuid().transform(value => value.toLowerCase()),
   kind: z.enum(['button', 'pronunciation']), occurred_at: z.string().max(40).datetime({ offset: true }),
 }).strict();

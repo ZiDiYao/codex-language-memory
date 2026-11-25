@@ -13,9 +13,12 @@ function target(action, arguments_) {
     case "languages/list": return get("/v1/languages");
     case "changes/read": return get("/v1/changes");
     case "activity/read": {
-      if (Object.keys(arguments_).some((key) => key !== "timezone") || typeof arguments_.timezone !== "string" ||
-          !/^[A-Za-z][A-Za-z0-9_+./-]{0,79}$/.test(arguments_.timezone)) throw new Error("invalid");
-      return { ...get("/v1/activity"), query: { timezone: arguments_.timezone } };
+      if (Object.keys(arguments_).some((key) => !["timezone", "year"].includes(key)) || typeof arguments_.timezone !== "string" ||
+          !/^[A-Za-z][A-Za-z0-9_+./-]{0,79}$/.test(arguments_.timezone) ||
+          (arguments_.year !== undefined && (!Number.isInteger(arguments_.year) || arguments_.year < 1970 || arguments_.year > 9999)))
+        throw new Error("invalid");
+      return { ...get("/v1/activity"), query: { timezone: arguments_.timezone,
+        ...(arguments_.year === undefined ? {} : { year: arguments_.year }) } };
     }
     case "activity/events": {
       if (Object.keys(arguments_).some((key) => key !== "events") || !Array.isArray(arguments_.events) ||

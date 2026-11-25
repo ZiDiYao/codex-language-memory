@@ -24,6 +24,39 @@ test('activity dates follow the requested calendar and always contain 182 consec
   assert.throws(() => activityWindow({ timezone: 'UTC', user_id: 'other' }), invalid);
 });
 
+test('explicit calendar years include leap days and enforce the timezone-local current-year boundary', () => {
+  const leap = activityWindow({ year: 2024, timezone: 'America/Toronto' }, now);
+  assert.equal(leap.year, 2024); assert.equal(leap.today, '2026-10-31');
+  assert.equal(leap.start_date, '2024-01-01'); assert.equal(leap.end_date, '2024-12-31');
+  assert.equal(leap.dates.length, 366); assert.equal(leap.dates.filter(date => date === '2024-02-29').length, 1);
+  assert.equal(activityWindow({ year: 2025 }, now).dates.length, 365);
+  assert.equal(activityWindow({ year: 1970 }, now).dates.length, 365);
+  assert.equal(activityWindow({}, now).year, null);
+  for (const year of [1969, 2027, 2024.5, '2024', null, NaN, Infinity])
+    assert.throws(() => activityWindow({ year }, now), invalid);
+  const midnight = new Date('2027-01-01T00:30:00Z');
+  assert.throws(() => activityWindow({ year: 2027, timezone: 'America/Toronto' }, midnight), invalid);
+  assert.equal(activityWindow({ year: 2027, timezone: 'UTC' }, midnight).dates.length, 365);
+  assert.equal(activityWindow({ year: 2027, timezone: 'Pacific/Auckland' }, new Date('2026-12-31T11:30:00Z')).year, 2027);
+});
+
+test('year metadata exposes actual evidence years while future dates cannot contribute counts or score', async () => {
+  let calls = 0;
+  const client = { query: async () => ++calls === 1 ? { rows: [{ first_year: 2024 }] } : { rows: [
+    { date: '2026-10-31', learning_count: 1, interaction_count: 1 },
+    { date: '2026-11-01', learning_count: 99, interaction_count: 99 },
+  ] } };
+  const result = await readActivity(client, 'tenant', { timezone: 'America/Toronto', year: 2026 }, now);
+  assert.equal(result.days.length, 365); assert.equal(result.today, '2026-10-31');
+  assert.deepEqual(result.available_years, [2026, 2025, 2024]);
+  assert.deepEqual(result.days.find(day => day.date === '2026-11-01'),
+    { date: '2026-11-01', learning_count: 0, interaction_count: 0, score: 0, level: 0 });
+  assert.deepEqual(result.totals, { learning_count: 1, interaction_count: 1, score: 17, active_days: 1 });
+  const empty = await readActivity({ query: async () => ({ rows: [] }) }, 'empty', { year: 2024 }, now);
+  assert.deepEqual(empty.available_years, [2026]); assert.equal(empty.days.length, 366);
+  assert.equal(empty.totals.active_days, 0);
+});
+
 test('heatmap weight and saturation are explicit and zero dates stay empty', async () => {
   assert.equal(activityScore(0, 0), 0); assert.equal(activityScore(1, 0), 14);
   assert.equal(activityScore(5, 0), 70); assert.equal(activityScore(0, 10), 30);

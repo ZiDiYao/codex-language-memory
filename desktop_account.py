@@ -1167,7 +1167,7 @@ class AccountManager:
         if method == "GET" and path == "/v1/activity" and json is None:
             from activity import ActivityScope
             scope = ActivityScope.model_validate(params if params is not None else {})
-            return self._call(path=path, method=method, params=scope.model_dump(), activity=True,
+            return self._call(path=path, method=method, params=scope.model_dump(exclude_none=True), activity=True,
                               expected_epoch=expected_epoch, budget=5)
         if method == "POST" and path == "/v1/activity/events" and not params:
             from activity import ActivityEvents

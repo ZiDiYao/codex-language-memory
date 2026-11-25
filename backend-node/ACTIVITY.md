@@ -13,6 +13,26 @@ supported IANA name and canonicalized, and is passed as a SQL parameter. The
 response contains 182 calendar dates, ascending, ending today in that timezone.
 DST days retain their actual local boundaries, including repeated hours.
 
+Optional `year=2024` instead returns every calendar date from January 1 through
+December 31 (365 or 366 entries). Years must be integers from 1970 through the
+current year in the requested timezone; future years are rejected. Omitting
+`year` retains the original 182-day range. Responses additionally contain:
+
+- `year`: the requested integer, or `null` for the legacy 182-day range.
+- `today`: the current date in the requested timezone. Dates after `today` have
+  zero counts/score/level and should be displayed as future, disabled cells.
+- `available_years`: descending years from the timezone's current year through
+  this tenant's earliest retained word/expression encounter or accepted UI
+  interaction, with a lower bound of 1970. No data yields only the current year.
+  Empty intervening years are selectable without inventing history. This list
+  is a display hint, not an authorization range: earlier legal empty years can
+  still be queried and return genuine zeros.
+
+Only the earliest qualifying timestamp from each existing date index is read
+for year choices; aggregation remains bounded to the selected calendar year or
+the legacy 182-day range, and never reads days after `today`. No migration,
+backfill or additional conversational/MCP tool is required.
+
 ```json
 {
   "timezone": "America/Toronto",

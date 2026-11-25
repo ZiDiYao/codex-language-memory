@@ -73,6 +73,17 @@ class ActivityPageTests(unittest.TestCase):
         result = self.bridge.request("api", {"action": "activity/read", "arguments": {}, "expected_epoch": 7})
         self.assertEqual(result, {"status": 409, "data": {"error": "account_changed"}})
 
+    def test_year_selection_reaches_the_fixed_api_without_losing_account_binding(self):
+        result = self.bridge.request("api", {"action": "activity/read", "arguments": {
+            "timezone": "America/Toronto", "year": 2024}, "expected_epoch": 7})
+        self.assertEqual(result["status"], 200)
+        self.assertEqual(self.account.calls, [("GET", "/v1/activity", {
+            "timezone": "America/Toronto", "year": 2024}, None, 7)])
+        for year in (True, "2024", 1969, 10000, 2024.5):
+            reply = self.bridge.request("api", {"action": "activity/read", "arguments": {"year": year}, "expected_epoch": 7})
+            self.assertEqual(reply["status"], 400)
+        self.assertEqual(len(self.account.calls), 1)
+
     def test_activity_envelopes_reject_text_paths_unbounded_batches_and_untyped_times(self):
         for payload in [{}, {"events": []}, {"events": [event()] * 21},
                         {"events": [{**event(), "text": "private note"}]},
@@ -151,6 +162,14 @@ class ActivityHttpTests(unittest.TestCase):
         self.assertEqual(self.cloud.activity_requests, [])
         self.assertEqual(self.manager.status()["state"], "connected")
         self.assertEqual(self.manager.status()["epoch"], self.epoch)
+
+    def test_year_is_an_integer_query_value_and_not_an_arbitrary_path_or_payload(self):
+        self.manager.request_api("GET", "/v1/activity", {"timezone": "America/Toronto", "year": 2024}, expected_epoch=self.epoch)
+        self.assertEqual(len(self.cloud.activity_requests), 1)
+        request = self.cloud.activity_requests[0]
+        self.assertEqual(request.url.path, "/v1/activity")
+        self.assertEqual(dict(request.url.params), {"timezone": "America/Toronto", "year": "2024"})
+        self.assertEqual(request.content, b"")
 
     def test_explicit_activity_read_can_refresh_an_expired_token(self):
         envelope = self.manager.credentials.read()

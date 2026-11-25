@@ -14,15 +14,19 @@ function validNow(now) {
 /** Calendar dates, rather than 24-hour intervals, keep DST days intact. */
 export function activityWindow(query = {}, now = new Date()) {
   validNow(now);
-  const { timezone } = parse('activityQuery', query);
+  const { timezone, year } = parse('activityQuery', query);
   const parts = new Intl.DateTimeFormat('en', { timeZone: timezone,
     year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
   const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
-  const end_date = `${values.year}-${values.month}-${values.day}`;
+  const today = `${values.year}-${values.month}-${values.day}`;
+  if (year !== undefined && year > Number(values.year)) throw new ValidationError();
+  const end_date = year === undefined ? today : `${year}-12-31`;
   const end = Date.parse(`${end_date}T00:00:00Z`);
-  const dates = Array.from({ length: ACTIVITY_DAYS }, (_, index) =>
-    new Date(end - (ACTIVITY_DAYS - 1 - index) * DAY_MS).toISOString().slice(0, 10));
-  return { timezone, start_date: dates[0], end_date, dates };
+  const start = year === undefined ? end - (ACTIVITY_DAYS - 1) * DAY_MS : Date.parse(`${year}-01-01T00:00:00Z`);
+  const count = Math.round((end - start) / DAY_MS) + 1;
+  const dates = Array.from({ length: count }, (_, index) =>
+    new Date(start + index * DAY_MS).toISOString().slice(0, 10));
+  return { timezone, year: year ?? null, today, start_date: dates[0], end_date, dates };
 }
 
 export function activityScore(learning, interaction) {
@@ -31,6 +35,24 @@ export function activityScore(learning, interaction) {
 
 export async function readActivity(client, tenantId, query = {}, now = new Date()) {
   const window = activityWindow(query, now);
+  // Only the first qualifying event from either indexed history is needed.
+  // Years with no evidence stay empty; no old UI activity is reconstructed.
+  const first = await client.query(`SELECT EXTRACT(YEAR FROM (min(first_at) AT TIME ZONE $2))::integer AS first_year
+    FROM (
+      (SELECT e.occurred_at AS first_at
+        FROM lm_encounters e JOIN lm_points p ON p.tenant_id=e.tenant_id AND p.id=e.point_id
+        WHERE e.tenant_id=$1 AND p.kind IN ('word','expression')
+          AND e.occurred_at < (($3::date + 1)::timestamp AT TIME ZONE $2)
+        ORDER BY e.occurred_at LIMIT 1)
+      UNION ALL
+      (SELECT occurred_at AS first_at FROM lm_activity_events
+        WHERE tenant_id=$1 AND occurred_at < (($3::date + 1)::timestamp AT TIME ZONE $2)
+        ORDER BY occurred_at LIMIT 1)
+    ) first_events`, [tenantId, window.timezone, window.today]);
+  const currentYear = Number(window.today.slice(0, 4));
+  const firstYear = Math.max(1970, Math.min(currentYear, first.rows[0]?.first_year ?? currentYear));
+  const available_years = Array.from({ length: currentYear - firstYear + 1 }, (_, index) => currentYear - index);
+  const through = window.end_date < window.today ? window.end_date : window.today;
   const { rows } = await client.query(`
     SELECT date, sum(learning_count)::integer AS learning_count,
       sum(interaction_count)::integer AS interaction_count
@@ -49,10 +71,10 @@ export async function readActivity(client, tenantId, query = {}, now = new Date(
       WHERE tenant_id=$1 AND occurred_at >= ($3::date::timestamp AT TIME ZONE $2)
         AND occurred_at < (($4::date + 1)::timestamp AT TIME ZONE $2)
       GROUP BY 1
-    ) activity GROUP BY date`, [tenantId, window.timezone, window.start_date, window.end_date]);
+    ) activity GROUP BY date`, [tenantId, window.timezone, window.start_date, through]);
   const byDate = new Map(rows.map(row => [row.date, row]));
   const days = window.dates.map(date => {
-    const row = byDate.get(date);
+    const row = date <= window.today ? byDate.get(date) : undefined;
     const learning_count = Number(row?.learning_count ?? 0), interaction_count = Number(row?.interaction_count ?? 0);
     const score = activityScore(learning_count, interaction_count);
     return { date, learning_count, interaction_count, score, level: score === 0 ? 0 : Math.ceil(score / 25) };
@@ -62,7 +84,8 @@ export async function readActivity(client, tenantId, query = {}, now = new Date(
     interaction_count: sum.interaction_count + day.interaction_count,
     active_days: sum.active_days + Number(day.score > 0), score: sum.score + day.score,
   }), { learning_count: 0, interaction_count: 0, active_days: 0, score: 0 });
-  return { timezone: window.timezone, start_date: window.start_date, end_date: window.end_date,
+  return { timezone: window.timezone, year: window.year, today: window.today, available_years,
+    start_date: window.start_date, end_date: window.end_date,
     weights: { learning: 0.7, interaction: 0.3 }, targets: { learning: 5, interaction: 10 }, days, totals };
 }
 

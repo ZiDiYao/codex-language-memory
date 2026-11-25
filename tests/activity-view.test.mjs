@@ -13,6 +13,31 @@ function fixture(end = "2026-11-24") {
     weights: { learning: .7, interaction: .3 }, targets: { learning: 5, interaction: 10 } };
 }
 
+function annual(year = 2026, today = "2026-11-24") {
+  const start = Date.UTC(year, 0, 1), end = Date.UTC(year, 11, 31);
+  const days = Array.from({ length: (end - start) / 86400000 + 1 }, (_, index) => ({
+    date: new Date(start + index * 86400000).toISOString().slice(0, 10), learning_count: 0, interaction_count: 0, score: 0, level: 0,
+  }));
+  return { timezone: "America/Toronto", year, today, available_years: [2026, 2025, 2024],
+    start_date: days[0].date, end_date: days.at(-1).date, days };
+}
+
+test("annual calendars cover Jan-Dec, leap years and 53 or54 complete week columns without inventing future activity", () => {
+  const leap = activityCalendar(annual(2024));
+  assert.equal(leap.days.length, 366);
+  assert.equal(leap.days.find((day) => day.date === "2024-02-29").future, false);
+  assert.equal(leap.months.length, 12);
+  assert.equal(leap.columns, 53);
+  const longYear = annual(2000, "2026-11-24");
+  assert.equal(activityCalendar(longYear).columns, 54);
+  const current = activityCalendar(annual());
+  assert.equal(current.days.length, 365);
+  assert.equal(current.days.find((day) => day.date === "2026-11-25").future, true);
+  assert.equal(current.days.find((day) => day.date === "2026-11-24").future, false);
+  const invalid = annual(); invalid.days.at(-1).interaction_count = 1;
+  assert.throws(() => activityCalendar(invalid), /future/);
+});
+
 test("calendar uses 182 real local dates across DST and pads only partial weeks", () => {
   const data = fixture();
   data.days.at(-1).learning_count = 5;
@@ -70,7 +95,7 @@ function dom() {
   const document = { activeElement: null, createElement: () => new Element(document),
     createDocumentFragment: () => Object.assign(new Element(document), { fragment: true }) };
   const root = new Element(document);
-  for (const name of ["grid", "calendar", "range", "status", "detail", "summary", "help"])
+  for (const name of ["grid", "calendar", "range", "status", "detail", "summary", "help", "months", "weekdays", "year", "legend"])
     root.append(Object.assign(new Element(document), { dataset: { [`activity${name[0].toUpperCase()}${name.slice(1)}`]: "" } }));
   for (const action of ["refresh", "retry"]) root.append(Object.assign(new Element(document), { dataset: { activityAction: action } }));
   const node = (name) => root.querySelector(`[data-activity-${name}]`);
@@ -90,7 +115,7 @@ test("real zero days, localized details, keyboard navigation and account clearin
   assert.equal(cells.filter((cell) => cell.tabIndex === 0).length, 1);
   assert.equal(cells.at(-1).tabIndex, 0);
   assert.match(cells.at(-1).attributes.get("aria-label"), /Nov 24, 2026.*0 word\/phrase encounters.*0\/100/);
-  assert.equal(node("status").textContent, "No activity in this period yet.");
+  assert.equal(node("status").textContent, "Only the available recent period is shown.");
   node("grid").fire("keydown", cells.at(-1), { key: "ArrowLeft" });
   assert.equal(document.activeElement.dataset.activityDate, "2026-11-17");
   assert.match(node("detail").textContent, /Nov 17, 2026/);
@@ -107,6 +132,48 @@ test("real zero days, localized details, keyboard navigation and account clearin
   assert.equal(node("grid").children.length, 0);
   assert.equal(node("calendar").hidden, true);
   assert.equal(node("summary").textContent, "");
+});
+
+test("annual view labels months/weekdays, disables future cells and selects years without losing navigation on errors", () => {
+  const { root, node, document } = dom();
+  const years = [];
+  const view = createActivityView(root, { onYearChange: (year) => years.push(year) });
+  view.render(annual());
+  assert.equal(node("months").children.length, 12);
+  assert.equal(node("months").children[0].children[0].textContent, "Jan");
+  assert.equal(node("months").children.at(-1).children[0].textContent, "Dec");
+  assert.equal(node("weekdays").children.length, 7);
+  assert.equal(node("weekdays").children[1].children[0].textContent, "Mon");
+  assert.equal(node("year").value, "2026");
+  assert.equal(node("year").disabled, false);
+  assert.equal(node("range").hidden, true, "annual navigation does not waste a row on the old rolling range");
+  const cells = node("grid").querySelectorAll("[data-activity-date]");
+  const today = cells.find((cell) => cell.dataset.activityDate === "2026-11-24");
+  const future = cells.find((cell) => cell.dataset.activityDate === "2026-11-25");
+  assert.equal(future.disabled, true);
+  assert.match(future.title, /Future date/);
+  assert.equal(today.tabIndex, 0);
+  today.focus();
+  node("grid").fire("keydown", today, { key: "End" });
+  assert.equal(document.activeElement, today, "End skips all future cells");
+  node("year").value = "2024";
+  node("year").fire("change");
+  assert.deepEqual(years, [2024]);
+  view.clear({ preserveYears: true, year: 2024 });
+  view.error(new Error("unavailable"));
+  assert.equal(node("grid").children.length, 0);
+  assert.equal(node("year").children.length, 3);
+  assert.equal(node("year").disabled, false);
+  view.clear();
+  assert.equal(node("year").children.length, 0, "account clearing drops previous tenant year choices");
+});
+
+test("a retained historical selection can still return to current year if its last record was deleted", () => {
+  const { root, node } = dom();
+  const view = createActivityView(root);
+  view.render({ ...annual(2024), available_years: [2026] });
+  assert.equal(node("year").children.length, 2);
+  assert.equal(node("year").disabled, false);
 });
 
 test("both profile and settings use one bounded shell with an internal scrolling body", async () => {

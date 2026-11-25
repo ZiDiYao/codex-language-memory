@@ -38,6 +38,7 @@ const editors = new Map();
 const activityRoot = $("[data-activity-view]");
 const activityView = activityRoot ? createActivityView(activityRoot, {
   getLanguage: () => locale,
+  onYearChange: (year) => activity.selectYear(year),
 }) : null;
 const activity = new ActivityController({
   request: (action, args) => api(action, args),
@@ -45,7 +46,7 @@ const activity = new ActivityController({
   onData: (data) => activityView?.render(data),
   onLoading: (loading) => activityView?.loading(loading),
   onError: (error) => activityView?.error(error),
-  onClear: () => activityView?.clear(),
+  onClear: (options) => activityView?.clear(options),
 });
 let speechButton;
 let speechActivityPhase;
