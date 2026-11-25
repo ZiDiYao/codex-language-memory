@@ -114,6 +114,51 @@ dbtest('background completion adds content and scenes without a new encounter or
   assert.equal(await runEnrichmentOnce(pool, async () => content), false);
 });
 
+dbtest('a substantial word lesson preserves supporting phrases inside one point and one real encounter', async t => {
+  const { repo, pool } = await fixture(t);
+  const target = { kind: 'word', language: 'en', title: 'secure', context: 'They secured funding for the project.' };
+  const id = (await repo.observe('secure-learning-question', [target])).results[0].id;
+  const expanded = { sense_key: 'obtain', meaning: '（动词）争取到、获得。', corrected_sentence: null,
+    explanation: '【当前用法】secure funding 表示争取到资金，比 get 正式。\n' +
+      '【常见含义】作动词也表示使安全、固定牢；作形容词表示安全可靠、稳定有保障。\n' +
+      '【搭配与句型】secure permission 获得许可；secure a place 争取名额；a secure password 安全性高的密码；' +
+      'feel secure 感到安心；secure something with a strap 用带子固定某物。\n' +
+      '【易混点】secure a job 是获得工作，a secure job 是一份稳定的工作。',
+    examples: [
+      { text: 'They secured funding for the project.', translation: '他们为项目争取到了资金。' },
+      { text: 'Secure the bag with a strap.', translation: '用带子固定好包。' },
+      { text: 'Choose a secure password.', translation: '选一个安全性高的密码。' },
+      { text: 'She has a secure job.', translation: '她有一份稳定的工作。' },
+      { text: 'The children feel secure at home.', translation: '孩子们在家感到安心。' },
+    ], scenes: ['Work & projects', 'Safety & security'] };
+  await runEnrichmentOnce(pool, async prompt => {
+    assert.deepEqual(prompt.target, { ...target, corrected_sentence: null });
+    assert.equal(prompt.explanation_language, 'zh');
+    return expanded;
+  });
+  const record = (await repo.getPoint(id)).record;
+  assert.equal(record.explanation, expanded.explanation);
+  assert.deepEqual(record.examples, expanded.examples);
+  assert.equal(record.title, target.title); assert.equal(record.kind, 'word'); assert.equal(record.language, 'en');
+  assert.equal(record.encounter_count, 1); assert.equal(record.last_review_result, null);
+  assert.equal(record.enrichment_state, 'ready'); assert.equal(record.content_ready, true);
+  assert.equal((await repo.query()).records.length, 1);
+  assert.equal((await pool.query('SELECT count(*)::integer n FROM lm_encounters')).rows[0].n, 1);
+  assert.equal((await pool.query('SELECT count(*)::integer n FROM lm_review_events')).rows[0].n, 0);
+});
+
+dbtest('richer future generation does not overwrite an existing same-sense manual explanation', async t => {
+  const { repo, pool, save } = await fixture(t);
+  const id = (await repo.save('existing-brief-note', [rich])).results[0].id;
+  await repo.update(id, { explanation: 'My teacher\'s explanation; keep this wording.' });
+  await save('later-real-question');
+  await runEnrichmentOnce(pool, async () => ({ ...content, explanation: 'A much longer generated lesson with more collocations.' }));
+  const record = (await repo.getPoint(id)).record;
+  assert.equal(record.explanation, 'My teacher\'s explanation; keep this wording.');
+  assert.equal(record.encounter_count, 2);
+  assert.equal(record.enrichment_state, 'ready');
+});
+
 dbtest('tenant locks skip safely; repeat encounters and mastery do not invalidate in-flight content', async t => {
   const { repo, pool, save } = await fixture(t); const id = (await save()).results[0].id;
   const job = await claimEnrichment(pool); const client = await pool.connect();

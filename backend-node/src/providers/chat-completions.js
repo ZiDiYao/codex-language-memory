@@ -1,4 +1,4 @@
-import { JSON_INSTRUCTIONS, configured, endpoint, requestJson, parseContent } from './shared.js';
+import { JSON_INSTRUCTIONS, NOTE_OUTPUT_TOKENS, configured, endpoint, requestJson, parseContent } from './shared.js';
 
 /** Shared Chat JSON transport; only explicitly selected vendor features are sent. */
 export function createChatEnricher({ apiKey, model, baseUrl, fetchImpl = fetch, deepseek = false } = {}) {
@@ -6,7 +6,7 @@ export function createChatEnricher({ apiKey, model, baseUrl, fetchImpl = fetch, 
   const url = endpoint(baseUrl, 'chat/completions');
   return async (input, { signal } = {}) => {
     const body = await requestJson(fetchImpl, url, { apiKey, signal, body: {
-      model, stream: false, max_tokens: 1600, response_format: { type: 'json_object' },
+      model, stream: false, max_tokens: NOTE_OUTPUT_TOKENS, response_format: { type: 'json_object' },
       ...(deepseek ? { thinking: { type: 'disabled' } } : {}),
       messages: [{ role: 'system', content: JSON_INSTRUCTIONS }, { role: 'user', content: JSON.stringify(input) }],
     } });

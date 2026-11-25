@@ -9,6 +9,7 @@ import { sceneSelection, sceneLabel } from "./scene-model.js";
 import { ExportDialog } from "./export-dialog.js";
 import { request, saveDownload, capabilities, openExternal, setAccountEpoch } from "./transport.js";
 import { createLocalProfile, accountCanRead } from "./local-profile.js";
+import { PronunciationController } from "./pronunciation.js";
 
 const $ = (selector) => document.querySelector(selector);
 const pageSize = 20;
@@ -33,42 +34,41 @@ let noticeTimer;
 const displayed = new Map();
 const editors = new Map();
 let speechButton;
-let speechTimer;
-let speechStarting = false;
-function resetSpeechButton() {
-  if (speechButton) {
-    speechButton.setAttribute("aria-pressed", "false");
-    speechButton.classList.remove("is-speaking");
-  }
-  speechButton = null;
-  clearTimeout(speechTimer);
-}
-async function listen(button, recordId) {
-  if (speechStarting) return;
-  speechStarting = true;
-  button.disabled = true;
-  try {
-    const result = await api("speech/play", { record_id: recordId });
-    resetSpeechButton();
-    if (result.playing) {
-      speechButton = button;
-      button.setAttribute("aria-pressed", "true");
-      button.classList.add("is-speaking");
-      const poll = async () => {
-        if (speechButton !== button) return;
-        try {
-          const state = await api("speech/status");
-          if (speechButton !== button) return;
-          if (!state.playing || state.record_id !== recordId) {
-            resetSpeechButton();
-            if (state.error) notice(state.error, true);
-          } else speechTimer = setTimeout(poll, 450);
-        } catch { resetSpeechButton(); }
-      };
-      speechTimer = setTimeout(poll, 450);
+const pronunciation = new PronunciationController({
+  sourceMode: globalThis.languageMemoryHost ? "data" : "blob",
+  canPlay: () => speechAvailable() && !accountPaused && !accountDraftBlocked && !runtime?.isPaused?.(),
+  requestAudio: async (recordId) => {
+    const source = sourceRevision;
+    const response = await request("audio", { record_id: recordId });
+    if (source !== sourceRevision) throw new Error("accountSuperseded");
+    return response;
+  },
+  onState(state) {
+    if (speechButton) {
+      speechButton.setAttribute("aria-pressed", "false");
+      speechButton.removeAttribute("aria-busy");
+      speechButton.classList.remove("is-speaking");
     }
-  } catch (error) { showError(error); }
-  finally { button.disabled = false; speechStarting = false; }
+    speechButton = state ? editors.get(state.recordId)?.card.querySelector(".entry-listen") : null;
+    if (speechButton) {
+      speechButton.setAttribute("aria-pressed", "true");
+      speechButton.setAttribute("aria-busy", String(state.phase === "loading"));
+      speechButton.classList.toggle("is-speaking", state.phase === "playing");
+    }
+  },
+  onError(error) {
+    if (["cloud_not_connected", "account_changed"].includes(error.message)) localProfile?.session.refresh();
+    showError(error);
+  },
+});
+function speechAvailable() { return available.speech && settings?._capabilities?.cloud_speech === true; }
+function renderSpeechAvailability() {
+  const enabled = speechAvailable();
+  if (!enabled) pronunciation.stop();
+  document.querySelectorAll(".entry-listen").forEach((button) => {
+    button.hidden = !enabled;
+    button.closest(".entry-heading").classList.toggle("without-speech", !enabled);
+  });
 }
 let selectedLanguage = "";
 let selectedKind = "";
@@ -268,7 +268,14 @@ async function flushEditors() {
   }
   return true;
 }
-if (runtime) runtime.beforeAccountChange = flushEditors;
+if (runtime) {
+  runtime.stopPronunciation = () => pronunciation.stop();
+  runtime.beforeAccountChange = async () => {
+    if (!(await flushEditors())) return false;
+    pronunciation.stop();
+    return true;
+  };
+}
 function applyLocale() {
   document.documentElement.lang = locale;
   document.title = t("appTitle");
@@ -283,6 +290,9 @@ function applyLocale() {
   });
   document.querySelectorAll("[data-tooltip]").forEach((node) => {
     node.title = t(node.dataset.tooltip);
+  });
+  document.querySelectorAll(".entry-listen").forEach((node) => {
+    node.setAttribute("aria-label", `${t("listen")} (${t("pronunciationDisclosure")})`);
   });
   document.querySelectorAll(".entry-status-group").forEach((node) => {
     node.setAttribute("aria-label", t("status"));
@@ -381,6 +391,7 @@ function renderSettings() {
   badge.textContent = t(badge.dataset.i18n);
   $("#settings-fields").disabled = false;
   renderLanguagePreferences();
+  renderSpeechAvailability();
 }
 function card(record, expanded = false) {
   const details = element("details", undefined, "history-entry");
@@ -393,13 +404,15 @@ function card(record, expanded = false) {
   const listenButton = element("button", undefined, "icon-button entry-listen");
   listenButton.type = "button";
   listenButton.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM15 8c2 2 2 6 0 8M18 5c4 4 4 10 0 14"/></svg>';
-  listenButton.setAttribute("aria-label", t("listen"));
+  listenButton.setAttribute("aria-label", `${t("listen")} (${t("pronunciationDisclosure")})`);
   listenButton.setAttribute("aria-pressed", "false");
-  listenButton.title = t("listen");
+  listenButton.dataset.tooltip = "pronunciationDisclosure";
+  listenButton.title = t("pronunciationDisclosure");
+  listenButton.hidden = !speechAvailable();
   listenButton.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    listen(listenButton, record.id);
+    pronunciation.toggle(record.id);
   });
   const mastery = element("div", undefined, "entry-status-group");
   mastery.setAttribute("role", "group");
@@ -415,8 +428,8 @@ function card(record, expanded = false) {
   const enrichment = element("small", undefined, "entry-enrichment");
   enrichment.setAttribute("role", "status");
   const lastSeen = translated("small", "lastSeen", { date: record.last_seen_at }, "entry-last-seen");
-  if (!available.speech) heading.classList.add("without-speech");
-  heading.append(title, ...(available.speech ? [listenButton] : []), mastery, element("span", undefined, "entry-chevron"));
+  if (!speechAvailable()) heading.classList.add("without-speech");
+  heading.append(title, listenButton, mastery, element("span", undefined, "entry-chevron"));
   summary.append(heading, preview, enrichment, lastSeen);
   function renderSummary(point) {
     const presentation = enrichmentSummary(point);
@@ -442,8 +455,9 @@ function card(record, expanded = false) {
   renderSummary(record);
   const editor = new EntryEditor(record, {
     t, api, languageName, uiLocale: locale, card: details,
-    onChange: (updated) => { displayed.set(updated.id, updated); renderSummary(updated); },
+    onChange: (updated) => { pronunciation.stop(updated.id); displayed.set(updated.id, updated); renderSummary(updated); },
     onDeleted: async (deleted) => {
+      pronunciation.stop(deleted.id);
       editors.get(deleted.id)?.dispose();
       editors.delete(deleted.id);
       displayed.delete(deleted.id);
@@ -504,6 +518,7 @@ function captureHistoryView(reset, preserve) {
   };
 }
 function clearRecords() {
+  pronunciation.stop();
   for (const editor of editors.values()) editor.dispose();
   displayed.clear();
   editors.clear();
@@ -516,6 +531,7 @@ function renderRecords(data, { reset, preserve, expanded, anchorId, anchorTop, f
     for (const [id, previous] of displayed) {
       const next = incoming.get(id);
       if (next && JSON.stringify(previous) === JSON.stringify(next)) continue;
+      pronunciation.stop(id);
       const editor = editors.get(id);
       editor?.dispose();
       editor?.card.remove();
@@ -605,7 +621,9 @@ function saveSettings(patch) {
   settingsWrites = settingsWrites.then(async () => {
     try {
       if (source !== sourceRevision) throw new Error("accountSuperseded");
-      settings = await api("settings/update", patch);
+      const confirmedCapabilities = settings?._capabilities;
+      const updated = await api("settings/update", patch);
+      settings = { ...updated, _capabilities: updated._capabilities ?? confirmedCapabilities };
     } catch (error) {
       if (source !== sourceRevision) return;
       settingsWriteError = error;
@@ -758,6 +776,7 @@ new IntersectionObserver(maybeLoadMore, { rootMargin: "250px" }).observe(
 window.addEventListener("beforeunload", (event) => {
   if (hasDirtyEditors()) { event.preventDefault(); event.returnValue = ""; }
 });
+window.addEventListener("pagehide", () => pronunciation.stop());
 document.addEventListener("visibilitychange", synchronize);
 window.addEventListener("focus", synchronize);
 setInterval(synchronize, 3000);
@@ -798,7 +817,7 @@ if (localAccount) {
         ++historyFeed.version;
         historyFeed.loading = false;
         clearTimeout(searchTimer);
-        resetSpeechButton();
+        pronunciation.stop();
       }
       accountPaused = next;
       $("#records-panel").inert = next && !accountDraftBlocked;

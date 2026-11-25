@@ -1,6 +1,42 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHostTransport } from "../web/host-transport.js";
+import { MAX_AUDIO_BYTES } from "../web/pronunciation.js";
+
+test("native pronunciation preserves binary audio without a file download or export receipt", async () => {
+  const bytes = Uint8Array.from([0, 128, 255, 42]);
+  const calls = [];
+  const host = createHostTransport({
+    callServerTool: async (request) => {
+      calls.push(request.arguments);
+      return { structuredContent: { status: 200, audio: {
+        blob: Buffer.from(bytes).toString("base64"), mime_type: "audio/wav",
+      } } };
+    },
+    downloadFile() { assert.fail("pronunciation is never a download"); },
+  });
+  const response = await host.request("audio", { record_id: 7, expected_epoch: 2 });
+  assert.equal(response.headers.get("Content-Type"), "audio/wav");
+  assert.equal(response.headers.get("Content-Disposition"), null);
+  assert.equal(response.headers.get("X-Export-Receipt"), null);
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()), bytes);
+  assert.deepEqual(calls, [{ route: "audio", payload: { record_id: 7, expected_epoch: 2 } }]);
+});
+
+test("native audio rejects malformed, unsupported and oversized replies, preserving backend error status", async () => {
+  for (const audio of [undefined, { blob: "!bad", mime_type: "audio/wav" },
+    { blob: "AA==", mime_type: "text/html" }, { blob: "", mime_type: "audio/wav" },
+    { blob: Buffer.alloc(MAX_AUDIO_BYTES + 1).toString("base64"), mime_type: "audio/mpeg" }]) {
+    const host = createHostTransport({ callServerTool: async () => ({ structuredContent: { status: 200, audio } }) });
+    await assert.rejects(host.request("audio", { record_id: 7 }), /speechUnavailable/);
+  }
+  const host = createHostTransport({ callServerTool: async () => ({
+    structuredContent: { status: 429, data: { error: "speech_busy" } },
+  }) });
+  const response = await host.request("audio", { record_id: 7 });
+  assert.equal(response.status, 429);
+  assert.deepEqual(await response.json(), { error: "speech_busy" });
+});
 
 test("native bridge forwards validated page requests and preserves HTTP error semantics", async () => {
   const calls = [];

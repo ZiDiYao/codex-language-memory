@@ -235,6 +235,14 @@ class RoutingStore:
         return self._dispatch("get_point", arguments=(record_id,),
                               cloud=lambda epoch: self._api(f"/v1/points/{_remote_id(record_id)}", epoch=epoch))
 
+    def audio(self, record_id):
+        snapshot = self._snapshot()
+        if snapshot["mode"] != "cloud":
+            raise CloudFeatureUnavailable("cloud_speech")
+        identifier = _remote_id(record_id)
+        return self._dispatch("audio", cloud=lambda epoch: self._response(
+            self._account.request_audio(identifier, expected_epoch=epoch)), migrate=False)
+
     def update(self, record_id, patch: Patch, expected_revision=None):
         return self._dispatch("update", arguments=(record_id, patch, expected_revision), cloud=lambda epoch: self._tool(
             "update_point", {"record_id": record_id, "patch": patch.model_dump(mode="json", exclude_unset=True),

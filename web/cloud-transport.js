@@ -27,11 +27,18 @@ function target(action, arguments_) {
 export function createCloudTransport({ apiBaseUrl, session, fetchImpl = globalThis.fetch }) {
   const base = new URL(apiBaseUrl);
   return {
-    capabilities: Object.freeze({ export: false, speech: false }),
+    capabilities: Object.freeze({ export: false, speech: true }),
     async request(route, payload) {
       // Unsupported local-only operations never fall back to loopback or MCP.
-      if (route !== "api" || !payload || typeof payload.action !== "string") throw new Error("unavailable");
-      const operation = target(payload.action, payload.arguments || {});
+      let operation;
+      if (route === "audio") {
+        if (!payload || Object.keys(payload).some((key) => !["record_id", "expected_epoch"].includes(key)))
+          throw new Error("invalid");
+        operation = { method: "GET", path: "/v1/points/" + identifier(payload.record_id) + "/audio" };
+      } else {
+        if (route !== "api" || !payload || typeof payload.action !== "string") throw new Error("unavailable");
+        operation = target(payload.action, payload.arguments || {});
+      }
       const url = new URL(operation.path, base);
       for (const [key, value] of Object.entries(operation.query || {})) {
         if (value === null || value === undefined) continue;

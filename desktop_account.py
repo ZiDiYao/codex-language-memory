@@ -10,6 +10,7 @@ import base64
 from concurrent.futures import TimeoutError as FutureTimeout
 from contextlib import contextmanager, asynccontextmanager
 import contextvars
+import copy
 from datetime import timedelta
 import fcntl
 import hashlib
@@ -218,19 +219,37 @@ def _token_identity(tokens):
 
 class KeychainTokenStorage:
     """SDK TokenStorage implementation bound to one cross-process account epoch."""
-    def __init__(self, credentials, state, epoch):
+    def __init__(self, credentials, state, epoch, *, request_scoped=False):
         self.credentials, self.state, self.epoch = credentials, state, epoch
         self.expires_at = 0.0
+        # Only AccountManager's noninteractive provider opts in, while holding
+        # the profile's operation lock. A new provider/storage is built for
+        # every remote request, so another process's refresh is observed next
+        # time. The SDK otherwise rereads the same Keychain item three times.
+        self._request_scoped = request_scoped
+        self._request_envelope = None
 
     @contextmanager
     def _envelope(self):
         with self.state.locked() as state:
             if state["epoch"] != self.epoch or state["mode"] != "cloud":
                 raise AccountError("account_changed")
-            value = self.credentials.read()
-            if value.get("epoch") != self.epoch:
-                value = {"epoch": self.epoch}
+            if self._request_scoped and self._request_envelope is not None:
+                value = copy.deepcopy(self._request_envelope)
+            else:
+                value = self.credentials.read()
+                if value.get("epoch") != self.epoch:
+                    value = {"epoch": self.epoch}
+                if self._request_scoped:
+                    self._request_envelope = copy.deepcopy(value)
             yield value
+
+    def _persist(self, value):
+        self.credentials.write(value)
+        if self._request_scoped:
+            # Publish only after the native store accepted the update. A
+            # failed refresh/write must not expose unpersisted credentials.
+            self._request_envelope = copy.deepcopy(value)
 
     async def get_tokens(self):
         with self._envelope() as value:
@@ -250,7 +269,7 @@ class KeychainTokenStorage:
                 tokens = tokens.model_copy(update={"refresh_token": value["tokens"]["refresh_token"]})
             self.expires_at = min(jwt_expiry, time.time() + tokens.expires_in) if tokens.expires_in is not None else jwt_expiry
             value.update(tokens=tokens.model_dump(mode="json"), identity=identity, expires_at=self.expires_at)
-            self.credentials.write(value)
+            self._persist(value)
 
     async def get_client_info(self):
         with self._envelope() as value:
@@ -267,7 +286,7 @@ class KeychainTokenStorage:
             raise AccountError("authentication_required")
         with self._envelope() as value:
             value["client"] = client_info.model_dump(mode="json")
-            self.credentials.write(value)
+            self._persist(value)
 
 
 class _Provider(OAuthClientProvider):
@@ -684,7 +703,7 @@ class AccountManager:
         return self.status()
 
     async def _provider(self, epoch, *, callback=None):
-        storage = KeychainTokenStorage(self.credentials, self.state, epoch)
+        storage = KeychainTokenStorage(self.credentials, self.state, epoch, request_scoped=callback is None)
         old_client = await storage.get_client_info() if callback is None else None
         redirect = await callback.start() if callback else str(old_client.redirect_uris[0]) if old_client and old_client.redirect_uris else "http://127.0.0.1:1/oauth/callback"
         metadata = OAuthClientMetadata(redirect_uris=[redirect], token_endpoint_auth_method="none",
@@ -782,6 +801,92 @@ class AccountManager:
                         raise AccountError("invalid_cloud_response")
                     return result.structuredContent
 
+    async def _audio(self, epoch, access_token, path):
+        """Proxy bounded authenticated audio bytes, never provider URLs or keys."""
+        self._assert_epoch(epoch)
+        # Authentication/refresh completed under the operation lock. Synthesis
+        # uses this fixed bearer once, so its long stream cannot serialize chat
+        # captures or trigger an OAuth refresh outside that lock.
+        async with self._shared_client().stream("GET", API_ORIGIN + path, auth=None,
+                headers={"Accept": "audio/wav, audio/mpeg", "Authorization": "Bearer " + access_token}) as response:
+            if response.status_code in (401, 403):
+                self._metadata_cache = None
+                raise AccountError("authentication_required")
+            if response.status_code != 200:
+                if response.status_code == 404:
+                    return {"status": "not_found", "error": "not_found"}
+                if response.status_code == 429:
+                    return {"status": "failed", "error": "speech_busy"}
+                if response.status_code == 422:
+                    try:
+                        maximum_error = 4096
+                        declared_error = int(response.headers.get("content-length", "0"))
+                        if not 0 <= declared_error <= maximum_error:
+                            raise ValueError()
+                        chunks, size = [], 0
+                        async for chunk in response.aiter_bytes(chunk_size=maximum_error + 1):
+                            size += len(chunk)
+                            if size > maximum_error:
+                                raise ValueError()
+                            chunks.append(chunk)
+                        code = json.loads(b"".join(chunks)).get("error")
+                    except (ValueError, UnicodeError, AttributeError):
+                        code = None
+                    return {"status": "failed", "error": "speech_language_unavailable" if code == "speech_language_unavailable" else "speech_unavailable"}
+                return {"status": "failed", "error": "speech_unavailable"}
+            mime = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+            if mime not in ("audio/wav", "audio/mpeg"):
+                raise AccountError("invalid_cloud_response")
+            maximum = 2 * 1024 * 1024
+            try:
+                declared = int(response.headers.get("content-length", "0"))
+            except ValueError:
+                raise AccountError("invalid_cloud_response") from None
+            if not 0 <= declared <= maximum:
+                raise AccountError("invalid_cloud_response")
+            chunks, size = [], 0
+            async for chunk in response.aiter_bytes():
+                size += len(chunk)
+                if size > maximum:
+                    raise AccountError("invalid_cloud_response")
+                chunks.append(chunk)
+            if not size or (declared and size != declared):
+                raise AccountError("invalid_cloud_response")
+            return {"status": "ok", "audio": b"".join(chunks), "mime_type": mime}
+
+    async def _remote_audio(self, epoch, path, *, budget=None):
+        """Serialize credential refresh, then release captures during synthesis."""
+        token = _account_context.set(True)
+        budget = self.request_timeout if budget is None else budget
+        try:
+            async with asyncio.timeout(budget):
+                async with self.state.operation(budget):
+                    self._assert_epoch(epoch)
+                    provider = await self._provider(epoch)
+                    settings = await self._rest(provider, "GET", "/v1/settings")
+                    if "enabled" not in settings:
+                        raise AccountError("invalid_cloud_response")
+                    current = provider.context.current_tokens
+                    if current is None or not current.access_token:
+                        raise AccountError("authentication_required")
+                    access_token = current.access_token
+                    self._assert_epoch(epoch)
+                result = await self._audio(epoch, access_token, path)
+                self._assert_epoch(epoch)
+                with self.state.locked() as state:
+                    if state["epoch"] != epoch or state["mode"] != "cloud":
+                        raise AccountError("account_changed")
+                    state.update(state="connected")
+                    state.pop("error", None)
+                    state.pop("credential_os_status", None)
+                return result
+        except Exception as error:
+            safe = _account_error(error)
+            self._failure(epoch, safe.code, safe.credential_os_status)
+            raise safe from None
+        finally:
+            _account_context.reset(token)
+
     def _failure(self, epoch, code, credential_os_status=None):
         with self.state.locked() as state:
             if state["epoch"] != epoch or state["mode"] != "cloud":
@@ -830,7 +935,9 @@ class AccountManager:
             _account_context.reset(token)
 
     async def _remote(self, epoch, *, name=None, arguments=None, path=None, params=None, method="GET", body=None,
-                      budget=None, capture_context=False):
+                      budget=None, capture_context=False, audio=False):
+        if audio:
+            return await self._remote_audio(epoch, path, budget=budget)
         token = _account_context.set(True)
         budget = self.request_timeout if budget is None else budget
         started = time.perf_counter()
@@ -941,6 +1048,11 @@ class AccountManager:
         if method != "GET" or not valid or params or json is not None:
             raise AccountError("unsupported_cloud_operation")
         return self._call(path=path, expected_epoch=expected_epoch)
+
+    def request_audio(self, record_id, *, expected_epoch=None):
+        if type(record_id) is not int or not 0 < record_id <= 9007199254740991:
+            raise AccountError("unsupported_cloud_operation")
+        return self._call(path=f"/v1/points/{record_id}/audio", audio=True, expected_epoch=expected_epoch)
 
     def close(self):
         """Release this process's callback/worker, without signing other clients out."""

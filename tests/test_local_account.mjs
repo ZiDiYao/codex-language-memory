@@ -164,6 +164,11 @@ test("desktop data requests bind the observed account epoch while account action
     globalThis.languageMemoryRuntime = { request: async (route, payload) => { calls.push({ route, payload }); return Response.json({}); } };
     await request("api", { action: "points/query", arguments: {} });
     assert.equal(calls[2].payload.expected_epoch, undefined);
+    await request("audio", { record_id: 4 });
+    assert.equal(calls[3].payload.expected_epoch, undefined);
+    delete globalThis.languageMemoryRuntime;
+    await request("audio", { record_id: 4 });
+    assert.deepEqual(calls[4], { route: "audio", payload: { record_id: 4, expected_epoch: 7 } });
   } finally {
     setAccountEpoch(null);
     if (previousHost) globalThis.languageMemoryHost = previousHost; else delete globalThis.languageMemoryHost;

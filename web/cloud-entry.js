@@ -31,7 +31,7 @@ function sessionMessage(key, login = true) {
 translateShell();
 status("cloudLoading");
 // Browser back/forward caching must not restore a previous account's library.
-window.addEventListener("pagehide", () => { $("main").hidden = true; });
+window.addEventListener("pagehide", () => { runtime?.stopPronunciation?.(); $("main").hidden = true; });
 window.addEventListener("pageshow", (event) => { if (event.persisted) window.location.reload(); });
 let client;
 let session;
@@ -84,6 +84,7 @@ async function initialize() {
     session = new CloudSession(client, {
       issuer: `https://${config.auth0Domain}/`,
       onRequired: (reason) => {
+        runtime?.stopPronunciation?.();
         profile.setStatus("accountSignedOut");
         sessionMessage(reason === "accountChanged" ? "cloudAccountChanged" : "cloudSessionExpired");
       },

@@ -2,6 +2,7 @@ import { AuthenticationError, authenticate, createTokenVerifier } from "./auth.j
 import { handleMcpRequest } from "./mcp.js";
 import { parse, ValidationError } from "./schemas.js";
 import { MAX_DESKTOP_IMPORT_BODY } from "./desktop-import.js";
+import { SpeechError } from "./speech.js";
 
 export const MAX_BODY = 1024 * 1024;
 const REST_METHODS = Object.freeze({
@@ -11,7 +12,8 @@ const REST_METHODS = Object.freeze({
   "/v1/languages": ["GET"], "/v1/changes": ["GET"],
   "/v1/desktop-imports": ["POST"],
 });
-const restMethods = (path) => REST_METHODS[path] ?? (/^\/v1\/points\/\d+$/.test(path) ? ["GET", "PATCH", "DELETE"] : null);
+const restMethods = (path) => REST_METHODS[path] ?? (/^\/v1\/points\/\d+$/.test(path) ? ["GET", "PATCH", "DELETE"]
+  : /^\/v1\/points\/\d+\/audio$/.test(path) ? ["GET"] : null);
 
 export class APIError extends Error {
   constructor(status, code) { super(code); this.status = status; this.code = code; }
@@ -107,7 +109,7 @@ function resultStatus(result) {
 }
 
 /** Native Node HTTP handler; authentication is shared by every data operation. */
-export function createApp({ config, repositoryFactory, verifyToken, readiness, logger = console }) {
+export function createApp({ config, repositoryFactory, verifyToken, readiness, speech, logger = console }) {
   const verify = verifyToken ?? createTokenVerifier(config);
   const importConfig = { ...config, requiredScopes: ["memory:write"] };
   const verifyImport = verifyToken ?? createTokenVerifier(importConfig);
@@ -156,7 +158,7 @@ export function createApp({ config, repositoryFactory, verifyToken, readiness, l
         if (url.search) throw new APIError(422, "invalid_request");
         result = await call("import_desktop", await readJson(request, MAX_DESKTOP_IMPORT_BODY));
       }
-      else if (path === "/v1/settings" && request.method === "GET") result = { ...await call("settings"), _capabilities: { lightweight_capture: true, capture_context: true } };
+      else if (path === "/v1/settings" && request.method === "GET") result = { ...await call("settings"), _capabilities: { lightweight_capture: true, capture_context: true, cloud_speech: speech?.enabled === true } };
       else if (path === "/v1/settings" && request.method === "PATCH") result = await call("settings", parse("settingsPatch", await readJson(request)));
       else if (["/v1/languages", "/v1/changes"].includes(path) && request.method === "GET") {
         if (url.search) throw new APIError(422, "invalid_request");
@@ -175,6 +177,25 @@ export function createApp({ config, repositoryFactory, verifyToken, readiness, l
       else if (path === "/v1/captures" && request.method === "POST") {
         const args = parse("capture", await readJson(request));
         result = await call("save", args.request_id, args.items, args.source);
+      } else if (/^\/v1\/points\/\d+\/audio$/.test(path) && request.method === "GET") {
+        if (url.search || request.headers['transfer-encoding'] || (request.headers['content-length'] && request.headers['content-length'] !== '0'))
+          throw new APIError(422, "invalid_request");
+        const id = Number(path.split('/').at(-2));
+        if (!Number.isSafeInteger(id) || id < 1) throw new APIError(422, "invalid_request");
+        const point = await call('get_point', id);
+        if (point.status !== 'found') return send(response, 404, { error: 'not_found' });
+        if (!speech?.enabled) throw new SpeechError();
+        const controller = new AbortController();
+        const disconnected = () => { if (!response.writableEnded) controller.abort(); };
+        response.once('close', disconnected);
+        try {
+          const audio = await speech.audio({ principal, record: point.record, signal: controller.signal });
+          if (response.destroyed) return;
+          response.writeHead(200, { 'Content-Type': audio.mimeType, 'Content-Length': audio.bytes.length,
+            'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff',
+            'X-Sayrove-Speech-Source': 'ai' });
+          return response.end(audio.bytes);
+        } finally { response.off('close', disconnected); }
       } else if (/^\/v1\/points\/\d+$/.test(path)) {
         const id = Number(path.split("/").at(-1));
         if (!Number.isSafeInteger(id) || id < 1) throw new APIError(422, "invalid_request");
@@ -198,6 +219,7 @@ export function createApp({ config, repositoryFactory, verifyToken, readiness, l
         "WWW-Authenticate": `Bearer error="${error.code}", resource_metadata="${config.publicUrl}/.well-known/oauth-protected-resource/mcp"`,
       });
       if (error instanceof APIError) return send(response, error.status, { error: error.code });
+      if (error instanceof SpeechError) return send(response, error.status, { error: error.code }, error.status === 429 ? { 'Retry-After': '5' } : {});
       if (error instanceof ValidationError || error?.code === "invalid_request") return send(response, 422, { error: "invalid_request" });
       logger.error("cloud_request_failed");
       return send(response, 503, { error: "unavailable" });

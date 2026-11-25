@@ -12,6 +12,7 @@ from mcp.types import Icon, ToolAnnotations
 from pydantic import ValidationError
 
 from dashboard_actions import dispatch
+from cloud_audio import audio_response
 from desktop_actions import connection_error
 from exports import ExportError, ExportRequest, build_export, export_scope
 
@@ -40,6 +41,7 @@ class AppTransport:
                 "api": self._api,
                 "export": self._export,
                 "export_complete": self._complete_export,
+                "audio": self._audio,
             }
             if not isinstance(payload, dict) or route not in handlers:
                 raise ValueError("Invalid request")
@@ -85,6 +87,12 @@ class AppTransport:
                 del self.pending_exports[payload["receipt"]]
         return {"status": 200, "data": {"status": "ok"}}
 
+    def _audio(self, payload):
+        status, body, mime = audio_response(self.store, payload)
+        if status != 200:
+            return {"status": status, "data": body}
+        return {"status": 200, "audio": {"blob": base64.b64encode(body).decode("ascii"), "mime_type": mime}}
+
 
 def register_app(server, store):
     transport = AppTransport(store)
@@ -112,7 +120,7 @@ def register_app(server, store):
     @server.tool(name="memory_app_request", title="Sayrove page actions",
                  annotations=ToolAnnotations(destructiveHint=False, openWorldHint=getattr(store, "account", None) is not None),
                  meta={"ui": {"visibility": ["app"]}})
-    def memory_app_request(route: Literal["api", "export", "export_complete"],
+    def memory_app_request(route: Literal["api", "export", "export_complete", "audio"],
                            payload: dict[str, Any]) -> dict[str, Any]:
         """App-only bridge for validated dashboard actions and local export downloads."""
         return transport.request(route, payload)

@@ -13,6 +13,8 @@ Keep automatic recording invisible in the assistant's text: no skill-use announc
 
 ## Ordinary learning
 
+For a short question whose answer language is explicit or already confirmed in this learning exchange, start with a brief useful learning answer before automatic capture. A requested target-language translation (such as “芹菜的英文”) can start with that translation. No progress preamble. Then submit silently; do not add a second answer or confirmation just for recording. If confirmed preferences are unavailable and needed to answer, obtain the single capture/context result first. Honor newer preferences and account changes; never infer first language to take this fast path.
+
 For a real learning gap, call `capture_and_context` once: fresh `request_id`, `items`, `source=automatic` (`explicit` for requested saves). Items need only `kind` (word/expression/grammar/correction), target-language `language`, canonical `title`, necessary original `context`/already given `corrected_sentence`. Batch actual targets or requested unsaved chat targets. Backend deduplicates/enriches; omit generated meanings, examples and scenes.
 
 No preliminary `get_settings`/search/scenes/profile/history calls, reference reads or polling. Answer language: explicit request, else `_context.explanation_language`, else confirmed `_context.first_language`. Never infer first language from chat/UI/target. If unset, answer the immediate question without a setup prompt; persist preferences only when explicitly confirmed. Answer directly without record-status text.

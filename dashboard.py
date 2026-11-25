@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 from pydantic import ValidationError
 
 from dashboard_actions import dispatch
+from cloud_audio import audio_response
 from desktop_actions import connection_error
 from exports import ExportError, ExportRequest, build_export, record_export
 from store import Store
@@ -34,6 +35,7 @@ ASSETS = {
     "i18n.js": ("i18n.js", "text/javascript; charset=utf-8"),
     "style.css": ("style.css", "text/css; charset=utf-8"),
     "local-profile.js": ("local-profile.js", "text/javascript; charset=utf-8"),
+    "pronunciation.js": ("pronunciation.js", "text/javascript; charset=utf-8"),
 }
 
 
@@ -55,7 +57,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Content-Security-Policy",
                          "default-src 'none'; script-src 'self'; style-src 'self'; "
-                         "connect-src 'self'; base-uri 'none'; frame-ancestors 'none'")
+                         "connect-src 'self'; media-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'")
         self.end_headers()
         self.wfile.write(data)
 
@@ -78,7 +80,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         route = self.route()
-        if route not in {"api", "export"}:
+        if route not in {"api", "export", "audio"}:
             self.respond(404, {"error": "not_found"})
             return
         origin = f"http://127.0.0.1:{self.server.server_port}"
@@ -91,6 +93,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             request = self.read_request()
             if route == "export":
                 self.export(request)
+            elif route == "audio":
+                self.respond(*audio_response(self.server.store, request))
             else:
                 self.respond(200, dispatch(self.server.store, request))
         except ExportError as error:

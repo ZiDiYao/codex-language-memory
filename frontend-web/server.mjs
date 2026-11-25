@@ -62,7 +62,7 @@ export async function readPublicFiles(root) {
 export function createWebHandler({ config, files }) {
   const publicHost = new URL(config.publicUrl).host;
   const csp = ["default-src 'none'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:", "font-src 'self'", "worker-src 'self'",
+    "img-src 'self' data:", "media-src 'self' blob:", "font-src 'self'", "worker-src 'self'",
     `connect-src 'self' ${config.authOrigin} ${config.apiOrigin}`,
     `frame-src ${config.authOrigin}`, "object-src 'none'", "base-uri 'none'",
     "frame-ancestors 'none'", "form-action 'self'"].join('; ');

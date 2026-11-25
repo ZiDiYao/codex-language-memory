@@ -1,3 +1,5 @@
+import { MAX_AUDIO_BYTES, audioMimeType } from "./pronunciation.js";
+
 // Only the MCP entry imports this adapter. Standalone pages need no host SDK.
 export function createHostTransport(app) {
   async function call(route, payload) {
@@ -15,6 +17,17 @@ export function createHostTransport(app) {
     },
     async request(route, payload) {
       const reply = await call(route, payload);
+      if (route === "audio" && reply.status === 200) {
+        const audio = reply.audio;
+        const type = audioMimeType(audio?.mime_type);
+        if (typeof audio.blob !== "string" || !audio.blob.length ||
+            audio.blob.length > 4 * Math.ceil(MAX_AUDIO_BYTES / 3)) throw new Error("speechUnavailable");
+        let bytes;
+        try { bytes = Uint8Array.from(atob(audio.blob), (character) => character.charCodeAt(0)); }
+        catch { throw new Error("speechUnavailable"); }
+        if (!bytes.length || bytes.length > MAX_AUDIO_BYTES) throw new Error("speechUnavailable");
+        return new Response(bytes, { headers: { "Content-Type": type, "Content-Length": String(bytes.length) } });
+      }
       if (reply.file && reply.status === 200) {
         const file = reply.file;
         return new Response(Uint8Array.from(atob(file.blob), (c) => c.charCodeAt(0)), {

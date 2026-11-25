@@ -9,7 +9,8 @@ export function setAccountEpoch(value) {
 export async function request(route, payload) {
   try {
     if (globalThis.languageMemoryRuntime) return await globalThis.languageMemoryRuntime.request(route, payload);
-    if (route === "api" && typeof payload?.action === "string" && !payload.action.startsWith("account/") && accountEpoch !== undefined)
+    if (accountEpoch !== undefined && (route === "audio" ||
+        (route === "api" && typeof payload?.action === "string" && !payload.action.startsWith("account/"))))
       payload = { ...payload, expected_epoch: accountEpoch };
     if (globalThis.languageMemoryHost) return await globalThis.languageMemoryHost.request(route, payload);
     return await fetch(route, {

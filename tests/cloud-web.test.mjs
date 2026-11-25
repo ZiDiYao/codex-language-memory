@@ -72,6 +72,47 @@ test("an API 401 pauses all requests and never retries an autosave under another
   assert.deepEqual(notifications, ["authenticationRequired"]);
 });
 
+test("cloud pronunciation retrieves stored-record audio with bearer auth and no text, query, cookies or download", async () => {
+  const { session } = sessionFixture();
+  const calls = [];
+  const transport = createCloudTransport({ apiBaseUrl: "https://memory.example", session, fetchImpl: async (url, options) => {
+    calls.push({ url, options });
+    return new Response(new Uint8Array([0, 128, 255]), { headers: { "Content-Type": "audio/mpeg" } });
+  } });
+  assert.equal(transport.capabilities.speech, true);
+  const response = await transport.request("audio", { record_id: 7 });
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()), new Uint8Array([0, 128, 255]));
+  assert.equal(calls[0].url, "https://memory.example/v1/points/7/audio");
+  assert.equal(calls[0].options.method, "GET");
+  assert.equal(calls[0].options.body, undefined);
+  assert.equal(calls[0].options.credentials, "omit");
+  assert.equal(calls[0].options.cache, "no-store");
+  assert.equal(calls[0].options.headers.Authorization, "Bearer " + uiToken("alice"));
+  for (const payload of [{ record_id: "7" }, { record_id: 0 }, { record_id: 7, text: "private text" }, { record_id: 7, voice: "local" }])
+    await assert.rejects(transport.request("audio", payload), /invalid/);
+  assert.equal(calls.length, 1);
+});
+
+test("late cloud audio is rejected after account invalidation and a 401 pauses without retry", async () => {
+  const { session } = sessionFixture();
+  const pending = deferred();
+  const transport = createCloudTransport({ apiBaseUrl: "https://memory.example", session, fetchImpl: () => pending.promise });
+  const audio = transport.request("audio", { record_id: 7 });
+  await new Promise((resolve) => setImmediate(resolve));
+  session.pause("accountChanged");
+  pending.resolve(new Response(new Uint8Array([1]), { headers: { "Content-Type": "audio/wav" } }));
+  await assert.rejects(audio, /accountChanged/);
+  const next = sessionFixture();
+  let calls = 0;
+  const unauthorized = createCloudTransport({ apiBaseUrl: "https://memory.example", session: next.session,
+    fetchImpl: async () => { ++calls; return Response.json({ error: "invalid_token" }, { status: 401 }); },
+  });
+  await assert.rejects(unauthorized.request("audio", { record_id: 7 }), /authenticationRequired/);
+  await assert.rejects(unauthorized.request("audio", { record_id: 7 }), /authenticationRequired/);
+  assert.equal(calls, 1);
+  assert.deepEqual(next.notifications, ["authenticationRequired"]);
+});
+
 test("an account change locks the previous page and rejects its late responses", async () => {
   const { session, notifications, state } = sessionFixture();
   const pending = deferred();

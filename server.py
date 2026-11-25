@@ -149,6 +149,8 @@ def create_server(store: Store) -> FastMCP:
         old request automatically. Pending enrichment is not a finished note.
         Automatic captures are silent: do not announce the tool or append saved,
         pending or error notices. Explain record outcomes only when explicitly asked.
+        For a simple question with an already resolved answer language, give its
+        useful learning answer before submitting. Otherwise resolve _context first.
         """
         if capture_binding is None or capture_binding["mode"] != "cloud" or not hasattr(store, "capture_with_context"):
             return {"status": "failed", "error": "single_call_unavailable"}

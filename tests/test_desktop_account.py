@@ -4,6 +4,7 @@ import base64
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import timedelta
+import fcntl
 import json
 import logging
 from pathlib import Path
@@ -59,6 +60,25 @@ class FakeCallback:
         self.closed = True
 
 
+class AudioStream(httpx.AsyncByteStream):
+    def __init__(self, chunks, *, entered=None, release=None):
+        self.chunks, self.entered, self.release = chunks, entered, release
+        self.chunks_read = 0
+        self.closed = False
+
+    async def __aiter__(self):
+        if self.entered:
+            self.entered.set()
+            while not self.release.is_set():
+                await asyncio.sleep(0.002)
+        for chunk in self.chunks:
+            self.chunks_read += 1
+            yield chunk
+
+    async def aclose(self):
+        self.closed = True
+
+
 class MockCloud:
     def __init__(self):
         self.registrations = []
@@ -80,6 +100,10 @@ class MockCloud:
         self.requests = []
         self.lightweight_capture = False
         self.single_call_status = 200
+        self.audio_requests = []
+        self.audio_status = 200
+        self.audio_headers = {"Content-Type": "audio/wav"}
+        self.audio_stream = None
 
     async def __call__(self, request):
         url = str(request.url)
@@ -116,6 +140,10 @@ class MockCloud:
             if not request.headers.get("authorization"):
                 return httpx.Response(401, headers={"WWW-Authenticate": 'Bearer resource_metadata="' + account.PRM + '"'})
             if request.url.path.startswith("/v1/"):
+                if request.url.path.endswith("/audio"):
+                    self.audio_requests.append(request)
+                    values = {"stream": self.audio_stream} if self.audio_stream is not None else {"content": b"RIFF-fixture-audio"}
+                    return httpx.Response(self.audio_status, headers=self.audio_headers, **values)
                 tools = {"/v1/settings": "get_settings", "/v1/scenes": "list_scenes", "/v1/points": "find_points", "/v1/captures": "save_points", "/v1/observations": "capture_points", "/v1/observations/context": "capture_and_context"}
                 if request.url.path in tools:
                     name = tools[request.url.path]
@@ -202,6 +230,134 @@ class DesktopAccountTests(unittest.TestCase):
         self.assertEqual(self.cloud.calls[-1]["arguments"]["request_id"], "perf-idempotent")
         self.assertEqual(result["status"], "processed")
         self.assertEqual(result["_timing"]["deadline_ms"], 1500)
+
+    def test_each_remote_request_reads_credential_envelope_once_without_cross_request_cache(self):
+        self.login()
+        with patch.object(self.keyring, "get_password", wraps=self.keyring.get_password) as read:
+            self.assertEqual(self.manager.call_tool("get_settings"), {"enabled": True})
+            self.assertEqual(read.call_count, 1)
+            self.assertEqual(self.manager.call_tool("get_settings"), {"enabled": True})
+            self.assertEqual(read.call_count, 2, "a new request must observe current cross-process credentials")
+
+    def test_request_snapshot_refresh_persists_and_reuses_updated_credentials(self):
+        self.login()
+        self.expire()
+        with patch.object(self.keyring, "get_password", wraps=self.keyring.get_password) as read:
+            self.assertEqual(self.manager.call_tool("get_settings"), {"enabled": True})
+            self.assertEqual(read.call_count, 1, "SDK initialization and refresh must share this request snapshot")
+        self.assertEqual(sum(form["grant_type"] == ["refresh_token"] for form in self.cloud.exchanges), 1)
+        self.assertGreater(self.manager.credentials.read()["expires_at"], time.time() + 3000)
+
+    def test_request_snapshot_rejects_an_epoch_change_even_after_loading_credentials(self):
+        self.login()
+        storage = account.KeychainTokenStorage(self.manager.credentials, self.manager.state,
+            self.manager.status()["epoch"], request_scoped=True)
+        self.assertIsNotNone(asyncio.run(storage.get_tokens()))
+        self.manager.disconnect()
+        with self.assertRaises(account.AccountError) as raised:
+            asyncio.run(storage.get_client_info())
+        self.assertEqual(raised.exception.code, "account_changed")
+        with self.assertRaises(account.AccountError):
+            asyncio.run(storage.set_tokens(OAuthToken(access_token=access_token(), expires_in=300)))
+
+    def test_failed_native_write_does_not_publish_unpersisted_request_snapshot(self):
+        self.login()
+        storage = account.KeychainTokenStorage(self.manager.credentials, self.manager.state,
+            self.manager.status()["epoch"], request_scoped=True)
+        original = asyncio.run(storage.get_tokens())
+        replacement = OAuthToken(access_token=access_token(expiry=time.time() + 5000), expires_in=5000)
+        with patch.object(storage.credentials, "write", side_effect=account.AccountError("credential_store_unavailable")):
+            with self.assertRaises(account.AccountError):
+                asyncio.run(storage.set_tokens(replacement))
+        self.assertEqual(asyncio.run(storage.get_tokens()).access_token, original.access_token)
+        self.assertEqual(self.manager.credentials.read()["tokens"]["access_token"], original.access_token)
+
+    def test_audio_refresh_is_serialized_but_synthesis_does_not_block_other_captures(self):
+        refresh_lock_checks, audio_lock_checks = [], []
+        def operation_held():
+            # A separately opened descriptor detects the same cross-process lock
+            # used by production managers without relying on timing assertions.
+            with self.state_path.with_suffix(".operation.lock").open("a") as lock:
+                try:
+                    fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    return True
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+                return False
+        async def transport(request):
+            if str(request.url) == account.TOKEN and parse_qs(request.content.decode()).get("grant_type") == ["refresh_token"]:
+                refresh_lock_checks.append(operation_held())
+            if request.url.path.endswith("/audio"):
+                audio_lock_checks.append(operation_held())
+            return await self.cloud(request)
+        self.transport = httpx.MockTransport(transport)
+        self.manager.http_transport = self.transport
+        self.login()
+        self.expire()
+        other = self.new_manager()
+        entered, release = threading.Event(), threading.Event()
+        stream = AudioStream([b"RIFF-fixture-audio"], entered=entered, release=release)
+        self.cloud.audio_stream = stream
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            audio = workers.submit(self.manager.request_audio, 7, expected_epoch=self.manager.status()["epoch"])
+            try:
+                self.assertTrue(entered.wait(2), "audio stream must start")
+                capture = workers.submit(other.call_tool, "capture_and_context", {
+                    "request_id": "during-speech-001", "items": [{"kind": "word", "language": "en", "title": "secure"}]})
+                self.assertEqual(capture.result(timeout=2)["status"], "processed")
+                self.assertFalse(audio.done(), "capture completes while synthesis is still waiting")
+            finally:
+                release.set()
+            self.assertEqual(audio.result(timeout=3)["status"], "ok")
+        self.assertEqual(refresh_lock_checks, [True], "refresh stays inside the cross-process operation lock")
+        self.assertEqual(audio_lock_checks, [False], "the fixed bearer stream must release that lock")
+        self.assertEqual(len(self.cloud.audio_requests), 1)
+        self.assertTrue(stream.closed)
+
+    def test_audio_unauthorized_after_pre_auth_does_not_refresh_or_replay(self):
+        self.login()
+        self.expire()
+        self.cloud.audio_status = 401
+        with self.assertRaises(account.AccountError) as raised:
+            self.manager.request_audio(7, expected_epoch=self.manager.status()["epoch"])
+        self.assertEqual(raised.exception.code, "authentication_required")
+        self.assertEqual(sum(form["grant_type"] == ["refresh_token"] for form in self.cloud.exchanges), 1)
+        self.assertEqual(len(self.cloud.audio_requests), 1, "audio GET cannot refresh or replay outside the lock")
+        self.assertEqual(self.manager.status()["state"], "signed_out")
+
+    def test_audio_bytes_are_discarded_after_account_epoch_changes_during_stream(self):
+        self.login()
+        epoch = self.manager.status()["epoch"]
+        entered, release = threading.Event(), threading.Event()
+        stream = AudioStream([b"RIFF-fixture-audio"], entered=entered, release=release)
+        self.cloud.audio_stream = stream
+        with ThreadPoolExecutor(max_workers=1) as workers:
+            pending = workers.submit(self.manager.request_audio, 7, expected_epoch=epoch)
+            try:
+                self.assertTrue(entered.wait(2))
+                with self.manager.state.locked() as state:
+                    state.update(epoch=epoch + 1, state="signed_out")
+            finally:
+                release.set()
+            with self.assertRaises(account.AccountError) as raised:
+                pending.result(timeout=3)
+        self.assertEqual(raised.exception.code, "account_changed")
+        self.assertEqual(self.manager.status()["state"], "signed_out")
+        self.assertTrue(stream.closed)
+
+    def test_audio_422_error_json_is_bounded_to_four_kib(self):
+        self.login()
+        for declared in (None, "4097"):
+            stream = AudioStream([b"x" * 4097, b"must-not-be-read"])
+            self.cloud.audio_status = 422
+            self.cloud.audio_stream = stream
+            self.cloud.audio_headers = {"Content-Type": "application/json"}
+            if declared:
+                self.cloud.audio_headers["Content-Length"] = declared
+            with self.subTest(declared_length=declared):
+                self.assertEqual(self.manager.request_audio(7), {"status": "failed", "error": "speech_unavailable"})
+                self.assertEqual(stream.chunks_read, 0 if declared else 1)
+                self.assertTrue(stream.closed)
 
     def test_lightweight_capture_uses_one_rest_write_with_original_payload_and_short_deadline(self):
         self.login()

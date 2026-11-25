@@ -73,7 +73,31 @@ export function loadConfig(environment = process.env) {
     enrichmentBaseUrl = absoluteUrl(enrichmentBaseUrl, 'SAYROVE_ENRICHMENT_BASE_URL', false).replace(/\/+$/, '');
   if (enrichmentProvider === 'openai-compatible' && !enrichmentBaseUrl)
     throw new Error('SAYROVE_ENRICHMENT_BASE_URL is required for openai-compatible');
+  const speechProvider = environment.SAYROVE_SPEECH_PROVIDER ?? 'disabled';
+  if (!['disabled', 'deepseek', 'openai-compatible'].includes(speechProvider))
+    throw new Error('SAYROVE_SPEECH_PROVIDER must name a registered provider');
+  const speechKeyName = speechProvider === 'deepseek' ? 'DEEPSEEK_API_KEY' : 'SAYROVE_SPEECH_API_KEY';
+  const speechRawKey = speechProvider === 'disabled' ? null : environment[speechKeyName];
+  if (speechRawKey != null && typeof speechRawKey !== 'string') throw new Error(`${speechKeyName} must be an API key`);
+  const speechApiKey = speechRawKey?.trim() || null;
+  const speechRawModel = environment.SAYROVE_SPEECH_MODEL;
+  if (speechRawModel != null && (typeof speechRawModel !== 'string' || speechRawModel.length > 120 || /[\r\n]/.test(speechRawModel)))
+    throw new Error('SAYROVE_SPEECH_MODEL must name a model');
+  const speechModel = speechProvider === 'deepseek' ? null : speechRawModel?.trim() || null;
+  const speechRawVoice = environment.SAYROVE_SPEECH_VOICE;
+  if (speechRawVoice != null && typeof speechRawVoice !== 'string') throw new Error('SAYROVE_SPEECH_VOICE must name a supported voice');
+  const speechVoice = speechRawVoice?.trim() || (speechProvider === 'deepseek' ? 'stella' : 'alloy');
+  if (typeof speechVoice !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(speechVoice)
+      || (speechProvider === 'deepseek' && !['stella', 'tide'].includes(speechVoice)))
+    throw new Error('SAYROVE_SPEECH_VOICE must name a supported voice');
+  const speechRawBaseUrl = environment.SAYROVE_SPEECH_BASE_URL;
+  if (speechRawBaseUrl != null && typeof speechRawBaseUrl !== 'string') throw new Error('SAYROVE_SPEECH_BASE_URL requires HTTPS');
+  let speechBaseUrl = speechRawBaseUrl?.trim() || (speechProvider === 'deepseek' ? 'https://api.deepseek.com' : null);
+  if (speechBaseUrl) speechBaseUrl = absoluteUrl(speechBaseUrl, 'SAYROVE_SPEECH_BASE_URL', false).replace(/\/+$/, '');
+  if (speechProvider === 'openai-compatible' && !speechBaseUrl)
+    throw new Error('SAYROVE_SPEECH_BASE_URL is required for openai-compatible');
   return Object.freeze({ enrichmentProvider, enrichmentApiKey, enrichmentModel, enrichmentBaseUrl,
+    speechProvider, speechApiKey, speechModel, speechVoice, speechBaseUrl,
     databaseUrl, publicUrl, authIssuer, authAudience, authJwksUrl,
     requiredScopes: Object.freeze(requiredScopes), allowInsecureLocal, webAllowedOrigins,
     host: environment.HOST ?? "0.0.0.0", port: Number(rawPort), resourceUrl: publicUrl + "/mcp" });

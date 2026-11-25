@@ -6,13 +6,16 @@ import { createPool, checkSchema } from "./database.js";
 import { startEnrichmentWorker } from "./enrichment.js";
 import { createEnricher } from "./providers/index.js";
 import { Repository } from "./repository.js";
+import { createSpeechService } from "./speech.js";
 
 export async function start(environment = process.env) {
   const config = loadConfig(environment);
   const provider = createEnricher({ provider: config.enrichmentProvider, apiKey: config.enrichmentApiKey,
     model: config.enrichmentModel, baseUrl: config.enrichmentBaseUrl ?? undefined });
   const pool = createPool(config.databaseUrl);
-  const handler = createApp({ config, repositoryFactory: (principal) => new Repository(pool, principal), readiness: () => checkSchema(pool) });
+  const speech = createSpeechService({ provider: config.speechProvider, apiKey: config.speechApiKey,
+    model: config.speechModel, voice: config.speechVoice, baseUrl: config.speechBaseUrl ?? undefined });
+  const handler = createApp({ config, repositoryFactory: (principal) => new Repository(pool, principal), readiness: () => checkSchema(pool), speech });
   const server = createServer(handler);
   server.requestTimeout = 30000;
   server.headersTimeout = 10000;
@@ -31,7 +34,7 @@ export async function start(environment = process.env) {
       const forceClose = setTimeout(() => server.closeAllConnections(), 5000);
       forceClose.unref();
       try { await new Promise((resolve) => server.close(resolve)); }
-      finally { clearTimeout(forceClose); await worker.close(); await pool.end(); }
+      finally { clearTimeout(forceClose); speech.close(); await worker.close(); await pool.end(); }
     })();
     return closing;
   }

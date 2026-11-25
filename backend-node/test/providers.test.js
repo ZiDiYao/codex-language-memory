@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createEnricher, PROVIDER_FACTORIES } from '../src/providers/index.js';
 import { createOpenAIEnricher as legacyOpenAI } from '../src/enrichment.js';
 import { createOpenAIEnricher } from '../src/providers/openai.js';
-import { CONTENT_SCHEMA } from '../src/providers/shared.js';
+import { CONTENT_SCHEMA, NOTE_OUTPUT_TOKENS, LEARNING_INSTRUCTIONS } from '../src/providers/shared.js';
 
 const input = { target: { kind: 'word', language: 'en', title: 'celery', context: '芹菜的英文咋说' },
   explanation_language: 'zh', existing_senses: [], scene_names: ['Food & cooking'] };
@@ -30,7 +30,7 @@ test('DeepSeek is the factory default and has an isolated non-thinking JSON requ
   assert.equal(request.signal, controller.signal);
   assert.equal(request.headers.Authorization, 'Bearer isolated-test-key');
   assert.equal(request.body.model, 'deepseek-flash');
-  assert.equal(request.body.stream, false); assert.equal(request.body.max_tokens, 1600);
+  assert.equal(request.body.stream, false); assert.equal(request.body.max_tokens, 3600);
   assert.deepEqual(request.body.thinking, { type: 'disabled' });
   assert.deepEqual(request.body.response_format, { type: 'json_object' });
   assert.equal(Object.hasOwn(request.body, 'store'), false);
@@ -53,10 +53,42 @@ test('OpenAI keeps Responses strict schema semantics and backwards-compatible re
   const { calls, fetchImpl } = mock({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(note) }] }] });
   assert.deepEqual(await createEnricher({ provider: 'openai', ...options, fetchImpl })(input), note);
   assert.equal(calls[0].url, 'https://api.openai.com/v1/responses');
-  assert.equal(calls[0].body.store, false); assert.equal(calls[0].body.max_output_tokens, 1600);
+  assert.equal(calls[0].body.store, false); assert.equal(calls[0].body.max_output_tokens, 3600);
   assert.equal(calls[0].body.text.format.strict, true);
   assert.deepEqual(calls[0].body.text.format.schema, CONTENT_SCHEMA);
   assert.equal(Object.hasOwn(calls[0].body, 'thinking'), false);
+});
+
+test('all enrichment adapters allow a substantial same-target word lesson without losing examples or Unicode', async () => {
+  const target = { ...input, target: { kind: 'word', language: 'en', title: 'secure', context: 'They secured funding.' } };
+  const expanded = { sense_key: 'obtain', meaning: '（动词）争取到、获得。', corrected_sentence: null,
+    explanation: '当前用法：secure funding 是争取到资金。\n常见词性：动词还可表示固定、使安全；形容词表示安全可靠或稳定。\n' +
+      '搭配：secure permission 获得许可；a secure job 稳定的工作；feel secure 感到安心。\n' +
+      '句型：secure something with something，用某物固定某物。secure a job 是获得工作，a secure job 是稳定工作。',
+    examples: [
+      { text: 'They secured funding for the project.', translation: '他们为项目争取到了资金。' },
+      { text: 'Secure the bag with a strap.', translation: '用带子固定好包。' },
+      { text: 'Choose a secure password.', translation: '选一个安全性高的密码。' },
+      { text: 'She has a secure job.', translation: '她有一份稳定的工作。' },
+      { text: 'The children feel secure at home.', translation: '孩子们在家感到安心。' },
+    ], scenes: ['Work & projects', 'Safety & security'] };
+  for (const providerName of ['deepseek', 'openai-compatible', 'openai']) {
+    const body = providerName === 'openai'
+      ? { status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(expanded) }] }] }
+      : chat({ message: { role: 'assistant', content: JSON.stringify(expanded) } });
+    const { calls, fetchImpl } = mock(body);
+    const provider = createEnricher({ provider: providerName, ...options,
+      ...(providerName === 'openai-compatible' ? { baseUrl: 'https://compatible.example/v1' } : {}), fetchImpl });
+    assert.deepEqual(await provider(target), expanded);
+    const request = calls[0].body;
+    assert.equal(request.max_tokens ?? request.max_output_tokens, NOTE_OUTPUT_TOKENS);
+    const instructions = request.instructions ?? request.messages[0].content;
+    assert.ok(instructions.startsWith(LEARNING_INSTRUCTIONS));
+    assert.match(instructions, /other common, practically relevant uses/u);
+    assert.match(instructions, /supporting material inside this one note/u);
+    assert.match(instructions, /hard field limit 2000/u);
+    assert.match(instructions, /sense_key represents the observed sense/u);
+  }
 });
 
 test('Generic compatible provider requires its own API root and sends no DeepSeek-only options', async () => {
