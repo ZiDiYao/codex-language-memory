@@ -1176,3 +1176,13 @@ const learningInstructionsMessages = {
   },
 };
 for (const [locale, values] of Object.entries(learningInstructionsMessages)) Object.assign(messages[locale], values);
+
+const statusSaveMessages = {
+  en: "The learning status could not be confirmed. The last saved selection is shown; please try again.",
+  zh: "状态暂未确认保存，已显示上次保存的选择，请重试。",
+  ja: "学習状態の保存を確認できませんでした。最後に保存した状態を表示しています。もう一度お試しください。",
+  ko: "학습 상태 저장을 확인하지 못했습니다. 마지막으로 저장된 상태가 표시됩니다. 다시 시도해 주세요.",
+  fr: "L’enregistrement du statut n’a pas pu être confirmé. Le dernier statut enregistré est affiché. Réessayez.",
+  es: "No se pudo confirmar el guardado del estado. Se muestra la última selección guardada. Inténtalo de nuevo.",
+};
+for (const [locale, value] of Object.entries(statusSaveMessages)) messages[locale].statusSaveFailed = value;

@@ -529,6 +529,7 @@ function card(record, expanded = false) {
   renderSummary(record);
   const editor = new EntryEditor(record, {
     t, api, languageName, uiLocale: locale, card: details,
+    isCurrent: () => !accountPaused && !accountDraftBlocked && editors.get(record.id) === editor,
     onChange: (updated) => { pronunciation.stop(updated.id); displayed.set(updated.id, updated); renderSummary(updated); },
     onDeleted: async (deleted) => {
       pronunciation.stop(deleted.id);
@@ -543,19 +544,18 @@ function card(record, expanded = false) {
     },
   });
   editor.node.dataset.studyActivity = "";
-  statusButtons.forEach((button) => button.addEventListener("click", async (event) => {
+  let statusSelection = 0;
+  statusButtons.forEach((button) => button.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const restoreFocus = document.activeElement === button;
-    statusButtons.forEach((control) => { control.disabled = true; });
-    try {
-      if (!(await editor.setStatus(button.dataset.status))) details.open = true;
-      else if (selectedStatus && editor.record.status !== selectedStatus) await loadRecords(true, true);
-    } finally {
-      statusButtons.forEach((control) => { control.disabled = false; });
-      if (restoreFocus && document.activeElement === document.body)
-        (button.isConnected ? button : statusPicker?.button)?.focus({ preventScroll: true });
-    }
+    const selection = ++statusSelection;
+    void editor.setStatus(button.dataset.status).then(async (saved) => {
+      if (selection !== statusSelection || !details.isConnected || !editor.active()) return;
+      if (!saved) {
+        if (editor.error === "editConflict" || editor.invalidSceneDraft) details.open = true;
+        notice("statusSaveFailed", true);
+      } else if (selectedStatus && editor.record.status !== selectedStatus) await loadRecords(true, true);
+    });
   }));
   editors.set(record.id, editor);
   body.append(editor.node);
@@ -957,7 +957,7 @@ new IntersectionObserver(maybeLoadMore, { rootMargin: "250px" }).observe(
   $("#load-sentinel"),
 );
 window.addEventListener("beforeunload", (event) => {
-  if (hasDirtyEditors()) { event.preventDefault(); event.returnValue = ""; }
+  if ([...editors.values()].some((editor) => editor.hasUnsavedText)) { event.preventDefault(); event.returnValue = ""; }
 });
 window.addEventListener("pagehide", () => { void historyPosition.save(); pronunciation.stop(); activity.invalidate(); });
 window.addEventListener("blur", () => { void historyPosition.save(); });

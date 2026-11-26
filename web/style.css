@@ -621,7 +621,7 @@ input[role="switch"]:checked::after {
 .entry-status { position: relative; z-index: 1; min-height: 28px; padding: 3px 9px; color: var(--muted); background: transparent; border: 0; border-radius: 5px; font-size: 11px; font-weight: 450; white-space: nowrap; transition: color 180ms var(--ease); }
 .entry-status:hover:not(:disabled) { color: var(--text); background: transparent; }
 .entry-status:active:not(:disabled) { transform: none; }
-.entry-status:disabled { opacity: 1; cursor: progress; }
+.entry-status:disabled { opacity: 1; }
 .entry-status[aria-pressed="true"] { color: var(--text); }
 .entry-chevron { width: 7px; height: 7px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: translateY(-2px) rotate(45deg); transition: transform 200ms var(--ease); }
 summary[aria-expanded="true"] .entry-chevron { transform: translateY(2px) rotate(225deg); }
