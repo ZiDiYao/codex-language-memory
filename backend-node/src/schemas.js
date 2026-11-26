@@ -41,6 +41,7 @@ export const kind = z.enum(['word', 'expression', 'grammar', 'correction']);
 export const status = z.enum(['new', 'mastered']);
 const reviewResult = z.enum(['correct', 'partial', 'incorrect', 'skipped']);
 const uiLanguage = z.enum(['en', 'zh', 'ja', 'ko', 'fr', 'es']);
+const englishLearningInstructions = string({ min: 0, max: 1500 });
 const scenes = z.array(sceneName).max(12).transform(uniqueScenes);
 const example = z.object({ text, translation: text.nullable().default(null) }).strict();
 const patchExample = z.object({ text, translation: text.nullable().optional() }).strict();
@@ -64,7 +65,8 @@ const review = z.object({ result: reviewResult, assisted: z.boolean().default(fa
   prompt: defaultNull(text), answer: defaultNull(text),
 }).strict().refine(value => value.effort === 'standard' || (value.result === 'correct' && !value.assisted), { message: 'invalid_request' });
 const settingsFields = { enabled: z.boolean(), ui_language: uiLanguage,
-  first_language: language.nullable(), explanation_language: language.nullable(), enabled_types: z.array(kind).max(4) };
+  first_language: language.nullable(), explanation_language: language.nullable(), enabled_types: z.array(kind).max(4),
+  english_learning_instructions: englishLearningInstructions };
 const settings = z.preprocess(value => {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     const result = { ...value }; for (const name of ['capture_mode','target_language','target_languages']) delete result[name]; return result;
@@ -73,6 +75,7 @@ const settings = z.preprocess(value => {
 }, z.object({ enabled: z.boolean().default(true), ui_language: uiLanguage.default('en'),
   first_language: language.nullable().default(null), explanation_language: language.nullable().default(null),
   enabled_types: z.array(kind).max(4).default(['word','expression','grammar','correction']),
+  english_learning_instructions: englishLearningInstructions.default(''),
 }).strict());
 const settingsPatch = z.object(Object.fromEntries(Object.entries(settingsFields).map(([key, schema]) => [key, schema.nullable().optional()]))).strict();
 const sceneScope = { language: defaultNull(language), kind: defaultNull(kind), include_variants: z.boolean().default(false) };

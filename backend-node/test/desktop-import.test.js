@@ -39,7 +39,7 @@ with tempfile.TemporaryDirectory() as directory:
     current=session['current']['record']
     session=study.prepare(session['id'],session['version'],current['id'],current['revision'],'Use this expression.')['session']
     study.answer(session['id'],session['version'],'fixture-study-answer',Review(result='correct',assisted=True,answer='Turn off the light.'))
-    store.settings(SettingsPatch(ui_language='zh',first_language='zh',explanation_language='zh',enabled=False))
+    store.settings(SettingsPatch(ui_language='zh',first_language='zh',explanation_language='zh',enabled=False,english_learning_instructions='Use kitchen examples.'))
     store.learning_preferences('en',LearnerPreferences(learning_goal='Everyday conversation',interests=['Cooking']))
     store.export_receipt('fixture-export',{'format':'json','count':2,'exported_at':now()})
     with store.connection() as db:
@@ -117,6 +117,7 @@ describe('PostgreSQL desktop import preserves actual Python learning snapshots',
     assert.equal(memory.rated_reviews, rawMemory.rated_reviews);
     assert.equal((await repository.settings()).enabled, false, 'capture pause does not block an evidence import');
     assert.equal((await repository.settings()).first_language, 'zh');
+    assert.equal((await repository.settings()).english_learning_instructions, 'Use kitchen examples.');
     const archive = (await pool.query('SELECT snapshot,result FROM lm_desktop_imports WHERE tenant_id=$1 AND source_id=$2', [repository.tenantId, source.source_id])).rows[0];
     assert.deepEqual(archive.snapshot, source);
     assert.equal(typeof archive.snapshot.tables.memory_states[0].card, 'string');

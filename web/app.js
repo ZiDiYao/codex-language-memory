@@ -12,6 +12,7 @@ import { createLocalProfile, accountCanRead } from "./local-profile.js";
 import { PronunciationController } from "./pronunciation.js";
 import { ActivityController, isStudyClick } from "./activity.js";
 import { createActivityView } from "./activity-view.js";
+import { createLearningInstructionsEditor } from "./learning-instructions.js";
 
 const $ = (selector) => document.querySelector(selector);
 const pageSize = 20;
@@ -177,6 +178,7 @@ const explanationLanguagePicker = new Picker($("#explanation-language"), {
   label: "Explanation language",
   onChange: (explanation_language) => saveSettings({ explanation_language: explanation_language || null }),
 });
+const learningInstructions = createLearningInstructionsEditor($("#learning-instructions"), { save: saveSettings, t });
 const exportDialog = new ExportDialog($("#export-dialog"), {
   t, api, languageName, download, flushEditors, feedback, errorKey,
   getFilters: filters, getCatalog: () => catalog, getLocale: () => locale,
@@ -298,11 +300,19 @@ async function flushEditors() {
   }
   return true;
 }
+async function flushLearningInstructions() {
+  if (await learningInstructions.flush()) return true;
+  openDialog($("#settings-dialog"));
+  $("#learning-instructions").open = true;
+  $("#english-learning-instructions").focus();
+  return false;
+}
 if (runtime) {
   runtime.activity = activity;
   runtime.stopPronunciation = () => pronunciation.stop();
+  runtime.invalidateLearningInstructions = () => learningInstructions.invalidate();
   runtime.beforeAccountChange = async () => {
-    if (!(await flushEditors())) return false;
+    if (!(await flushEditors()) || !(await flushLearningInstructions())) return false;
     pronunciation.stop();
     activity.invalidate();
     return true;
@@ -343,6 +353,7 @@ function applyLocale() {
   exportDialog?.relabel();
   localProfile?.relabel();
   activity.relabel();
+  learningInstructions.relabel();
 }
 function refreshEditorLocales() {
   for (const editor of editors.values()) {
@@ -424,6 +435,7 @@ function renderSettings() {
   badge.textContent = t(badge.dataset.i18n);
   $("#settings-fields").disabled = false;
   renderLanguagePreferences();
+  learningInstructions.load(settings);
   renderSpeechAvailability();
 }
 function card(record, expanded = false) {
@@ -659,7 +671,10 @@ function saveSettings(patch) {
       if (source !== sourceRevision) throw new Error("accountSuperseded");
       const confirmedCapabilities = settings?._capabilities;
       const updated = await api("settings/update", patch);
+      if (Object.hasOwn(patch, "english_learning_instructions") && updated.english_learning_instructions !== patch.english_learning_instructions)
+        throw new Error("learningInstructionsSaveFailed");
       settings = { ...updated, _capabilities: updated._capabilities ?? confirmedCapabilities };
+      return settings;
     } catch (error) {
       if (source !== sourceRevision) return;
       settingsWriteError = error;
@@ -682,6 +697,7 @@ function saveSettings(patch) {
       }
     }
   });
+  return settingsWrites;
 }
 async function synchronize() {
   if (!ready || accountPaused || runtime?.isPaused?.() || syncing || historyFeed.loading || document.visibilityState === "hidden")
@@ -850,7 +866,7 @@ if (localAccount) {
     root: document, t, openDialog, closeDialog, openExternal, activity,
     call: (action) => api(action),
     beforeChange: async () => {
-      if (accountDraftBlocked || !(await flushEditors())) return false;
+      if (accountDraftBlocked || !(await flushEditors()) || !(await flushLearningInstructions())) return false;
       await settingsWrites;
       return !settingsWriteError;
     },
@@ -864,6 +880,7 @@ if (localAccount) {
         clearTimeout(searchTimer);
         pronunciation.stop();
         activity.invalidate();
+        learningInstructions.invalidate();
       }
       accountPaused = next;
       $("#records-panel").inert = next && !accountDraftBlocked;
@@ -876,6 +893,7 @@ if (localAccount) {
     },
     async onSourceChange(status, previous) {
       activity.invalidate();
+      learningInstructions.invalidate();
       exportDialog.invalidate();
       setAccountEpoch(status.epoch);
       if (previous && hasDirtyEditors()) {

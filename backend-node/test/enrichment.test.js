@@ -100,6 +100,54 @@ dbtest('single-call capture honors recording/type settings and isolates context 
   assert.equal((await repo.getPoint(saved.results[0].id)).status, 'not_found');
 });
 
+dbtest('English teaching preferences persist without replacing settings and capture context uses current tenant preferences', async t => {
+  const { repo, pool, principal } = await fixture(t);
+  const other = new Repository(pool, { ...principal, subject: 'bob' });
+  assert.equal((await repo.settings()).english_learning_instructions, '');
+  assert.equal(Object.hasOwn((await repo.observeWithContext('custom-empty-observation', [raw]))._context, 'english_learning_instructions'), false);
+  await repo.settings({ english_learning_instructions: '  Use kitchen examples.  ' });
+  await repo.settings({ ui_language: 'ja' });
+  const settings = await repo.settings();
+  assert.equal(settings.english_learning_instructions, 'Use kitchen examples.');
+  assert.equal(settings.first_language, 'zh');
+  assert.equal(settings.ui_language, 'ja');
+  const first = await repo.observeWithContext('custom-context-request', [raw]);
+  assert.equal(first._context.english_learning_instructions, 'Use kitchen examples.');
+  await repo.settings({ english_learning_instructions: 'Give short contrasts.' });
+  const replay = await repo.observeWithContext('custom-context-request', [raw]);
+  assert.equal(replay.replayed, true);
+  assert.equal(replay._context.english_learning_instructions, 'Give short contrasts.');
+  assert.equal(replay.results[0].encounter_count, first.results[0].encounter_count);
+  await repo.settings({ enabled: false });
+  const paused = await repo.observeWithContext('custom-paused-request', [raw]);
+  assert.equal(paused.status, 'paused');
+  assert.equal(paused._context.english_learning_instructions, 'Give short contrasts.');
+  assert.equal((await other.settings()).english_learning_instructions, '');
+  const bob = await other.observeWithContext('custom-context-request', [raw]);
+  assert.equal(Object.hasOwn(bob._context, 'english_learning_instructions'), false);
+  await repo.settings({ english_learning_instructions: '\u3000\n ' });
+  const cleared = await repo.observeWithContext('custom-context-request', [raw]);
+  assert.equal(Object.hasOwn(cleared._context, 'english_learning_instructions'), false);
+  assert.equal((await repo.settings()).enabled, false);
+});
+
+dbtest('worker includes only current-tenant English teaching preferences for English targets', async t => {
+  const { repo, pool } = await fixture(t);
+  const preference = 'Use cooking examples and explain the register.';
+  await repo.settings({ english_learning_instructions: preference });
+  for (const [index, language] of ['en', 'en-us', 'ja'].entries()) {
+    await repo.observe(`custom-note-language-${index}`, [{ ...raw, language }]);
+    const job = await claimEnrichment(pool);
+    assert.equal(job.prompt.target.language, language);
+    if (language.startsWith('en')) assert.equal(job.prompt.english_learning_instructions, preference);
+    else assert.equal(Object.hasOwn(job.prompt, 'english_learning_instructions'), false);
+    await completeEnrichment(job, content);
+  }
+  await repo.settings({ english_learning_instructions: '' });
+  await repo.observe('custom-note-cleared', [{ ...raw, title: 'rinse' }]);
+  assert.equal(Object.hasOwn((await claimEnrichment(pool)).prompt, 'english_learning_instructions'), false);
+});
+
 dbtest('background completion adds content and scenes without a new encounter or review', async t => {
   const { repo, pool, save } = await fixture(t); const id = (await save()).results[0].id;
   let prompt;

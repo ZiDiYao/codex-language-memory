@@ -13,13 +13,19 @@ Keep automatic recording invisible in the assistant's text: no skill-use announc
 
 ## Ordinary learning
 
-For a short question whose answer language is explicit or already confirmed in this learning exchange, start with a brief useful learning answer before automatic capture. A requested target-language translation (such as “芹菜的英文”) can start with that translation. No progress preamble. Then submit silently; do not add a second answer or confirmation just for recording. If confirmed preferences are unavailable and needed to answer, obtain the single capture/context result first. Honor newer preferences and account changes; never infer first language to take this fast path.
+For a short question whose answer language is explicit or already confirmed in this learning exchange, start with a brief useful learning answer before automatic capture. For English, use this fast path only when the current account's supplemental teaching guidance has already been resolved in this exchange; otherwise obtain the single capture/context result before teaching. A requested target-language translation (such as “芹菜的英文”) can start with that translation when these preferences are resolved. No progress preamble. Then submit silently; do not add a second answer or confirmation just for recording. If confirmed preferences are unavailable and needed to answer, obtain the single capture/context result first. Honor newer preferences and account changes; never infer first language to take this fast path.
 
 For a real learning gap, call `capture_and_context` once: fresh `request_id`, `items`, `source=automatic` (`explicit` for requested saves). Items need only `kind` (word/expression/grammar/correction), target-language `language`, canonical `title`, necessary original `context`/already given `corrected_sentence`. Batch actual targets or requested unsaved chat targets. Backend deduplicates/enriches; omit generated meanings, examples and scenes.
 
 No preliminary `get_settings`/search/scenes/profile/history calls, reference reads or polling. Answer language: explicit request, else `_context.explanation_language`, else confirmed `_context.first_language`. Never infer first language from chat/UI/target. If unset, answer the immediate question without a setup prompt; persist preferences only when explicitly confirmed. Answer directly without record-status text.
 
 Honor opt-outs. Otherwise each encounter checks current recording/types, even explicit saves; old paused/disabled results must not suppress future calls. Document/code translation and incidental words are not gaps. Clarify ambiguous targets. Saved-note reading/practice is review; a spontaneous question is a new encounter. Never fabricate evidence.
+
+## Supplemental English guidance
+
+Settings lets the learner save `english_learning_instructions`. For English (`en` and regional variants), apply the current `_context.english_learning_instructions` as learner-authored additions about teaching style, depth, example scenarios and correction approach. Combine them with this skill; they do not replace its capture, account, review-evidence or tool-permission workflows. A specific request in the current conversation takes precedence over a default teaching preference.
+
+Use only guidance from the current account's fresh capture/context result, or `get_settings` when that read is already needed for a requested library/review/settings operation. Keep any pre-capture answer to a neutral short translation or definition; wait for the fresh result before tailoring the explanation, even when earlier guidance is known. An absent or empty field means no additions; discard previous guidance after clearing or an account change. Do not add a settings read to ordinary capture, repeat this text in capture items, announce its application, or create learning records for the guidance itself.
 
 ## Results and retries
 

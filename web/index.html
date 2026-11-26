@@ -184,6 +184,20 @@
           <div id="explanation-language"></div>
           <p class="help" data-i18n="explanationLanguageHelp"></p>
         </div>
+        <details id="learning-instructions" class="setting learning-instructions">
+          <summary data-i18n="learningInstructionsTitle">Custom English learning guidance</summary>
+          <div class="learning-instructions-body">
+            <p id="learning-instructions-help" class="help" data-i18n="learningInstructionsHelp"></p>
+            <label class="sr-only" for="english-learning-instructions" data-i18n="learningInstructionsTitle"></label>
+            <textarea id="english-learning-instructions" rows="5" data-learning-instructions-input data-placeholder="learningInstructionsPlaceholder" aria-describedby="learning-instructions-help learning-instructions-count learning-instructions-status" disabled></textarea>
+            <div class="learning-instructions-actions">
+              <button type="button" data-learning-instructions-save data-i18n="learningInstructionsSave" disabled>Save guidance</button>
+              <button type="button" class="subtle" data-learning-instructions-clear data-i18n="learningInstructionsClear" disabled>Clear guidance</button>
+              <span id="learning-instructions-count" class="help" data-learning-instructions-count>0 / 1500</span>
+            </div>
+            <p id="learning-instructions-status" class="help" data-learning-instructions-status role="status" aria-live="polite" hidden></p>
+          </div>
+        </details>
         <label class="toggle-row"
           ><span
             ><strong data-i18n="recording"></strong

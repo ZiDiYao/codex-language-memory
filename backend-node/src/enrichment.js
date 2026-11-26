@@ -53,6 +53,8 @@ export async function claimEnrichment(pool, { leaseMs = 60000 } = {}) {
     await client.query('COMMIT');
     return { ...job, repository, token, attempts: job.attempts + 1, revision: contentRevision(current),
       prompt: { target: job.input, explanation_language: settings.explanation_language ?? settings.first_language ?? job.input.language,
+        ...(job.input.language.split('-')[0] === 'en' && settings.english_learning_instructions
+          ? { english_learning_instructions: settings.english_learning_instructions } : {}),
         existing_senses: [{ sense_key: point.sense_key, meaning: point.meaning }, ...point.additional_senses.map(sense => ({ sense_key: sense.sense_key, meaning: sense.meaning }))],
         scene_names: scenes } };
   } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error; }

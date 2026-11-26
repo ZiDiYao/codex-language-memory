@@ -278,6 +278,7 @@ export class Repository {
       const respond = (value) => includeContext ? { ...value, _context: {
         enabled: settings.enabled, enabled_types: [...settings.enabled_types],
         first_language: settings.first_language, explanation_language: settings.explanation_language,
+        ...(settings.english_learning_instructions ? { english_learning_instructions: settings.english_learning_instructions } : {}),
       } } : value;
       const receipt = (await client.query('SELECT * FROM lm_save_requests WHERE tenant_id=$1 AND request_id=$2',
         [this.tenantId, requestId])).rows[0];

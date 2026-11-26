@@ -87,6 +87,8 @@ def create_server(store: Store) -> FastMCP:
         Set first_language only from the user's confirmation. explanation_language is a global override;
         null resets it to first_language. These do not change the target language or translate old records.
         Capture automatically covers every language while recording is enabled.
+        english_learning_instructions adds user teaching preferences for English;
+        an empty string clears them and leaves the built-in learning workflow active.
         """
         return write_at_epoch(expected_connection_epoch, lambda: store.settings(patch))
 
@@ -144,13 +146,16 @@ def create_server(store: Store) -> FastMCP:
         No preliminary settings/search call is needed. Send only kind, language,
         title and necessary original context/correction. The backend enforces
         recording/types, deduplicates and enriches later. Use returned _context
-        for the answer language. Reuse request_id and exact items on uncertain
+        for the answer language and any supplemental english_learning_instructions
+        when teaching English. Reuse request_id and exact items on uncertain
         retries. Account changes require reconnecting Sayrove; never rebind an
         old request automatically. Pending enrichment is not a finished note.
         Automatic captures are silent: do not announce the tool or append saved,
         pending or error notices. Explain record outcomes only when explicitly asked.
-        For a simple question with an already resolved answer language, give its
-        useful learning answer before submitting. Otherwise resolve _context first.
+        For a simple question with current answer-language and teaching preferences
+        already resolved, a neutral brief definition may precede submitting.
+        Tailor the explanation only after receiving fresh supplemental guidance.
+        Otherwise resolve _context before expanding the English explanation.
         """
         if capture_binding is None or capture_binding["mode"] != "cloud" or not hasattr(store, "capture_with_context"):
             return {"status": "failed", "error": "single_call_unavailable"}

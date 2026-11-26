@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fixtures from './python-parity-fixtures.json' with { type: 'json' };
 import { encode, encodeAscii, fingerprint, normalized, serializeRecord } from '../src/parity.js';
-import { validatePoint, validatePatch, validateReview, validateCapture, validateQuery, settingsWithDefaults } from '../src/schemas.js';
+import { validatePoint, validatePatch, validateReview, validateCapture, validateQuery, settingsWithDefaults, validateSettingsPatch } from '../src/schemas.js';
 import { advance, memorySnapshot, recallRating } from '../src/learning.js';
 import { inferScenes, uniqueScenes } from '../src/scenes.js';
 
@@ -35,7 +35,7 @@ test('strict schemas preserve Python defaults and patch omission semantics', () 
   assert.equal(result.examples[0].translation, null);
   assert.deepEqual(validatePatch({ examples: [{ text: 'Updated.' }] }), { examples: [{ text: 'Updated.' }] });
   assert.deepEqual(validateReview({ result: 'correct' }), { result: 'correct', assisted: false, effort: 'standard', prompt: null, answer: null });
-  assert.deepEqual(settingsWithDefaults({}), { enabled: true, ui_language: 'en', first_language: null, explanation_language: null, enabled_types: ['word','expression','grammar','correction'] });
+  assert.deepEqual(settingsWithDefaults({}), { enabled: true, ui_language: 'en', first_language: null, explanation_language: null, enabled_types: ['word','expression','grammar','correction'], english_learning_instructions: '' });
   assert.equal(validatePoint({ ...point, title: '😀'.repeat(350) }).title.length, 700);
   for (const invalid of [
     { ...point, title: '😀'.repeat(351) }, { ...point, title: '\u0000' }, { ...point, title: '\ud800' },
@@ -47,6 +47,17 @@ test('strict schemas preserve Python defaults and patch omission semantics', () 
   assert.throws(() => validateReview({ result: 'partial', effort: 'hard' }), /invalid_request/u);
   // Capture validation leaves per-item failures to the repository.
   assert.equal(validateCapture({ request_id: 'capture-raw-batch', items: [{ title: '\u0000' }, point] }).items.length, 2);
+});
+
+test('supplementary English instructions accept trimmed empty values and enforce Unicode scalar limits', () => {
+  assert.deepEqual(validateSettingsPatch({ english_learning_instructions: '  Use cooking examples.\nCorrect gently.  ' }),
+    { english_learning_instructions: 'Use cooking examples.\nCorrect gently.' });
+  assert.equal(validateSettingsPatch({ english_learning_instructions: '\u3000\n ' }).english_learning_instructions, '');
+  assert.equal(settingsWithDefaults({ english_learning_instructions: '😀'.repeat(1500) }).english_learning_instructions.length, 3000);
+  for (const value of ['😀'.repeat(1501), '\u0000', '\ud800', false, {}])
+    assert.throws(() => validateSettingsPatch({ english_learning_instructions: value }), /invalid_request/u);
+  assert.throws(() => settingsWithDefaults({ english_learning_instructions: null }), /invalid_request/u);
+  assert.deepEqual(validateSettingsPatch({ ui_language: 'zh' }), { ui_language: 'zh' }, 'an unrelated patch does not clear teaching preferences');
 });
 
 test('scene defaults are contextual and custom labels remain open-ended', () => {

@@ -1106,3 +1106,73 @@ const activityYearMessages = {
 };
 for (const [locale, values] of Object.entries(activityYearMessages))
   Object.assign(messages[locale], Object.fromEntries(activityYearKeys.map((key, index) => [key, values[index]])));
+
+const learningInstructionsMessages = {
+  en: {
+    learningInstructionsTitle: "Custom English learning guidance",
+    learningInstructionsHelp: "Add to Sayrove’s default teaching approach. Saved guidance applies to future English conversations and new notes. Leave it empty to use the defaults.",
+    learningInstructionsPlaceholder: "For example: use work situations; explain the core meaning first, then give two natural examples.",
+    learningInstructionsSave: "Save guidance", learningInstructionsClear: "Clear guidance",
+    learningInstructionsSaved: "Learning guidance saved", learningInstructionsUnsaved: "Unsaved draft",
+    learningInstructionsInvalid: "Use valid text with no more than 1,500 characters.",
+    learningInstructionsUnavailable: "This service does not support custom learning guidance yet.",
+    learningInstructionsSaveFailed: "Guidance could not be saved. Your draft is kept here; try again.",
+    learningInstructionsChanged: "This setting changed elsewhere. Your draft is kept here; review it before saving.",
+  },
+  zh: {
+    learningInstructionsTitle: "自定义英语学习指引",
+    learningInstructionsHelp: "补充 Sayrove 的默认教学方式。保存后用于后续英语对话及新笔记，留空则使用默认方式。",
+    learningInstructionsPlaceholder: "例如：优先使用工作场景；先讲核心含义，再给两个自然例句。",
+    learningInstructionsSave: "保存指引", learningInstructionsClear: "清空指引",
+    learningInstructionsSaved: "学习指引已保存", learningInstructionsUnsaved: "草稿尚未保存",
+    learningInstructionsInvalid: "请使用有效文本，最多 1500 个字符。",
+    learningInstructionsUnavailable: "当前服务暂未支持自定义学习指引。",
+    learningInstructionsSaveFailed: "暂时无法保存指引，草稿已保留，请重试。",
+    learningInstructionsChanged: "此设置已在其他位置更新。草稿已保留，请确认后保存。",
+  },
+  ja: {
+    learningInstructionsTitle: "英語学習のカスタム指針",
+    learningInstructionsHelp: "Sayrove の標準の教え方に希望を追加できます。保存後の英語の会話と新しいノートに適用されます。空欄なら標準の設定を使います。",
+    learningInstructionsPlaceholder: "例：仕事の場面を優先し、基本の意味を説明してから自然な例文を2つ示してください。",
+    learningInstructionsSave: "指針を保存", learningInstructionsClear: "指針をクリア",
+    learningInstructionsSaved: "学習の指針を保存しました", learningInstructionsUnsaved: "未保存の下書き",
+    learningInstructionsInvalid: "有効なテキストを1500文字以内で入力してください。",
+    learningInstructionsUnavailable: "このサービスはカスタム学習指針にまだ対応していません。",
+    learningInstructionsSaveFailed: "指針を保存できませんでした。下書きは保持されています。もう一度お試しください。",
+    learningInstructionsChanged: "この設定は別の場所で更新されました。下書きを確認してから保存してください。",
+  },
+  ko: {
+    learningInstructionsTitle: "맞춤 영어 학습 지침",
+    learningInstructionsHelp: "Sayrove의 기본 학습 방식에 원하는 내용을 추가하세요. 저장 후 영어 대화와 새 노트에 적용됩니다. 비워 두면 기본 방식을 사용합니다.",
+    learningInstructionsPlaceholder: "예: 업무 상황을 우선하고, 핵심 의미를 먼저 설명한 뒤 자연스러운 예문 두 개를 보여 주세요.",
+    learningInstructionsSave: "지침 저장", learningInstructionsClear: "지침 지우기",
+    learningInstructionsSaved: "학습 지침을 저장했습니다", learningInstructionsUnsaved: "저장하지 않은 초안",
+    learningInstructionsInvalid: "올바른 텍스트를 1500자 이내로 입력하세요.",
+    learningInstructionsUnavailable: "이 서비스는 아직 맞춤 학습 지침을 지원하지 않습니다.",
+    learningInstructionsSaveFailed: "지침을 저장하지 못했습니다. 초안이 유지되어 있으니 다시 시도하세요.",
+    learningInstructionsChanged: "이 설정이 다른 곳에서 변경되었습니다. 초안을 확인한 후 저장하세요.",
+  },
+  fr: {
+    learningInstructionsTitle: "Consignes personnelles pour l’anglais",
+    learningInstructionsHelp: "Complétez la méthode de Sayrove. Les consignes enregistrées s’appliquent aux prochaines conversations en anglais et aux nouvelles notes. Laissez ce champ vide pour utiliser la méthode par défaut.",
+    learningInstructionsPlaceholder: "Par exemple : privilégier le travail, expliquer d’abord le sens principal, puis donner deux exemples naturels.",
+    learningInstructionsSave: "Enregistrer", learningInstructionsClear: "Effacer les consignes",
+    learningInstructionsSaved: "Consignes enregistrées", learningInstructionsUnsaved: "Brouillon non enregistré",
+    learningInstructionsInvalid: "Saisissez un texte valide de 1 500 caractères maximum.",
+    learningInstructionsUnavailable: "Ce service ne prend pas encore en charge les consignes personnelles.",
+    learningInstructionsSaveFailed: "Impossible d’enregistrer. Votre brouillon est conservé ; réessayez.",
+    learningInstructionsChanged: "Ce réglage a été modifié ailleurs. Vérifiez votre brouillon avant de l’enregistrer.",
+  },
+  es: {
+    learningInstructionsTitle: "Indicaciones personales para aprender inglés",
+    learningInstructionsHelp: "Complementa el método de Sayrove. Las indicaciones guardadas se aplican a futuras conversaciones en inglés y a notas nuevas. Déjalo vacío para usar el método predeterminado.",
+    learningInstructionsPlaceholder: "Por ejemplo: prioriza situaciones de trabajo; explica primero el significado principal y da dos ejemplos naturales.",
+    learningInstructionsSave: "Guardar indicaciones", learningInstructionsClear: "Borrar indicaciones",
+    learningInstructionsSaved: "Indicaciones guardadas", learningInstructionsUnsaved: "Borrador sin guardar",
+    learningInstructionsInvalid: "Introduce un texto válido de hasta 1500 caracteres.",
+    learningInstructionsUnavailable: "Este servicio aún no admite indicaciones personales.",
+    learningInstructionsSaveFailed: "No se pudieron guardar. El borrador se conserva; inténtalo de nuevo.",
+    learningInstructionsChanged: "Este ajuste cambió en otro lugar. Revisa el borrador antes de guardarlo.",
+  },
+};
+for (const [locale, values] of Object.entries(learningInstructionsMessages)) Object.assign(messages[locale], values);

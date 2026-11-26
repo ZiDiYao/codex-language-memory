@@ -146,7 +146,8 @@ export function validateDesktopSnapshot(raw) {
     const global = tables.learner_preferences.find(row => row.language === '*')?.data ?? {};
     const settings = settingsWithDefaults({ ...(tables.capture_preferences[0]?.data ?? {}),
       enabled: (tables.settings[0]?.recording ?? 1) === 1, first_language: global.first_language ?? null,
-      explanation_language: global.explanation_language ?? null });
+      explanation_language: global.explanation_language ?? null,
+      english_learning_instructions: global.english_learning_instructions ?? '' });
     return { payload: raw, sourceId: value.source_id, payloadSha: fingerprint(raw), tables, settings };
   } catch { throw new ValidationError(); }
 }

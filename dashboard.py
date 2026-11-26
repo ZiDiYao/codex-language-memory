@@ -28,6 +28,7 @@ ASSETS = {
     "transport.js": ("transport.js", "text/javascript; charset=utf-8"),
     "motion.js": ("motion.js", "text/javascript; charset=utf-8"),
     "entry-editor.js": ("entry-editor.js", "text/javascript; charset=utf-8"),
+    "learning-instructions.js": ("learning-instructions.js", "text/javascript; charset=utf-8"),
     "record-feed.js": ("record-feed.js", "text/javascript; charset=utf-8"),
     "history-model.js": ("history-model.js", "text/javascript; charset=utf-8"),
     "scene-model.js": ("scene-model.js", "text/javascript; charset=utf-8"),

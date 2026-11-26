@@ -160,7 +160,7 @@ export function createApp({ config, repositoryFactory, verifyToken, readiness, s
         if (url.search) throw new APIError(422, "invalid_request");
         result = await call("import_desktop", await readJson(request, MAX_DESKTOP_IMPORT_BODY));
       }
-      else if (path === "/v1/settings" && request.method === "GET") result = { ...await call("settings"), _capabilities: { lightweight_capture: true, capture_context: true, cloud_speech: speech?.enabled === true, activity: true } };
+      else if (path === "/v1/settings" && request.method === "GET") result = { ...await call("settings"), _capabilities: { lightweight_capture: true, capture_context: true, custom_learning_instructions: true, cloud_speech: speech?.enabled === true, activity: true } };
       else if (path === "/v1/settings" && request.method === "PATCH") result = await call("settings", parse("settingsPatch", await readJson(request)));
       else if (["/v1/languages", "/v1/changes"].includes(path) && request.method === "GET") {
         if (url.search) throw new APIError(422, "invalid_request");

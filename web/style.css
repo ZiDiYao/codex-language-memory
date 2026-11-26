@@ -424,6 +424,17 @@ dialog[data-closing]::backdrop {
   border-bottom: 1px solid var(--line);
   margin-bottom: 14px;
 }
+.learning-instructions summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; font-size: 12px; font-weight: 500; }
+.learning-instructions summary::-webkit-details-marker { display: none; }
+.learning-instructions summary::after { content: ""; width: 5px; height: 5px; border-right: 1px solid var(--muted); border-bottom: 1px solid var(--muted); transform: rotate(45deg); margin: -3px 4px 0; }
+.learning-instructions[open] summary::after { transform: translateY(3px) rotate(225deg); }
+.learning-instructions summary:focus-visible { outline: 2px solid var(--muted); outline-offset: 5px; border-radius: 2px; }
+.learning-instructions-body { margin-top: 12px; }
+.learning-instructions textarea { display: block; width: 100%; min-height: 108px; max-height: 240px; resize: vertical; margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 12px; line-height: 1.6; }
+.learning-instructions textarea:disabled { opacity: .5; }
+.learning-instructions-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.learning-instructions-actions button { min-height: 28px; padding: 4px 8px; font-size: 11px; }
+.learning-instructions-actions > span { margin-inline-start: auto; font-size: 10px; }
 fieldset {
   border: 0;
   padding: 0;

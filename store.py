@@ -116,11 +116,28 @@ CaptureTypes = Annotated[list[Kind], Field(max_length=4)]
 UILanguage = Literal["en", "zh", "ja", "ko", "fr", "es"]
 
 
+def valid_learning_instructions(value):
+    if isinstance(value, str):
+        if "\x00" in value:
+            raise ValueError("Learning instructions cannot contain a NUL character")
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError:
+            raise ValueError("Learning instructions must contain valid Unicode characters") from None
+    return value
+
+
+EnglishLearningInstructions = Annotated[str, StringConstraints(
+    strip_whitespace=True, max_length=1500,
+), BeforeValidator(valid_learning_instructions)]
+
+
 class LearningSettings(StrictModel):
     enabled: bool = True
     ui_language: UILanguage = "en"
     first_language: Language | None = None
     explanation_language: Language | None = None
+    english_learning_instructions: EnglishLearningInstructions = ""
     enabled_types: CaptureTypes = ["word", "expression", "grammar", "correction"]
 
     @model_validator(mode="before")
@@ -137,6 +154,7 @@ class SettingsPatch(StrictModel):
     ui_language: UILanguage | None = None
     first_language: Language | None = None
     explanation_language: Language | None = None
+    english_learning_instructions: EnglishLearningInstructions | None = None
     enabled_types: CaptureTypes | None = None
 
 
@@ -376,6 +394,7 @@ class Store:
         learner = json.loads(row[0]) if row else {}
         preferences["first_language"] = learner.get("first_language")
         preferences["explanation_language"] = learner.get("explanation_language")
+        preferences["english_learning_instructions"] = learner.get("english_learning_instructions", "")
         return LearningSettings.model_validate(preferences).model_dump()
 
     def settings(self, patch: SettingsPatch | None = None) -> dict:
@@ -386,14 +405,15 @@ class Store:
                 current.update(changes)
                 current = LearningSettings.model_validate(current).model_dump()
                 db.execute("UPDATE settings SET recording = ? WHERE id = 1", (current["enabled"],))
-                preferences = {key: value for key, value in current.items() if key not in ("enabled", "first_language", "explanation_language")}
+                shared_preferences = ("first_language", "explanation_language", "english_learning_instructions")
+                preferences = {key: value for key, value in current.items() if key not in ("enabled", *shared_preferences)}
                 db.execute("UPDATE capture_preferences SET data = ? WHERE id = 1", (encode(preferences),))
-                if {"first_language", "explanation_language"} & changes.keys():
+                if set(shared_preferences) & changes.keys():
                     row = db.execute("SELECT data FROM learner_preferences WHERE language = '*' ").fetchone()
                     learner = json.loads(row[0]) if row else {}
-                    for key in ("first_language", "explanation_language"):
+                    for key in shared_preferences:
                         if key in changes:
-                            if current[key] is None:
+                            if current[key] is None or current[key] == "":
                                 learner.pop(key, None)
                             else:
                                 learner[key] = current[key]

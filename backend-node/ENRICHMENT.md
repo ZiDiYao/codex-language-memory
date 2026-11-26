@@ -52,6 +52,22 @@ not replace that desktop guard. This additive API needs no database migration or
 enrichment-provider changes. Existing observation and rich-save contracts remain
 available.
 
+## Supplementary English teaching preferences
+
+Settings expose `english_learning_instructions`, an empty-by-default string of
+up to 1500 Unicode code points. A partial settings patch updates it; whitespace
+clears it. It is stored with the authenticated tenant's existing settings JSON,
+without a schema migration. Settings advertise
+`_capabilities.custom_learning_instructions=true`; clients must leave editing
+unavailable when connected to an older backend without this capability.
+
+Nonempty preferences are returned in the existing capture `_context`, including
+paused outcomes and replays, using current settings rather than a receipt snapshot.
+The enrichment worker supplies them only for English (`en`/`en-*`) targets. All
+providers treat them as supplementary teaching preferences alongside the built-in
+instructions; they cannot replace the output schema, target identity, field
+limits, configured explanation language, recording rules or factual accuracy.
+
 ## Configure and deploy
 
 The production cloud service uses `backend-node/`. Apply `node src/migration.js`

@@ -74,7 +74,7 @@ class LanguageTests(unittest.TestCase):
         upgraded = Store(self.path)
         self.assertEqual(upgraded.settings(), {
             "enabled": True, "ui_language": "ko", "enabled_types": ["word"],
-            "first_language": None, "explanation_language": None,
+            "first_language": None, "explanation_language": None, "english_learning_instructions": "",
         })
         self.assertEqual(upgraded.save("before-upgrade", [APPROACH])["results"], original["results"])
         result = upgraded.save("after-upgrade", [dict(APPROACH, language="fr")])

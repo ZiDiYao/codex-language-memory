@@ -524,6 +524,9 @@ test('single-call capture transport validates requests and scopes context to the
     },
   }) });
   assert.equal((await service.call('/v1/settings')).body._capabilities.capture_context, true);
+  assert.equal((await service.call('/v1/settings')).body._capabilities.custom_learning_instructions, true);
+  const settingsRpc = await service.rpc('tools/call', { name: 'get_settings', arguments: {} });
+  assert.equal(settingsRpc.body.result.structuredContent._capabilities.custom_learning_instructions, true);
   const tools = (await service.rpc()).body.result.tools;
   assert.equal(tools.some(tool => tool.name === 'capture_and_context'), true);
   const body = { request_id: 'context-api-observation', items: [{ kind: 'word', language: 'en', title: 'celery' }] };
@@ -539,4 +542,22 @@ test('single-call capture transport validates requests and scopes context to the
   assert.equal((await service.call('/v1/observations/context?user_id=bob', { method: 'POST', body })).status, 422);
   assert.equal((await service.call('/v1/observations/context')).status, 405);
   assert.equal(observed.length, 2);
+});
+
+test('REST and MCP settings support supplementary English instructions with partial updates, clearing and tenant isolation', async t => {
+  const service = await fixture(t);
+  const saved = await service.call('/v1/settings', { method: 'PATCH', body: { english_learning_instructions: '  Use cooking examples.  ' } });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.english_learning_instructions, 'Use cooking examples.');
+  await service.call('/v1/settings', { method: 'PATCH', body: { ui_language: 'zh' } });
+  assert.equal((await service.call('/v1/settings')).body.english_learning_instructions, 'Use cooking examples.');
+  const changed = await service.rpc('tools/call', { name: 'update_settings', arguments: { patch: { english_learning_instructions: 'Brief contrasts.' } } });
+  assert.equal(changed.body.result.structuredContent.english_learning_instructions, 'Brief contrasts.');
+  assert.equal(changed.body.result.structuredContent.ui_language, 'zh');
+  assert.equal((await service.call('/v1/settings', { subject: 'bob' })).body.english_learning_instructions, undefined);
+  const cleared = await service.call('/v1/settings', { method: 'PATCH', body: { english_learning_instructions: '\u3000\n' } });
+  assert.equal(cleared.body.english_learning_instructions, '');
+  assert.equal(cleared.body.ui_language, 'zh');
+  for (const value of ['😀'.repeat(1501), '\u0000', '\ud800'])
+    assert.equal((await service.call('/v1/settings', { method: 'PATCH', body: { english_learning_instructions: value } })).status, 422);
 });

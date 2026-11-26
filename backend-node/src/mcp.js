@@ -31,7 +31,7 @@ export function createMcpServer({ repositoryFactory, principal, logger = console
       return { content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result };
     });
   }
-  tool("get_settings", "Read this learner's recording and language preferences.", empty, async () => ({ ...await call("settings"), _capabilities: { lightweight_capture: true, capture_context: true } }));
+  tool("get_settings", "Read this learner's recording, language and supplementary English teaching preferences.", empty, async () => ({ ...await call("settings"), _capabilities: { lightweight_capture: true, capture_context: true, custom_learning_instructions: true } }));
   tool("update_settings", "Update only supplied preferences for this learner.", z.object({ patch: schemas.settingsPatch }).strict(),
     ({ patch }) => call("settings", patch), write);
   tool("get_recording", "Read whether new language-learning captures are enabled.", empty, async () => {

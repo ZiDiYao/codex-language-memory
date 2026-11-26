@@ -102,6 +102,29 @@ test('Generic compatible provider requires its own API root and sends no DeepSee
   assert.throws(() => createEnricher({ provider: 'openai-compatible', ...options }), /provider_base_url_required/u);
 });
 
+test('all providers keep built-in contracts while accepting supplementary teaching preferences as a separate input field', async () => {
+  const preference = 'Use cooking examples; explain common mistakes briefly.';
+  const customized = { ...input, english_learning_instructions: preference };
+  for (const providerName of ['deepseek', 'openai-compatible', 'openai']) {
+    const body = providerName === 'openai'
+      ? { status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(note) }] }] }
+      : chat();
+    const { calls, fetchImpl } = mock(body);
+    await createEnricher({ provider: providerName, ...options,
+      ...(providerName === 'openai-compatible' ? { baseUrl: 'https://compatible.example/v1' } : {}), fetchImpl })(customized);
+    const request = calls[0].body;
+    const system = request.instructions ?? request.messages[0].content;
+    assert.ok(system.startsWith(LEARNING_INSTRUCTIONS));
+    assert.match(system, /supplementary teaching preferences/u);
+    assert.match(system, /do not replace the required JSON shape/u);
+    assert.match(system, /supplied target identity/u);
+    assert.equal(system.includes(preference), false, 'user preferences never replace or splice into the built-in system prompt');
+    const received = JSON.parse(request.input ?? request.messages[1].content);
+    assert.deepEqual(received, customized);
+    assert.deepEqual(received.target, input.target);
+  }
+});
+
 test('Missing provider key/model disables work and unknown providers fail without fallback', () => {
   for (const provider of Object.keys(PROVIDER_FACTORIES)) {
     assert.equal(createEnricher({ provider }), null);
