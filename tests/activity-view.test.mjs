@@ -72,7 +72,11 @@ test("malformed, duplicate, incomplete and impossible dates cannot become invent
 class Element {
   constructor(document) {
     this.ownerDocument = document; this.children = []; this.dataset = {}; this.attributes = new Map(); this.events = new Map();
-    this.style = { setProperty() {} }; this.classList = { toggle() {}, add() {} }; this.textContent = "";
+    const classes = new Set();
+    this.style = { setProperty() {} };
+    this.classList = { toggle(key, value) { if (value ?? !classes.has(key)) classes.add(key); else classes.delete(key); },
+      add(key) { classes.add(key); }, contains(key) { return classes.has(key); } };
+    this.textContent = "";
   }
   append(...nodes) { for (const node of nodes) {
     if (node.fragment) this.append(...node.children);
@@ -100,7 +104,7 @@ function dom() {
     createDocumentFragment: () => Object.assign(new Element(document), { fragment: true }) };
   globalThis.document = document;
   const root = new Element(document);
-  for (const name of ["grid", "calendar", "range", "status", "detail", "months", "weekdays", "year", "legend"])
+  for (const name of ["grid", "calendar", "range", "status", "detail", "months", "year", "legend"])
     root.append(Object.assign(new Element(document), { dataset: { [`activity${name[0].toUpperCase()}${name.slice(1)}`]: "" } }));
   root.append(Object.assign(new Element(document), { dataset: { activityAction: "retry" } }));
   const node = (name) => root.querySelector(`[data-activity-${name}]`);
@@ -141,7 +145,7 @@ test("real zero days, localized details, keyboard navigation and account clearin
   assert.equal(node("detail").title, node("detail").textContent);
 });
 
-test("annual view labels months/weekdays, disables future cells and selects years without losing navigation on errors", () => {
+test("annual view labels months, disables future cells and selects years without losing navigation on errors", () => {
   const { root, node, document, yearButton, yearList } = dom();
   const years = [];
   const view = createActivityView(root, { onYearChange: (year) => years.push(year) });
@@ -149,8 +153,6 @@ test("annual view labels months/weekdays, disables future cells and selects year
   assert.equal(node("months").children.length, 12);
   assert.equal(node("months").children[0].children[0].textContent, "Jan");
   assert.equal(node("months").children.at(-1).children[0].textContent, "Dec");
-  assert.equal(node("weekdays").children.length, 7);
-  assert.equal(node("weekdays").children[1].children[0].textContent, "Mon");
   assert.equal(yearButton().children[0].textContent, "2026");
   assert.equal(yearButton().disabled, false);
   assert.equal(node("range").hidden, true, "annual navigation does not waste a row on the old rolling range");
@@ -173,6 +175,29 @@ test("annual view labels months/weekdays, disables future cells and selects year
   view.clear();
   assert.equal(yearList().children.length, 0, "account clearing drops previous tenant year choices");
   assert.equal(yearButton().disabled, true);
+});
+
+test("reopening retains the calendar while refresh announcements stay out of its layout", () => {
+  const { root, node } = dom();
+  const view = createActivityView(root);
+  view.loading();
+  assert.equal(node("status").classList.contains("sr-only"), false);
+  const data = annual();
+  data.days[0] = { ...data.days[0], learning_count: 1, score: 14, level: 1 };
+  view.render(data);
+  const cells = [...node("grid").children];
+  view.loading();
+  assert.equal(node("calendar").hidden, false);
+  assert.deepEqual(node("grid").children, cells);
+  assert.equal(node("status").textContent, "Updating activity…");
+  assert.equal(node("status").classList.contains("sr-only"), true);
+  view.render(data);
+  assert.equal(node("status").hidden, true);
+  view.loading();
+  view.error(new Error("unavailable"));
+  assert.equal(node("calendar").hidden, false);
+  assert.equal(node("status").hidden, false);
+  assert.equal(node("status").classList.contains("sr-only"), false, "a failed refresh still has a visible retry message");
 });
 
 test("a retained historical selection can still return to current year if its last record was deleted", () => {

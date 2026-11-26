@@ -34,7 +34,7 @@ test("desktop and web share a real lazy activity view while web keeps only its S
     const heatmap = markup.match(/<div class="profile-heatmap"[^>]*>([\s\S]*?)<\/div>/)[1];
     assert.equal(heatmap.trim(), "", "no activity cells or counts are invented before the server responds");
     assert.doesNotMatch(markup, /profileComingSoon|profileActivityHelp/);
-    assert.doesNotMatch(markup, /data-activity-action="refresh"|data-activity-summary|data-activity-help|activityWeights/);
+    assert.doesNotMatch(markup, /data-activity-action="refresh"|data-activity-summary|data-activity-help|data-activity-weekdays|activityWeights/);
     assert.match(markup, /data-activity-action="retry"/);
     assert.match(markup, /class="dialog-body"/);
     assert.doesNotMatch(markup, /accountCloud|<input\b/);

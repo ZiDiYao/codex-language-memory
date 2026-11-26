@@ -65,7 +65,7 @@ export function createActivityView(root, { getLanguage = () => "en", onYearChang
   if (!root) throw new TypeError("Activity view is missing");
   const $ = (name) => root.querySelector(`[data-activity-${name}]`);
   const grid = $("grid"), calendar = $("calendar"), range = $("range"), status = $("status"), detail = $("detail");
-  const months = $("months"), weekdays = $("weekdays"), yearHost = $("year"), legend = $("legend");
+  const months = $("months"), yearHost = $("year"), legend = $("legend");
   const retry = root.querySelector('[data-activity-action="retry"]');
   let model = null, labels = new Map(), yearChoices = [], annualNavigation = false;
   const text = (key, values) => activityText(getLanguage(), key, values);
@@ -86,6 +86,8 @@ export function createActivityView(root, { getLanguage = () => "en", onYearChang
     status.textContent = key ? text(key) : "";
     status.hidden = !key;
     status.classList.toggle("error", error);
+    // Refresh the existing calendar without adding a row that moves it on every open.
+    status.classList.toggle("sr-only", key === "activityRefreshing");
   }
   function showDay(node) {
     const label = labels.get(node?.dataset.activityDate);
@@ -122,7 +124,6 @@ export function createActivityView(root, { getLanguage = () => "en", onYearChang
     labels = new Map();
     grid.replaceChildren();
     months?.replaceChildren();
-    weekdays?.replaceChildren();
     yearPicker?.close();
     if (!preserveYears) {
       yearPicker?.setOptions([]);
@@ -200,19 +201,6 @@ export function createActivityView(root, { getLanguage = () => "en", onYearChang
           return span;
         }));
       }
-      if (weekdays) weekdays.replaceChildren(...Array.from({ length: 7 }, (_, index) => {
-        const span = root.ownerDocument.createElement("span");
-        if ([1, 3, 5].includes(index)) {
-          for (const [format, className] of [["short", "activity-label-short"], ["narrow", "activity-label-narrow"]]) {
-            const label = root.ownerDocument.createElement("span");
-            label.className = className;
-            label.textContent = new Intl.DateTimeFormat(localeFor(getLanguage()), { weekday: format, timeZone: "UTC" })
-              .format(new Date(Date.UTC(2023, 0, 1 + index)));
-            span.append(label);
-          }
-        }
-        return span;
-      }));
       if (yearPicker) {
         const years = [...new Set([next.year, ...next.availableYears])].sort((a, b) => b - a);
         yearChoices = years; annualNavigation = next.annual;
