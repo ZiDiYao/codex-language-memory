@@ -23,7 +23,8 @@ export class RecordFeed {
   async load({ reset = false, amount = 20, filters = {}, view = {} } = {}) {
     if (!reset && (this.loading || !this.hasMore || this.failed)) return false;
     const version = reset ? ++this.version : this.version;
-    const isCurrent = () => version === this.version;
+    const ownsRequest = () => version === this.version;
+    const isCurrent = () => ownsRequest() && (!view.requestCurrent || view.requestCurrent());
     if (reset) {
       this.cursor = null;
       this.hasMore = true;
@@ -47,7 +48,7 @@ export class RecordFeed {
       return false;
     } finally {
       // Only the current request owns the loading indicator and retry state.
-      if (isCurrent()) {
+      if (ownsRequest()) {
         this.loading = false;
         this.onFinish();
       }

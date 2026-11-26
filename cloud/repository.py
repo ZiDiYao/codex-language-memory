@@ -116,8 +116,9 @@ class Repository:
             return current
 
     def versions(self):
-        with self._transaction() as (_, tenant):
-            return {"content": tenant.content_version, "preferences": tenant.preferences_version}
+        with self._transaction() as (session, tenant):
+            latest = session.scalar(select(func.coalesce(func.max(Point.id), 0)).where(Point.tenant_id == self.tenant_id))
+            return {"content": tenant.content_version, "preferences": tenant.preferences_version, "latest_point_id": latest}
 
     def recording(self, enabled=None):
         result = self.settings(SettingsPatch(enabled=enabled) if enabled is not None else None)

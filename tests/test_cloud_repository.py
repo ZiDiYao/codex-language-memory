@@ -56,6 +56,18 @@ class CloudRepositoryTests(unittest.TestCase):
         self.assertEqual(response["results"][0]["status"], "added", response)
         return response["results"][0]["id"]
 
+    def test_latest_point_watermark_ignores_other_tenants_and_note_edits(self):
+        self.assertEqual(self.repo.versions()["latest_point_id"], 0)
+        own_id = self.save(request_id="watermark-own")
+        other_id = self.save(self.other, request_id="watermark-other")
+        self.assertNotEqual(own_id, other_id)
+        self.assertEqual(self.repo.versions()["latest_point_id"], own_id)
+        self.assertEqual(self.other.versions()["latest_point_id"], other_id)
+        self.repo.update(own_id, Patch(note="fixture-only note edit"))
+        self.assertEqual(self.repo.versions()["latest_point_id"], own_id)
+        self.repo.delete(own_id)
+        self.assertEqual(self.repo.versions()["latest_point_id"], 0)
+
     def test_principal_isolation_covers_every_read_write_and_receipt(self):
         identifier = self.save(request_id="same-request")
         self.assertEqual(self.other.query()["records"], [])

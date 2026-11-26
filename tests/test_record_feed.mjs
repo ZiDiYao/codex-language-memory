@@ -87,6 +87,20 @@ test("infinite scroll ignores overlapping requests and stops at the last page", 
   assert.equal(calls.length, 2);
 });
 
+test("canceling a pending viewport restoration drops its page and still releases request ownership", async () => {
+  const pending = deferred();
+  let current = true;
+  const { feed, commits, errors, finished } = fixture(() => pending.promise);
+  const reading = feed.load({ reset: true, view: { requestCurrent: () => current } });
+  current = false;
+  pending.resolve(page([1]));
+  assert.equal(await reading, false);
+  assert.deepEqual(commits, []);
+  assert.deepEqual(errors, []);
+  assert.equal(feed.loading, false);
+  assert.equal(finished.length, 1);
+});
+
 test("a failed page waits for an explicit retry and then recovers", async () => {
   let calls = 0;
   const { feed, errors, commits } = fixture(() => {

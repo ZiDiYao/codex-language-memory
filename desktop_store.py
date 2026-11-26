@@ -174,6 +174,37 @@ class RoutingStore:
     def changes(self):
         return self.versions()
 
+    def _history_view_state(self, snapshot):
+        from pathlib import Path
+        from ui_state import HistoryViewState
+        if snapshot["mode"] == "local":
+            return None
+        self._connected(snapshot)
+        state_path = getattr(getattr(self._account, "state", None), "path", None)
+        if state_path is None:
+            raise CloudFeatureUnavailable("history_view_state")
+        state_path = Path(state_path)
+        return HistoryViewState(state_path.with_suffix(state_path.suffix + ".ui-state.json"))
+
+    def history_view_read(self, filter_key=None):
+        snapshot = self._snapshot()
+        state = self._history_view_state(snapshot)
+        if state is None:
+            result = self._local.history_view_read(filter_key)
+            self._unchanged(snapshot)
+            return result
+        return state.read(f'cloud:{snapshot["epoch"]}', filter_key, guard=lambda: self._unchanged(snapshot))
+
+    def history_view_write(self, filter_key, filters, view):
+        snapshot = self._snapshot()
+        state = self._history_view_state(snapshot)
+        if state is None:
+            result = self._local.history_view_write(filter_key, filters, view)
+            self._unchanged(snapshot)
+            return result
+        return state.write(f'cloud:{snapshot["epoch"]}', {"filter_key": filter_key, "filters": filters, "view": view},
+                           guard=lambda: self._unchanged(snapshot))
+
     def settings(self, patch: SettingsPatch | None = None):
         def cloud(epoch):
             return (self._tool("get_settings", {}, epoch=epoch) if patch is None else

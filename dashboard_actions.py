@@ -8,6 +8,7 @@ from pydantic import Field
 from activity import ActivityEvents, ActivityScope
 from exports import ExportSelection, export_history, preview_export
 from desktop_actions import ACCOUNT_ACTIONS, account_action
+from ui_state import HistoryViewRead, HistoryViewWrite
 import speech
 from store import (Kind, Language, Patch, RecordId, Revision, SceneName, SettingsPatch,
                    Status, Store, StrictModel, Title)
@@ -62,6 +63,9 @@ def _activity_call(store, name, *arguments, **keywords):
 # Keep the allowlist, argument schema and operation together. No arbitrary Store
 # method names or paths from a client are ever executed.
 ACTIONS = {
+    "history/view/read": Action(HistoryViewRead, lambda store, scope: store.history_view_read(scope.filter_key)),
+    "history/view/write": Action(HistoryViewWrite, lambda store, state: store.history_view_write(
+        state.filter_key, state.filters.model_dump(mode="json"), state.view.model_dump(mode="json"))),
     "activity/read": Action(ActivityScope, lambda store, scope: _activity_call(store, "activity", scope.timezone,
         **({"year": scope.year} if scope.year is not None else {}))),
     "activity/events": Action(ActivityEvents, lambda store, batch: _activity_call(store, "activity_events", batch.model_dump(mode="json"))),
@@ -96,6 +100,6 @@ def dispatch(store: Store, request):
         raise ValueError("Invalid account epoch")
     binder = getattr(store, "expect_epoch", None)
     if binder is not None:
-        with binder(expected, require_cloud=name in {"settings/update", "points/update", "points/delete", "activity/read", "activity/events", "exports/preview", "exports/history"}):
+        with binder(expected, require_cloud=name in {"settings/update", "points/update", "points/delete", "activity/read", "activity/events", "exports/preview", "exports/history", "history/view/read", "history/view/write"}):
             return ACTIONS[name].call(store, request["arguments"])
     return ACTIONS[name].call(store, request["arguments"])

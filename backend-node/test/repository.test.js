@@ -97,6 +97,46 @@ describe('PostgreSQL Node repository', { skip: !url, concurrency: false }, () =>
     assert.deepEqual((await repository.query()).records, []);
   });
 
+  test('changes watermark identifies new tenant records without counting merges, edits, reviews or deleted maximum IDs as additions', async () => {
+    const alice = repo('watermark-alice'), bob = repo('watermark-bob');
+    assert.deepEqual(await alice.versions(), { content: 0, preferences: 0, latest_point_id: 0 });
+    assert.equal((await bob.versions()).latest_point_id, 0);
+    const first = await save(alice);
+    assert.equal((await alice.versions()).latest_point_id, first);
+    const bobFirst = await save(bob, { title: 'separate tenant' });
+    assert.ok(bobFirst > first);
+    assert.equal((await alice.versions()).latest_point_id, first, 'other tenants cannot advance this account watermark');
+    const merged = await alice.save('watermark-merge-request', [point]);
+    assert.equal(merged.results[0].status, 'merged');
+    const initial = await alice.versions();
+    assert.equal(initial.latest_point_id, first);
+    await alice.update(first, { note: 'An edited learning note.' });
+    await alice.recordReview(first, 'watermark-review-request', { result: 'correct' });
+    await alice.settings({ ui_language: 'zh' });
+    const changed = await alice.versions();
+    assert.ok(changed.content > initial.content);
+    assert.ok(changed.preferences > initial.preferences);
+    assert.equal(changed.latest_point_id, first);
+    const second = await save(alice, { title: 'slice' });
+    assert.ok(second > first);
+    let acknowledged = (await alice.versions()).latest_point_id;
+    const previousCount = (await alice.query()).records.length;
+    assert.equal(acknowledged, second);
+    await alice.delete(second);
+    const afterDelete = await alice.versions();
+    assert.equal(afterDelete.latest_point_id, first, 'the API reports current maximum, not a historical counter');
+    assert.equal(afterDelete.latest_point_id > acknowledged, false, 'deleting the latest record cannot signal an addition');
+    acknowledged = Math.max(acknowledged, afterDelete.latest_point_id);
+    const replacement = await save(alice, { title: 'chop' });
+    assert.equal((await alice.query()).records.length, previousCount, 'net record count alone misses this replacement');
+    assert.ok((await alice.versions()).latest_point_id > acknowledged);
+    assert.equal((await alice.versions()).latest_point_id, replacement);
+    await alice.delete(replacement);
+    await alice.delete(first);
+    assert.equal((await alice.versions()).latest_point_id, 0);
+    assert.equal((await bob.versions()).latest_point_id, bobFirst);
+  });
+
   test('scenes overlap across types and compose with language and kind, including Unicode normalization', async () => {
     const repository = repo('scenes');
     const id = await save(repository);

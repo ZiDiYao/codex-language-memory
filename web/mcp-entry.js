@@ -3,8 +3,15 @@ import { createHostTransport } from "./host-transport.js";
 
 const app = new App({ name: "Sayrove", version: "1.0.0" }, {}, { autoResize: false });
 // Register handlers before initialization so launch notifications are accepted.
-app.ontoolresult = () => {};
-app.ontoolinput = () => {};
+let seenInput = false, seenResult = false, lastResume = 0;
+const resume = () => {
+  if (!globalThis.sayroveHistoryLifecycle || Date.now() - lastResume < 1000) return;
+  lastResume = Date.now();
+  void globalThis.sayroveHistoryLifecycle.resume();
+};
+app.ontoolinput = () => { if (seenInput) resume(); seenInput = true; };
+app.ontoolresult = () => { if (seenResult) resume(); seenResult = true; };
+app.onteardown = async () => { await globalThis.sayroveHistoryLifecycle?.flush(); return {}; };
 try {
   await app.connect();
   globalThis.languageMemoryHost = createHostTransport(app);

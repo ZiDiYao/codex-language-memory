@@ -103,6 +103,20 @@ async def exercise(archive):
                                     {"text": "お手伝いいただき、ありがとうございます。", "translation": "Thank you for your help."}]}]
             saved = await call(session, "save_points", {"request_id": "beta-save-once", "items": points})
             record_id = saved["results"][0]["id"]
+            view_filters = {"include_variants": True, "language": "en"}
+            view_key = json.dumps(view_filters, separators=(",", ":"))
+            versions_before_view = await call(session, "memory_app_request", {"route": "api", "payload": {
+                "action": "changes/read", "arguments": {}}})
+            history_view = {"anchor_id": record_id, "anchor_top": -12.5, "scroll_y": 800,
+                            "loaded_count": 20, "expanded_ids": [record_id],
+                            "latest_point_id": versions_before_view["data"]["latest_point_id"]}
+            view_saved = await call(session, "memory_app_request", {"route": "api", "payload": {
+                "action": "history/view/write", "arguments": {
+                    "filter_key": view_key, "filters": view_filters, "view": history_view}}})
+            assert view_saved["status"] == 200 and view_saved["data"]["view"] == history_view
+            versions_after_view = await call(session, "memory_app_request", {"route": "api", "payload": {
+                "action": "changes/read", "arguments": {}}})
+            assert versions_after_view == versions_before_view, "UI position must not create learning or preference changes"
             scenes = await call(session, "list_scenes")
             assert next(scene for scene in scenes["scenes"] if scene["name"] == "Work & projects")["count"] == 2
             in_scene = await call(session, "find_points", {"scene": "Work & projects", "kind": "word", "language": "en"})
@@ -213,6 +227,11 @@ async def exercise(archive):
         async with stdio_client(parameters(), errlog=error_log) as streams, ClientSession(*streams) as session:
             await session.initialize()
             assert (await call(session, "get_settings"))["ui_language"] == "fr"
+            reopened_view = await call(session, "memory_app_request", {"route": "api", "payload": {
+                "action": "history/view/read", "arguments": {}}})
+            assert reopened_view["status"] == 200 and reopened_view["data"]["filter_key"] == view_key
+            assert reopened_view["data"]["view"] == history_view
+            checks.append("Frozen private library position survives upgrade and restart without changing learning records or preferences")
             assert (await call(session, "find_points", {"scene": "Problem solving", "language": "en"}))["records"][0]["id"] == record_id
             resumed = (await call(session, "get_study", {"language": "en"}))["session"]
             assert resumed["current"]["prompt"] == "Explain the current note."

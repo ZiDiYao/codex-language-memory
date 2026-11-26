@@ -5,6 +5,7 @@ import { auth0Options, CloudSession, completeCloudCallback } from "./cloud-auth.
 import { createCloudTransport, validateCloudConfig } from "./cloud-transport.js";
 import { createCloudProfile, loginRedirectOptions } from "./cloud-profile.js";
 import { openDialog, closeDialog } from "./motion.js";
+import { createBrowserHistoryStorage } from "./history-position.js";
 
 const $ = (selector) => document.querySelector(selector);
 const locale = detectCloudLocale(navigator.languages || [navigator.language]);
@@ -31,7 +32,7 @@ function sessionMessage(key, login = true) {
 translateShell();
 status("cloudLoading");
 // Browser back/forward caching must not restore a previous account's library.
-window.addEventListener("pagehide", () => { runtime?.stopPronunciation?.(); runtime?.activity?.invalidate(); runtime?.invalidateLearningInstructions?.(); $("main").hidden = true; });
+window.addEventListener("pagehide", () => { runtime?.saveHistoryPosition?.(); runtime?.stopPronunciation?.(); runtime?.activity?.invalidate(); runtime?.invalidateLearningInstructions?.(); $("main").hidden = true; });
 window.addEventListener("pageshow", (event) => { if (event.persisted) window.location.reload(); });
 let client;
 let session;
@@ -87,6 +88,7 @@ async function initialize() {
         runtime?.stopPronunciation?.();
         runtime?.activity?.invalidate();
         runtime?.invalidateLearningInstructions?.();
+        runtime?.invalidateHistoryPosition?.();
         profile.setStatus("accountSignedOut");
         sessionMessage(reason === "accountChanged" ? "cloudAccountChanged" : "cloudSessionExpired");
       },
@@ -100,11 +102,14 @@ async function initialize() {
     if (!(await client.isAuthenticated())) { status("cloudLoginHelp"); return; }
     await session.getToken();
     profile.setStatus("accountSignedIn");
-    profile.setUser(await client.getUser());
+    const user = await client.getUser();
+    profile.setUser(user);
     runtime = {
       ...createCloudTransport({ apiBaseUrl: config.apiBaseUrl, session }),
       beforeAccountChange: async () => true,
       isPaused: () => session.blocked,
+      historyStorage: createBrowserHistoryStorage({ apiBaseUrl: config.apiBaseUrl,
+        issuer: `https://${config.auth0Domain}/`, subject: user?.sub }),
     };
     globalThis.languageMemoryRuntime = runtime;
     $("#cloud-auth").hidden = true;

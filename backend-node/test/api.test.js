@@ -68,7 +68,8 @@ function isolatedStorage() {
         return { scenes: [...counts].map(([name, count]) => ({ name, count })), total: state.records.size };
       },
       async languages() { return { languages: [...new Set([...state.records.values()].map((record) => record.language))] }; },
-      async versions() { return { content: state.records.size, preferences: state.settings.enabled ? 0 : 1 }; },
+      async versions() { return { content: state.records.size, preferences: state.settings.enabled ? 0 : 1,
+        latest_point_id: Math.max(0, ...state.records.keys()) }; },
       async review(filters) { return this.query(filters); },
       async record_review(id, request_id) {
         if (!state.records.has(id)) return { status: "not_found" };
@@ -238,6 +239,8 @@ test("Languages and changes routes use only the verified tenant and reject anony
   assert.deepEqual((await call("/v1/languages", { subject: "bob" })).body.languages, []);
   assert.equal((await call("/v1/changes")).body.content, 1);
   assert.equal((await call("/v1/changes", { subject: "bob" })).body.content, 0);
+  assert.equal((await call("/v1/changes")).body.latest_point_id, 1);
+  assert.equal((await call("/v1/changes", { subject: "bob" })).body.latest_point_id, 0);
   await call("/v1/settings", { method: "PATCH", body: { enabled: false } });
   assert.equal((await call("/v1/changes")).body.preferences, 1);
   assert.equal((await call("/v1/changes", { subject: "bob" })).body.preferences, 0);
@@ -469,7 +472,8 @@ test("real PostgreSQL repository shares authenticated HTTP/MCP storage without c
   const aliceVersions = (await service.call("/v1/changes")).body;
   const bobVersions = (await service.call("/v1/changes", { subject: "bob" })).body;
   assert.equal(aliceVersions.content, 1);
-  assert.deepEqual(bobVersions, { content: 0, preferences: 0 });
+  assert.equal(aliceVersions.latest_point_id, id);
+  assert.deepEqual(bobVersions, { content: 0, preferences: 0, latest_point_id: 0 });
   await service.call("/v1/settings", { method: "PATCH", body: { ui_language: "zh" } });
   assert.equal((await service.call("/v1/changes")).body.preferences, 1);
   assert.equal((await service.call("/v1/changes", { subject: "bob" })).body.preferences, 0);

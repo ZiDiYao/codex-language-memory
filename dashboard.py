@@ -31,6 +31,7 @@ ASSETS = {
     "learning-instructions.js": ("learning-instructions.js", "text/javascript; charset=utf-8"),
     "record-feed.js": ("record-feed.js", "text/javascript; charset=utf-8"),
     "history-model.js": ("history-model.js", "text/javascript; charset=utf-8"),
+    "history-position.js": ("history-position.js", "text/javascript; charset=utf-8"),
     "scene-model.js": ("scene-model.js", "text/javascript; charset=utf-8"),
     "export-dialog.js": ("export-dialog.js", "text/javascript; charset=utf-8"),
     "export-model.js": ("export-model.js", "text/javascript; charset=utf-8"),

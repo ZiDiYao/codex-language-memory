@@ -63,6 +63,8 @@ test('Node and Python share identities, receipts, revisions, scenes, senses and 
   const saved = await repository.save('interop-capture-node', [point]);
   assert.equal(saved.results[0].status, 'added');
   const id = saved.results[0].id;
+  assert.equal((await repository.versions()).latest_point_id, id);
+  assert.deepEqual(python('versions'), await repository.versions());
   assert.equal(python('save', ['interop-capture-node', [point]]).replayed, true);
   const fromNode = (await repository.get_point(id)).record;
   const fromPython = python('get_point', [id]).record;
@@ -105,6 +107,7 @@ test('Node and Python share identities, receipts, revisions, scenes, senses and 
   python('settings', [{ enabled: false }]);
   assert.equal((await repository.settings()).enabled, false);
   const other = new Repository(pool, { ...principal, subject: 'another-learner' });
+  assert.deepEqual(await other.versions(), { content: 0, preferences: 0, latest_point_id: 0 });
   assert.deepEqual((await other.query({})).records, []);
   assert.equal((await other.get_point(id)).status, 'not_found');
 });

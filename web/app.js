@@ -13,6 +13,7 @@ import { PronunciationController } from "./pronunciation.js";
 import { ActivityController, isStudyClick } from "./activity.js";
 import { createActivityView } from "./activity-view.js";
 import { createLearningInstructionsEditor } from "./learning-instructions.js";
+import { HistoryPosition, historyFilterKey } from "./history-position.js";
 
 const $ = (selector) => document.querySelector(selector);
 const pageSize = 20;
@@ -108,15 +109,37 @@ let selectedScene = "";
 let sceneCatalog = [];
 let sceneCatalogVersion = 0;
 let switchingFilters = false;
+let resumingHistory = false;
+let historyResumeRequested = false;
+let historyInteractionVersion = 0;
+let historySaveTimer;
 const historyFeed = new RecordFeed({
   fetchPage: (args) => api("points/query", args),
-  canCommit: ({ preserve, filtersKey }) => !accountPaused && filtersKey === JSON.stringify(filters()) &&
+  canCommit: ({ preserve, filtersKey, restorePlan }) => !accountPaused && filtersKey === JSON.stringify(filters()) &&
+    (!restorePlan || restorePlan.isCurrent()) &&
     !hasDirtyEditors() && !(preserve && historyIsInteracting()),
   onStart: beginHistoryLoad,
   onCommit: renderRecords,
   onError: failHistoryLoad,
   onFinish: finishHistoryLoad,
 });
+const historyPosition = new HistoryPosition({
+  storage: runtime?.historyStorage ?? {
+    read: (args) => api("history/view/read", args),
+    write: (args) => api("history/view/write", args),
+  },
+  getFilters: filters,
+  capture: captureHistoryPosition,
+  restore: restoreHistoryPosition,
+  canUse: () => ready && !accountPaused && !accountDraftBlocked && !runtime?.isPaused?.() && !$("main").hidden,
+});
+const historyLifecycle = {
+  save: () => historyPosition.save(),
+  flush: () => historyPosition.flush(),
+  resume: () => requestHistoryResume(),
+  invalidate: () => historyPosition.invalidate(),
+};
+globalThis.sayroveHistoryLifecycle = historyLifecycle;
 
 function t(key, params = {}) {
   return messages[locale][key].replace(/\{(\w+)\}/g, (_, name) => {
@@ -252,6 +275,7 @@ async function loadScenes(preserve = false) {
   return true;
 }
 async function changeFilter(name, value) {
+  cancelHistoryRestore();
   if (switchingFilters) {
     languagePicker.setValue(selectedLanguage);
     scenePicker.setValue(selectedScene);
@@ -311,8 +335,11 @@ if (runtime) {
   runtime.activity = activity;
   runtime.stopPronunciation = () => pronunciation.stop();
   runtime.invalidateLearningInstructions = () => learningInstructions.invalidate();
+  runtime.saveHistoryPosition = historyLifecycle.save;
+  runtime.invalidateHistoryPosition = historyLifecycle.invalidate;
   runtime.beforeAccountChange = async () => {
     if (!(await flushEditors()) || !(await flushLearningInstructions())) return false;
+    await historyPosition.flush();
     pronunciation.stop();
     activity.invalidate();
     return true;
@@ -558,12 +585,96 @@ function captureHistoryView(reset, preserve) {
     : null;
   return {
     reset, preserve,
+    filtersSnapshot: { ...filters() },
     filtersKey: JSON.stringify(filters()),
     expanded: new Set(preserve
       ? [...document.querySelectorAll(".history-entry[open]")].map((node) => node.dataset.id) : []),
     anchorId: anchor?.dataset.id,
     anchorTop: anchor?.getBoundingClientRect().top,
   };
+}
+function captureHistoryPosition() {
+  const cards = [...document.querySelectorAll("#records > .history-entry")];
+  const anchor = cards.find((node) => node.getBoundingClientRect().bottom > 0);
+  return {
+    anchor_id: anchor ? Number(anchor.dataset.id) : null,
+    anchor_top: anchor?.getBoundingClientRect().top ?? 0,
+    scroll_y: Math.max(0, window.scrollY),
+    loaded_count: Math.max(1, Math.min(2000, displayed.size)),
+    expanded_ids: cards.filter((node) => node.open).map((node) => Number(node.dataset.id)).slice(0, 100),
+  };
+}
+async function restoreHistoryPosition(plan) {
+  if (!plan.isCurrent() || hasDirtyEditors() || historyIsInteracting() || document.querySelector("dialog[open]")) return false;
+  if (plan.initial && plan.state) {
+    selectedLanguage = plan.filters.language ?? "";
+    selectedKind = plan.filters.kind ?? "";
+    selectedScene = plan.filters.scene ?? "";
+    selectedStatus = plan.filters.status ?? "";
+    $("#search").value = plan.filters.keyword ?? "";
+    renderSearchClear();
+    renderCatalog(); renderKinds(); renderStatus();
+    await loadScenes();
+    if (!plan.isCurrent()) return false;
+  }
+  const contentChanged = plan.contentVersion !== undefined && plan.contentVersion !== versions.content;
+  if (!plan.initial && contentChanged) {
+    const nextCatalog = await api("languages/list");
+    if (!plan.isCurrent()) return false;
+    catalog = nextCatalog;
+    renderCatalog();
+    if (!(await loadScenes(true)) || !plan.isCurrent()) return false;
+  }
+  const reload = plan.initial || plan.toTop || contentChanged || !displayed.size ||
+    historyFilterKey(historyPosition.activeFilters) !== historyFilterKey(filters());
+  if (reload) {
+    const loaded = await loadRecords(true, false, { restorePlan: plan,
+      amount: plan.toTop ? pageSize : Math.min(2000, Math.max(pageSize, plan.state?.view.loaded_count ?? pageSize)) });
+    if (!loaded || !plan.isCurrent()) return false;
+    if (plan.contentVersion !== undefined) versions.content = plan.contentVersion;
+  }
+  // Notes size themselves on the next frame. Restore after that layout work.
+  for (const editor of editors.values()) if (editor.card.open)
+    editor.card.querySelectorAll("textarea").forEach((input) => editor.resize(input));
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  if (!plan.isCurrent()) return false;
+  if (plan.toTop) window.scrollTo({ top: 0, behavior: "instant" });
+  else if (plan.state) {
+    const node = editors.get(plan.state.view.anchor_id)?.card;
+    if (node) window.scrollBy({ top: node.getBoundingClientRect().top - plan.state.view.anchor_top, behavior: "instant" });
+    else window.scrollTo({ top: plan.state.view.scroll_y, behavior: "instant" });
+  }
+  return true;
+}
+function cancelHistoryRestore() {
+  ++historyInteractionVersion;
+  historyResumeRequested = false;
+  historyPosition.cancelRestore();
+}
+async function requestHistoryResume() {
+  historyResumeRequested = true;
+  if (!ready || accountPaused || runtime?.isPaused?.() || document.visibilityState === "hidden" ||
+      syncing || resumingHistory || historyFeed.loading) return;
+  if (hasDirtyEditors() || historyIsInteracting() || document.querySelector("dialog[open]")) {
+    historyResumeRequested = false;
+    return;
+  }
+  historyResumeRequested = false;
+  resumingHistory = true;
+  const source = sourceRevision;
+  const interaction = historyInteractionVersion;
+  try {
+    const latest = await api("changes/read");
+    if (source !== sourceRevision || interaction !== historyInteractionVersion) return;
+    historyPosition.observe(latest.latest_point_id);
+    await historyPosition.resume({ contentVersion: latest.content });
+  } catch { /* View bookkeeping must not block the library. */ }
+  finally {
+    resumingHistory = false;
+    if (historyResumeRequested) void requestHistoryResume();
+    else void synchronize();
+    requestAnimationFrame(maybeLoadMore);
+  }
 }
 function clearRecords() {
   pronunciation.stop();
@@ -572,7 +683,7 @@ function clearRecords() {
   editors.clear();
   $("#records").replaceChildren();
 }
-function renderRecords(data, { reset, preserve, expanded, anchorId, anchorTop, filtersKey, animateFilterChange }) {
+function renderRecords(data, { reset, preserve, expanded, anchorId, anchorTop, filtersKey, filtersSnapshot, animateFilterChange, restorePlan }) {
   const host = $("#records");
   if (reset) {
     const incoming = new Map(data.records.map((record) => [record.id, record]));
@@ -610,15 +721,17 @@ function renderRecords(data, { reset, preserve, expanded, anchorId, anchorTop, f
     added.push(empty);
   }
   // Explicit desktop filter switches also animate cards reused by both filters.
-  if (!preserve) enterResults(animateFilterChange ? [...host.children] : added);
+  if (!preserve && !restorePlan) enterResults(animateFilterChange ? [...host.children] : added);
   committedFiltersKey = filtersKey;
+  historyPosition.committed(filtersSnapshot);
   updateLoadState(data.has_more ? "scrollMore" : "allLoaded", { count: displayed.size });
   if (anchorId) {
     const restored = [...$("#records").children].find((node) => node.dataset.id === anchorId);
     if (restored) window.scrollBy(0, restored.getBoundingClientRect().top - anchorTop);
   }
 }
-function beginHistoryLoad({ reset, preserve }) {
+function beginHistoryLoad({ reset, preserve, restorePlan }) {
+  if (reset && !preserve && !restorePlan) void historyPosition.save();
   $("#retry-load").hidden = true;
   if (!reset || !$("#records").children.length) updateLoadState("loading");
   $("#records").setAttribute("aria-busy", "true");
@@ -630,25 +743,34 @@ function failHistoryLoad(error) {
 }
 function finishHistoryLoad() {
   $("#records").removeAttribute("aria-busy");
-  if (!historyFeed.failed) requestAnimationFrame(maybeLoadMore);
+  if (!historyFeed.failed) requestAnimationFrame(() => historyResumeRequested ? requestHistoryResume() : maybeLoadMore());
 }
 function maybeLoadMore() {
-  if (ready && !accountPaused && JSON.stringify(filters()) === committedFiltersKey &&
+  if (ready && !accountPaused && !resumingHistory && !historyPosition.restoring && JSON.stringify(filters()) === committedFiltersKey &&
       !historyFeed.loading && !historyFeed.failed && historyFeed.hasMore &&
       $("#load-sentinel").getBoundingClientRect().top < window.innerHeight + 250) {
     loadRecords();
   }
 }
-async function loadRecords(reset = false, preserve = false, { animateFilterChange = false } = {}) {
+async function loadRecords(reset = false, preserve = false, { animateFilterChange = false, restorePlan, amount } = {}) {
   if (!ready || accountPaused) return false;
   if (reset && !preserve && !(await flushEditors())) return false;
   if (preserve && (hasDirtyEditors() || historyIsInteracting())) return false;
-  return historyFeed.load({
+  const previousFeed = { cursor: historyFeed.cursor, hasMore: historyFeed.hasMore, failed: historyFeed.failed };
+  const reading = historyFeed.load({
     reset,
-    amount: preserve ? Math.max(pageSize, displayed.size) : pageSize,
+    amount: amount ?? (preserve ? Math.max(pageSize, displayed.size) : pageSize),
     filters: filters(),
-    view: { ...captureHistoryView(reset, preserve), animateFilterChange },
+    view: { ...captureHistoryView(reset, preserve), animateFilterChange, restorePlan,
+      ...(restorePlan ? { requestCurrent: restorePlan.isCurrent } : {}),
+      ...(restorePlan && !restorePlan.toTop && restorePlan.state ?
+        { expanded: new Set(restorePlan.state.view.expanded_ids.map(String)) } : {}) },
   });
+  const requestVersion = historyFeed.version;
+  const loaded = await reading;
+  if (restorePlan && !loaded && !restorePlan.isCurrent() && requestVersion === historyFeed.version)
+    Object.assign(historyFeed, previousFeed);
+  return loaded;
 }
 async function loadSettings() {
   const revision = settingsRevision;
@@ -700,12 +822,13 @@ function saveSettings(patch) {
   return settingsWrites;
 }
 async function synchronize() {
-  if (!ready || accountPaused || runtime?.isPaused?.() || syncing || historyFeed.loading || document.visibilityState === "hidden")
+  if (!ready || accountPaused || runtime?.isPaused?.() || syncing || resumingHistory || historyPosition.restoring || historyFeed.loading || document.visibilityState === "hidden")
     return;
   syncing = true;
   try {
     refreshEditorLocales();
     const latest = await api("changes/read");
+    historyPosition.observe(latest.latest_point_id);
     if (latest.content !== versions.content) {
       if (hasDirtyEditors() || historyIsInteracting() || switchingFilters) return;
       const latestCatalog = await api("languages/list");
@@ -723,6 +846,7 @@ async function synchronize() {
     showError(error);
   } finally {
     syncing = false;
+    if (historyResumeRequested) void requestHistoryResume();
   }
 }
 async function download(format, selection) {
@@ -803,6 +927,7 @@ document.querySelectorAll("dialog").forEach((dialog) => {
   });
 });
 $("#search-form").addEventListener("submit", (event) => {
+  cancelHistoryRestore();
   event.preventDefault();
   clearTimeout(searchTimer);
   loadRecords(true);
@@ -813,6 +938,7 @@ function renderSearchClear() {
 }
 renderSearchClear();
 $("#search").addEventListener("input", () => {
+  cancelHistoryRestore();
   renderSearchClear();
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => loadRecords(true), 250);
@@ -833,12 +959,25 @@ new IntersectionObserver(maybeLoadMore, { rootMargin: "250px" }).observe(
 window.addEventListener("beforeunload", (event) => {
   if (hasDirtyEditors()) { event.preventDefault(); event.returnValue = ""; }
 });
-window.addEventListener("pagehide", () => { pronunciation.stop(); activity.invalidate(); });
+window.addEventListener("pagehide", () => { void historyPosition.save(); pronunciation.stop(); activity.invalidate(); });
+window.addEventListener("blur", () => { void historyPosition.save(); });
+window.addEventListener("scroll", () => {
+  clearTimeout(historySaveTimer);
+  historySaveTimer = setTimeout(() => void historyPosition.save(), 180);
+}, { passive: true });
+for (const type of ["wheel", "touchstart", "pointerdown"]) window.addEventListener(type, cancelHistoryRestore, { passive: true });
+window.addEventListener("keydown", (event) => {
+  if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(event.key) &&
+      !event.target.closest?.("input, textarea, [contenteditable], [role=combobox]")) cancelHistoryRestore();
+});
 document.querySelectorAll("#settings-open, #settings-fields, #ui-language, #language, #scene, #status, #search-clear, #retry-load")
   .forEach((node) => { node.dataset.studyActivity = ""; });
 document.addEventListener("click", (event) => { if (isStudyClick(event)) activity.record("button"); }, { capture: true });
-document.addEventListener("visibilitychange", synchronize);
-window.addEventListener("focus", synchronize);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") void historyPosition.save();
+  else void requestHistoryResume();
+});
+window.addEventListener("focus", requestHistoryResume);
 setInterval(synchronize, 3000);
 applyLocale();
 async function initialize(promptSettings = true) {
@@ -853,9 +992,13 @@ async function initialize(promptSettings = true) {
     applyLocale();
     localePicker.button.disabled = false;
     ready = true;
+    historyPosition.observe(versions.latest_point_id);
     if (activityRoot?.closest("dialog")?.open) void activity.open();
+    const interaction = historyInteractionVersion;
     await loadScenes();
-    await loadRecords(true);
+    if (interaction !== historyInteractionVersion ||
+        !(await historyPosition.resume({ initial: true, contentVersion: versions.content }))) await loadRecords(true);
+    requestAnimationFrame(maybeLoadMore);
     if (promptSettings && !settings.first_language) openDialog($("#settings-dialog"));
   } catch (error) {
     showError(error);
@@ -877,6 +1020,7 @@ if (localAccount) {
         ++sceneCatalogVersion;
         ++historyFeed.version;
         historyFeed.loading = false;
+        historyPosition.invalidate();
         clearTimeout(searchTimer);
         pronunciation.stop();
         activity.invalidate();
@@ -892,6 +1036,7 @@ if (localAccount) {
       }
     },
     async onSourceChange(status, previous) {
+      historyPosition.invalidate();
       activity.invalidate();
       learningInstructions.invalidate();
       exportDialog.invalidate();

@@ -370,8 +370,18 @@ class Store:
 
     def versions(self):
         with self.connection() as db:
-            row = db.execute("SELECT content, preferences FROM change_versions WHERE id = 1").fetchone()
+            row = db.execute("SELECT content, preferences, COALESCE((SELECT MAX(id) FROM knowledge), 0) AS latest_point_id "
+                             "FROM change_versions WHERE id = 1").fetchone()
             return dict(row)
+
+    def history_view_read(self, filter_key=None):
+        from ui_state import HistoryViewState
+        return HistoryViewState(self.path.with_suffix(self.path.suffix + ".ui-state.json")).read("local", filter_key)
+
+    def history_view_write(self, filter_key, filters, view):
+        from ui_state import HistoryViewState
+        return HistoryViewState(self.path.with_suffix(self.path.suffix + ".ui-state.json")).write(
+            "local", {"filter_key": filter_key, "filters": filters, "view": view})
 
     def export_receipt(self, scope, receipt=None):
         with self.connection(write=receipt is not None) as db:

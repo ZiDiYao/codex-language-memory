@@ -103,9 +103,14 @@ export class Repository {
   }
 
   async versions() {
-    return this.transaction(false, async (_, tenant) => ({
-      content: tenant.content_version, preferences: tenant.preferences_version,
-    }));
+    return this.transaction(false, async (client, tenant) => {
+      // The existing (tenant_id, id) unique index supports a bounded reverse
+      // lookup. Only this UI changes read needs the current record watermark.
+      const latest = (await client.query('SELECT id FROM lm_points WHERE tenant_id=$1 ORDER BY id DESC LIMIT 1',
+        [this.tenantId])).rows[0];
+      return { content: tenant.content_version, preferences: tenant.preferences_version,
+        latest_point_id: latest?.id ?? 0 };
+    });
   }
 
   async point(client, id) {

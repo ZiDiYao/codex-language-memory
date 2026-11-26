@@ -148,6 +148,23 @@ dbtest('worker includes only current-tenant English teaching preferences for Eng
   assert.equal(Object.hasOwn((await claimEnrichment(pool)).prompt, 'english_learning_instructions'), false);
 });
 
+dbtest('background enrichment changes content versions without advancing the latest record watermark', async t => {
+  const { repo, pool } = await fixture(t);
+  const captured = await repo.observe('watermark-pending-observation', [raw]);
+  const id = captured.results[0].id;
+  const before = await repo.versions();
+  assert.equal(before.latest_point_id, id);
+  const merged = await repo.observe('watermark-pending-repeat', [raw]);
+  assert.equal(merged.results[0].status, 'merged');
+  assert.equal((await repo.versions()).latest_point_id, id);
+  const job = await claimEnrichment(pool);
+  assert.equal((await repo.versions()).latest_point_id, id);
+  await completeEnrichment(job, content);
+  const completed = await repo.versions();
+  assert.ok(completed.content > before.content);
+  assert.equal(completed.latest_point_id, id);
+});
+
 dbtest('background completion adds content and scenes without a new encounter or review', async t => {
   const { repo, pool, save } = await fixture(t); const id = (await save()).results[0].id;
   let prompt;
