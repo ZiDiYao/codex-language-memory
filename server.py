@@ -152,10 +152,15 @@ def create_server(store: Store) -> FastMCP:
         old request automatically. Pending enrichment is not a finished note.
         Automatic captures are silent: do not announce the tool or append saved,
         pending or error notices. Explain record outcomes only when explicitly asked.
-        For a simple question with current answer-language and teaching preferences
-        already resolved, a neutral brief definition may precede submitting.
-        Tailor the explanation only after receiving fresh supplemental guidance.
-        Otherwise resolve _context before expanding the English explanation.
+        For ordinary learning, first give useful teaching: the meaning and a
+        usable pattern/example, or a correction and its key reason. Do not call
+        immediately after a one-line gloss or an opening sentence. Submit at a
+        natural break or after a short answer, without recording narration.
+        Use current requests and confirmed same-account preferences initially;
+        missing supplemental guidance alone must not delay useful teaching.
+        Apply fresh _context to the remaining explanation. Never infer a first
+        language; resolve context first only if a missing explanation preference
+        genuinely prevents a useful answer.
         """
         if capture_binding is None or capture_binding["mode"] != "cloud" or not hasattr(store, "capture_with_context"):
             return {"status": "failed", "error": "single_call_unavailable"}
