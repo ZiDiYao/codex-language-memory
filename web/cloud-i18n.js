@@ -158,7 +158,7 @@ export function applyCloudMessages(appName = "Sayrove") {
   const name = typeof appName === "string" && appName.trim() ? appName.trim() : "Sayrove";
   for (const [locale, copy] of Object.entries(cloudMessages)) {
     Object.assign(messages[locale], copy, {
-      appTitle: locale === "zh" && name === "Sayrove" ? "拾语" : name,
+      appTitle: name,
       authenticationRequired: copy.cloudSessionExpired,
       accountChanged: copy.cloudAccountChanged,
     });

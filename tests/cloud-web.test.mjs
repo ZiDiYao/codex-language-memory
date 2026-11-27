@@ -229,8 +229,7 @@ test("public configuration validates API destinations and cloud copy stays neutr
   assert.equal(detectCloudLocale(["zh-CN", "en"]), "zh");
   assert.equal(detectCloudLocale(["de-DE", "fr-CA"]), "fr");
   applyCloudMessages("Sayrove");
-  assert.equal(messages.zh.appTitle, "拾语");
-  assert.equal(messages.en.appTitle, "Sayrove");
+  for (const value of Object.values(messages)) assert.equal(value.appTitle, "Sayrove");
   assert.doesNotMatch(JSON.stringify(messages), /codex/i);
   const keys = Object.keys(messages.en).sort();
   for (const locale of Object.keys(messages)) assert.deepEqual(Object.keys(messages[locale]).sort(), keys);
