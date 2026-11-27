@@ -1,4 +1,4 @@
-# Sayrove · 拾语
+# Sayrove 
 
 Sayrove is a personal language-learning library for everyday words, expressions,
 grammar and corrections. The public Web entry is
